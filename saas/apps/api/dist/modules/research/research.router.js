@@ -1,0 +1,15 @@
+import { Router } from 'express';
+import { authenticate } from '../auth/auth.middleware';
+import { ResearchController } from './research.controller';
+import { ResearchRepository } from './research.repository';
+import { ResearchService } from './research.service';
+const repository = new ResearchRepository();
+const service = new ResearchService(repository);
+const controller = new ResearchController(service);
+export const researchRouter = Router();
+researchRouter.use(authenticate);
+researchRouter.post('/research/submissions', controller.createSubmission);
+researchRouter.post('/research/submissions/:id/answers', controller.addAnswer);
+researchRouter.post('/research/submissions/:id/complete', controller.completeSubmission);
+researchRouter.get('/research/submissions', controller.listSubmissions);
+researchRouter.get('/research/submissions/:id', controller.getSubmissionById);

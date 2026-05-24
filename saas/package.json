@@ -1,0 +1,14 @@
+{
+  "name": "consultoria-saas",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @consultoria/web run dev",
+    "dev:api": "npm --workspace @consultoria/api run dev",
+    "dev:all": "npm run dev:api && npm run dev:web",
+    "build": "npm run build --workspace @consultoria/domain && npm run build --workspace @consultoria/api && npm run build --workspace @consultoria/web"
+  }
+}

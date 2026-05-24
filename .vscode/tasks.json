@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev: backend",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev:all"],
+      "options": {
+        "cwd": "${workspaceFolder}\\saas"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev",
+        "clear": true
+      }
+    },
+    {
+      "label": "dev: flutter (chrome)",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["run", "-d", "chrome"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev",
+        "clear": true
+      }
+    },
+    {
+      "label": "dev: backend + flutter",
+      "dependsOrder": "parallel",
+      "dependsOn": ["dev: backend", "dev: flutter (chrome)"],
+      "problemMatcher": []
+    }
+  ]
+}

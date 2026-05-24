@@ -1,0 +1,50 @@
+import 'dart:convert';
+
+class User {
+  const User({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.role,
+    this.companyId,
+    this.company,
+  });
+
+  final String id;
+  final String name;
+  final String email;
+  final String role;
+  final String? companyId;
+  final Map<String, dynamic>? company;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'role': role,
+      'companyId': companyId,
+      'company': company,
+    };
+  }
+
+  factory User.fromMap(Map<String, dynamic> map) {
+    return User(
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      email: map['email']?.toString() ?? '',
+      role: map['role']?.toString() ?? 'EMPLOYEE',
+      companyId: map['companyId']?.toString(),
+      company: map['company'] is Map<String, dynamic>
+          ? map['company'] as Map<String, dynamic>
+          : map['company'] is Map
+              ? Map<String, dynamic>.from(map['company'] as Map)
+              : null,
+    );
+  }
+
+  String toJson() => jsonEncode(toMap());
+
+  factory User.fromJson(String source) =>
+      User.fromMap(jsonDecode(source) as Map<String, dynamic>);
+}
