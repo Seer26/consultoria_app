@@ -65,7 +65,7 @@ npm.cmd run build
 
 Os testes de API utilizaram bancos temporários. Os resultados, a classificação
 das dependências e os hashes de preservação do banco operacional ficam
-registrados em `RELATORIO_SPRINT_3_10_HARDENING_REPOSITORIO.md`.
+consolidados em `RELATORIO_SPRINT_3_11_INTEGRACAO_BASELINE.md`.
 
 O audit inicial encontrou 6 vulnerabilidades: 2 baixas, 3 moderadas e 1 alta.
 Atualizações compatíveis no lockfile corrigiram todas elas sem `--force`,
