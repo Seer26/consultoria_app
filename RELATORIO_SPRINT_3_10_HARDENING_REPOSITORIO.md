@@ -290,6 +290,7 @@ Commits temáticos já criados:
 23feb6e chore: normalize repository line endings
 fc29f7b chore: remediate dependency vulnerabilities
 c7d8606 docs: record dependency hardening evidence
+f094fa9 docs: record clean clone evidence
 ```
 
 O commit documental contém somente os documentos consolidados e a remoção
@@ -298,15 +299,25 @@ em commit documental adicional, sem alteração funcional.
 
 ## 17. Publicação da branch
 
-A branch ainda não foi publicada nesta etapa do relatório. O push ocorrerá
-somente após commit documental, clone limpo, auditoria final do diff e
-confirmação de worktree limpo.
+A branch foi publicada com sucesso após commit documental, clone limpo,
+auditoria final do diff e confirmação de worktree limpo:
 
-Não haverá force push, tag, PR, merge ou alteração de `main`.
+```powershell
+git push -u origin codex/dependency-hardening
+```
+
+- commit inicialmente publicado: `f094fa9`;
+- upstream: `origin/codex/dependency-hardening`;
+- branch remota criada sem force push;
+- nenhum PR, tag, merge ou deploy;
+- `main` permaneceu em `e039fc6`.
+
+Este registro de publicação será enviado em um commit documental posterior,
+sem alteração funcional.
 
 ## 18. Estado final do Git
 
-Estado esperado ao encerrar:
+Estado confirmado ao encerrar:
 
 - branch `codex/dependency-hardening`;
 - upstream `origin/codex/dependency-hardening`;
@@ -370,7 +381,7 @@ Estado esperado ao encerrar:
 - [x] nenhum secret ou artefato proibido incluído;
 - [x] commits temáticos locais;
 - [x] clone limpo final;
-- [ ] branch publicada sem force push;
+- [x] branch publicada sem force push;
 - [x] `main` não alterada;
 - [x] tag não publicada;
 - [x] nenhum deploy, PostgreSQL ou pagamento.

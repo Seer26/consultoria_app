@@ -26,8 +26,10 @@ fc29f7b chore: remediate dependency vulnerabilities
 Não fazer merge, excluir a branch ou publicar a tag sem revisão humana.
 
 A baseline permanece publicada no repositório privado. A branch
-`codex/dependency-hardening` contém somente padronização Git, atualização
-compatível do lockfile e documentação. Nenhum pull request foi aberto.
+`codex/dependency-hardening` também foi publicada e rastreia
+`origin/codex/dependency-hardening`. Ela contém somente padronização Git,
+atualização compatível do lockfile e documentação. Nenhum pull request foi
+aberto.
 
 ## Arquivos proibidos verificados
 
