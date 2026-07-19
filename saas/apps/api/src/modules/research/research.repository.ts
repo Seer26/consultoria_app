@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 import type {
   AuthenticatedUserRecord,
   CompanyRecord,
@@ -63,26 +63,26 @@ interface SubmissionListRow extends SubmissionRow {
   answers_count: number;
 }
 
-function parseStringArray(value: string | null): string[] {
+function parseStringArray(value: string | unknown[] | null): string[] {
   if (!value) {
     return [];
   }
 
   try {
-    const parsed = JSON.parse(value);
+    const parsed = Array.isArray(value) ? value : JSON.parse(value);
     return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
   } catch {
     return [];
   }
 }
 
-function parsePillarScores(value: string | null): ResearchPillarScore[] {
+function parsePillarScores(value: string | unknown[] | null): ResearchPillarScore[] {
   if (!value) {
     return [];
   }
 
   try {
-    const parsed = JSON.parse(value);
+    const parsed = Array.isArray(value) ? value : JSON.parse(value);
     if (!Array.isArray(parsed)) {
       return [];
     }
@@ -173,28 +173,30 @@ function mapAnswer(row: AnswerRow): ResearchAnswerRecord {
 }
 
 export class ResearchRepository {
-  findUserById(id: string): AuthenticatedUserRecord | null {
-    const row = database.prepare(`
+  async findUserById(id: string): Promise<AuthenticatedUserRecord | null> {
+    const row = await dataSource.one<UserRow>(`
       SELECT id, name, email, role, company_id, status
       FROM users
       WHERE id = ?
-    `).get(id) as UserRow | undefined;
+    `, [id]);
 
     return row ? mapUser(row) : null;
   }
 
-  findCompanyById(id: string): CompanyRecord | null {
-    const row = database.prepare(`
+  async findCompanyById(id: string): Promise<CompanyRecord | null> {
+    const row = await dataSource.one<CompanyRow>(`
       SELECT id, name, slug, status
       FROM companies
       WHERE id = ?
-    `).get(id) as CompanyRow | undefined;
+    `, [id]);
 
     return row ? mapCompany(row) : null;
   }
 
-  createSubmission(input: ResearchSubmissionRecord): ResearchSubmissionRecord {
-    database.prepare(`
+  async createSubmission(
+    input: ResearchSubmissionRecord,
+  ): Promise<ResearchSubmissionRecord> {
+    await dataSource.execute(`
       INSERT INTO diagnosis_submissions (
         id,
         company_id,
@@ -235,7 +237,7 @@ export class ResearchRepository {
         @updatedAt,
         @completedAt
       )
-    `).run({
+    `, {
       ...input,
       criticalPoints: stringifyStringArray(input.criticalPoints),
       opportunities: stringifyStringArray(input.opportunities),
@@ -247,8 +249,8 @@ export class ResearchRepository {
     return input;
   }
 
-  findSubmissionById(id: string): ResearchSubmissionRecord | null {
-    const row = database.prepare(`
+  async findSubmissionById(id: string): Promise<ResearchSubmissionRecord | null> {
+    const row = await dataSource.one<SubmissionRow>(`
       SELECT
         id,
         company_id,
@@ -270,13 +272,15 @@ export class ResearchRepository {
         completed_at
       FROM diagnosis_submissions
       WHERE id = ? AND submission_type = 'RESEARCH'
-    `).get(id) as SubmissionRow | undefined;
+    `, [id]);
 
     return row ? mapSubmission(row) : null;
   }
 
-  updateSubmission(input: ResearchSubmissionRecord): ResearchSubmissionRecord {
-    database.prepare(`
+  async updateSubmission(
+    input: ResearchSubmissionRecord,
+  ): Promise<ResearchSubmissionRecord> {
+    await dataSource.execute(`
       UPDATE diagnosis_submissions
       SET respondent_role = @respondentRole,
           department = @department,
@@ -291,7 +295,7 @@ export class ResearchRepository {
           updated_at = @updatedAt,
           completed_at = @completedAt
       WHERE id = @id
-    `).run({
+    `, {
       ...input,
       criticalPoints: stringifyStringArray(input.criticalPoints),
       opportunities: stringifyStringArray(input.opportunities),
@@ -303,8 +307,8 @@ export class ResearchRepository {
     return input;
   }
 
-  createAnswer(input: ResearchAnswerRecord): ResearchAnswerRecord {
-    database.prepare(`
+  async createAnswer(input: ResearchAnswerRecord): Promise<ResearchAnswerRecord> {
+    await dataSource.execute(`
       INSERT INTO diagnosis_answers (
         id,
         submission_id,
@@ -327,36 +331,38 @@ export class ResearchRepository {
         @score,
         @createdAt
       )
-    `).run(input);
+    `, input);
 
     return input;
   }
 
-  listAnswersBySubmissionId(submissionId: string): ResearchAnswerRecord[] {
-    const rows = database.prepare(`
+  async listAnswersBySubmissionId(
+    submissionId: string,
+  ): Promise<ResearchAnswerRecord[]> {
+    const rows = await dataSource.many<AnswerRow>(`
       SELECT id, submission_id, question_id, question, answer, pillar, value, score, created_at
       FROM diagnosis_answers
       WHERE submission_id = ?
       ORDER BY created_at ASC
-    `).all(submissionId) as AnswerRow[];
+    `, [submissionId]);
 
     return rows.map(mapAnswer);
   }
 
-  getNextAnswerSequence(submissionId: string): number {
-    const row = database.prepare(`
+  async getNextAnswerSequence(submissionId: string): Promise<number> {
+    const row = await dataSource.one<{ total: number }>(`
       SELECT COUNT(*) as total
       FROM diagnosis_answers
       WHERE submission_id = ?
-    `).get(submissionId) as { total: number } | undefined;
+    `, [submissionId]);
 
     return Number(row?.total ?? 0) + 1;
   }
 
-  listResearchSubmissions(input: {
+  async listResearchSubmissions(input: {
     companyId?: string;
     userId?: string;
-  }): ResearchListItem[] {
+  }): Promise<ResearchListItem[]> {
     const conditions = [`ds.submission_type = 'RESEARCH'`];
     const params: Array<string> = [];
 
@@ -370,7 +376,7 @@ export class ResearchRepository {
       params.push(input.userId);
     }
 
-    const rows = database.prepare(`
+    const rows = await dataSource.many<SubmissionListRow>(`
       SELECT
         ds.id,
         ds.company_id,
@@ -420,7 +426,7 @@ export class ResearchRepository {
         c.name,
         u.name
       ORDER BY ds.created_at DESC
-    `).all(...params) as SubmissionListRow[];
+    `, params);
 
     return rows.map((row) => {
       const mapped = mapSubmission(row);

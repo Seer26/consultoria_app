@@ -10,7 +10,11 @@ import { legalService } from '../legal/legal.service';
 const repository = new AuthRepository();
 const service = new AuthService(repository);
 
-export function authenticate(request: Request, response: Response, next: NextFunction): void {
+export async function authenticate(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+): Promise<void> {
   const authorizationHeader = request.headers.authorization;
 
   if (!authorizationHeader?.startsWith('Bearer ')) {
@@ -23,12 +27,12 @@ export function authenticate(request: Request, response: Response, next: NextFun
   let payload: ReturnType<AuthService['verifyToken']> | undefined;
   try {
     payload = service.verifyToken(token);
-    request.auth = service.resolveAuthenticatedUser(payload);
+    request.auth = await service.resolveAuthenticatedUser(payload);
     const legalRoute = request.originalUrl.startsWith('/legal/');
-    if (!legalRoute && legalService.hasPending(request.auth)) {
+    if (!legalRoute && await legalService.hasPending(request.auth)) {
       response.status(428).json({
         error: 'LEGAL_ACCEPTANCE_REQUIRED',
-        pending: legalService.listPending(request.auth),
+        pending: await legalService.listPending(request.auth),
       });
       return;
     }

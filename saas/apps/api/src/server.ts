@@ -1,11 +1,18 @@
 import { app } from './app';
 import { env } from './config/env';
+import { dataSource } from './database/data-source';
 import { initDatabase } from './database/init';
-import { database } from './db/database';
+import { runPostgresMigrations } from './database/migrate';
 import { logger } from './shared/logger';
 
 async function start() {
-  await initDatabase();
+  if (env.databaseProvider === 'postgres') {
+    if (env.runMigrationsOnStartup) {
+      await runPostgresMigrations();
+    }
+  } else {
+    await initDatabase();
+  }
 
   const server = app.listen(env.port, () => {
     logger.info('API running', {
@@ -28,9 +35,9 @@ async function start() {
     }, 10_000);
     forceExit.unref();
 
-    server.close((error) => {
+    server.close(async (error) => {
       try {
-        database.close();
+        await dataSource.close();
       } catch (closeError) {
         logger.error('Failed to close database during shutdown', {
           error: closeError,

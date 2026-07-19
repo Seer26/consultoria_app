@@ -74,7 +74,7 @@ export class DiagnosisService {
     return defaultQuestionnaire;
   }
 
-  submit(input: DiagnosisSubmissionInput): DiagnosisResult {
+  async submit(input: DiagnosisSubmissionInput): Promise<DiagnosisResult> {
     const company: Company = {
       id: `company-${Date.now()}`,
       ...input.company,
@@ -159,18 +159,23 @@ export class DiagnosisService {
       submissionId,
     );
 
-    this.repository.saveCompany(company);
-    this.repository.saveSubmission({
+    await this.repository.saveCompany(company);
+    await this.repository.saveSubmission({
       submissionId,
       companyId: company.id,
       questionnaireId: defaultQuestionnaire.id,
     });
-    this.repository.saveAnswers(
+    await this.repository.saveAnswers(
       submissionId,
       input.answers,
-      Object.fromEntries(defaultQuestionnaire.questions.map((question) => [question.id, question.pillar])),
+      Object.fromEntries(
+        defaultQuestionnaire.questions.map((question) => [
+          question.id,
+          question.pillar,
+        ]),
+      ),
     );
-    this.repository.saveActionPlan(submissionId, actionPlan);
+    await this.repository.saveActionPlan(submissionId, actionPlan);
 
     return {
       submissionId,

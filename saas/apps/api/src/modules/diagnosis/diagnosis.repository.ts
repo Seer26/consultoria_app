@@ -1,6 +1,6 @@
 import type { ActionTask, Company, DiagnosisAnswerInput } from '@consultoria/domain';
 
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 
 function slugify(value: string): string {
   return value
@@ -13,9 +13,9 @@ function slugify(value: string): string {
 }
 
 export class DiagnosisRepository {
-  saveCompany(company: Company): void {
+  async saveCompany(company: Company): Promise<void> {
     const timestamp = new Date().toISOString();
-    const statement = database.prepare(`
+    await dataSource.execute(`
       INSERT INTO companies (id, name, slug, status, sector, size, created_at, updated_at)
       VALUES (@id, @name, @slug, @status, @sector, @size, @createdAt, @updatedAt)
       ON CONFLICT(id) DO UPDATE SET
@@ -24,9 +24,7 @@ export class DiagnosisRepository {
         sector = excluded.sector,
         size = excluded.size,
         updated_at = excluded.updated_at
-    `);
-
-    statement.run({
+    `, {
       id: company.id,
       name: company.name,
       slug: slugify(company.name) || company.id,
@@ -38,9 +36,13 @@ export class DiagnosisRepository {
     });
   }
 
-  saveSubmission(input: { submissionId: string; companyId: string; questionnaireId: string }): void {
+  async saveSubmission(input: {
+    submissionId: string;
+    companyId: string;
+    questionnaireId: string;
+  }): Promise<void> {
     const timestamp = new Date().toISOString();
-    const statement = database.prepare(`
+    await dataSource.execute(`
       INSERT INTO diagnosis_submissions (
         id,
         company_id,
@@ -61,9 +63,7 @@ export class DiagnosisRepository {
         @updatedAt,
         @completedAt
       )
-    `);
-
-    statement.run({
+    `, {
       id: input.submissionId,
       companyId: input.companyId,
       questionnaireId: input.questionnaireId,
@@ -75,36 +75,24 @@ export class DiagnosisRepository {
     });
   }
 
-  saveAnswers(submissionId: string, answers: DiagnosisAnswerInput[], questionPillars: Record<string, string>): void {
+  async saveAnswers(
+    submissionId: string,
+    answers: DiagnosisAnswerInput[],
+    questionPillars: Record<string, string>,
+  ): Promise<void> {
     const timestamp = new Date().toISOString();
-    const statement = database.prepare(`
-      INSERT INTO diagnosis_answers (
-        id,
-        submission_id,
-        question_id,
-        question,
-        answer,
-        pillar,
-        value,
-        score,
-        created_at
-      )
-      VALUES (
-        @id,
-        @submissionId,
-        @questionId,
-        @question,
-        @answer,
-        @pillar,
-        @value,
-        @score,
-        @createdAt
-      )
-    `);
-
-    const insertMany = database.transaction((items: DiagnosisAnswerInput[]) => {
-      for (const item of items) {
-        statement.run({
+    await dataSource.transaction(async () => {
+      for (const item of answers) {
+        await dataSource.execute(`
+          INSERT INTO diagnosis_answers (
+            id, submission_id, question_id, question, answer, pillar,
+            value, score, created_at
+          )
+          VALUES (
+            @id, @submissionId, @questionId, @question, @answer, @pillar,
+            @value, @score, @createdAt
+          )
+        `, {
           id: `${submissionId}-${item.questionId}`,
           submissionId,
           questionId: item.questionId,
@@ -117,25 +105,23 @@ export class DiagnosisRepository {
         });
       }
     });
-
-    insertMany(answers);
   }
 
-  saveActionPlan(submissionId: string, tasks: ActionTask[]): void {
-    const statement = database.prepare(`
-      INSERT INTO action_tasks (id, submission_id, pillar, title, description, priority, status)
-      VALUES (@id, @submissionId, @pillar, @title, @description, @priority, @status)
-    `);
-
-    const insertMany = database.transaction((items: ActionTask[]) => {
-      for (const item of items) {
-        statement.run({
+  async saveActionPlan(submissionId: string, tasks: ActionTask[]): Promise<void> {
+    await dataSource.transaction(async () => {
+      for (const item of tasks) {
+        await dataSource.execute(`
+          INSERT INTO action_tasks (
+            id, submission_id, pillar, title, description, priority, status
+          )
+          VALUES (
+            @id, @submissionId, @pillar, @title, @description, @priority, @status
+          )
+        `, {
           ...item,
           submissionId,
         });
       }
     });
-
-    insertMany(tasks);
   }
 }

@@ -50,20 +50,20 @@ function getCurrentPeriodRange(now = new Date()): { start: string; end: string }
 export class EntitlementsService {
   constructor(private readonly repository: EntitlementsRepository) {}
 
-  ensureDefaultSubscription(companyId: string): CompanyPlanRecord {
-    const existing = this.repository.findCompanyPlan(companyId);
+  async ensureDefaultSubscription(companyId: string): Promise<CompanyPlanRecord> {
+    const existing = await this.repository.findCompanyPlan(companyId);
     if (existing) {
       return existing;
     }
 
-    if (!this.repository.companyExists(companyId)) {
+    if (!await this.repository.companyExists(companyId)) {
       throw new Error('COMPANY_NOT_FOUND');
     }
 
     const period = getCurrentPeriodRange();
-    this.repository.createDefaultSubscription(companyId, period.start, period.end);
+    await this.repository.createDefaultSubscription(companyId, period.start, period.end);
 
-    const created = this.repository.findCompanyPlan(companyId);
+    const created = await this.repository.findCompanyPlan(companyId);
     if (!created) {
       throw new Error('PLAN_NOT_FOUND');
     }
@@ -71,8 +71,8 @@ export class EntitlementsService {
     return created;
   }
 
-  resolveUserCompanyId(userId: string): string {
-    const companyId = this.repository.findUserCompanyId(userId);
+  async resolveUserCompanyId(userId: string): Promise<string> {
+    const companyId = await this.repository.findUserCompanyId(userId);
     if (!companyId) {
       throw new Error('COMPANY_ID_REQUIRED');
     }
@@ -80,8 +80,12 @@ export class EntitlementsService {
     return companyId;
   }
 
-  assertCanUseFeature(companyId: string, feature: PlanFeature, requested = 1): void {
-    const current = this.getFeatureUsage(companyId, feature);
+  async assertCanUseFeature(
+    companyId: string,
+    feature: PlanFeature,
+    requested = 1,
+  ): Promise<void> {
+    const current = await this.getFeatureUsage(companyId, feature);
     if (current.used + requested > current.limit) {
       audit('plan_limit_blocked', {
         companyId,
@@ -99,16 +103,25 @@ export class EntitlementsService {
     }
   }
 
-  recordUsage(companyId: string, feature: PlanFeature, quantity = 1): void {
+  async recordUsage(
+    companyId: string,
+    feature: PlanFeature,
+    quantity = 1,
+  ): Promise<void> {
     if (quantity <= 0) {
       return;
     }
 
-    this.repository.incrementUsageCounter(companyId, feature, getCurrentUsagePeriod(), quantity);
+    await this.repository.incrementUsageCounter(
+      companyId,
+      feature,
+      getCurrentUsagePeriod(),
+      quantity,
+    );
   }
 
-  listPlans() {
-    return this.repository.listPlans().map((plan) => ({
+  async listPlans() {
+    return (await this.repository.listPlans()).map((plan) => ({
       id: plan.id,
       slug: plan.slug,
       name: plan.name,
@@ -126,31 +139,30 @@ export class EntitlementsService {
     }));
   }
 
-  changeCompanyPlan(input: {
+  async changeCompanyPlan(input: {
     companyId: string;
     planSlug: string;
     actorUserId: string;
     reason?: string | null;
-  }): CurrentPlanSnapshot {
+  }): Promise<CurrentPlanSnapshot> {
     const { companyId } = input;
     const normalizedSlug = input.planSlug.trim().toLowerCase();
     if (!normalizedSlug) {
       throw new Error('INVALID_PLAN_SLUG');
     }
 
-    const current = this.ensureDefaultSubscription(companyId);
+    const current = await this.ensureDefaultSubscription(companyId);
 
-    const plan = this.repository.findPlanBySlug(normalizedSlug);
+    const plan = await this.repository.findPlanBySlug(normalizedSlug);
     if (!plan || plan.status !== 'ACTIVE') {
       throw new Error('PLAN_NOT_FOUND');
     }
 
     const updatedAt = new Date().toISOString();
-    this.repository.updateCompanyPlan(companyId, plan.id, updatedAt);
-    this.repository.createSubscriptionEvent({
+    await this.repository.changeCompanyPlanWithEvent({
       companyId,
       previousPlanId: current.plan.id,
-      newPlanId: plan.id,
+      planId: plan.id,
       actorUserId: input.actorUserId,
       origin: 'MANUAL_ADMIN',
       reason: input.reason?.trim() || null,
@@ -168,13 +180,13 @@ export class EntitlementsService {
     return this.getCurrentPlan(companyId);
   }
 
-  listCompanyPlanEvents(companyId: string) {
-    this.ensureDefaultSubscription(companyId);
+  async listCompanyPlanEvents(companyId: string) {
+    await this.ensureDefaultSubscription(companyId);
     return this.repository.listSubscriptionEvents(companyId);
   }
 
-  getCurrentPlan(companyId: string): CurrentPlanSnapshot {
-    const companyPlan = this.ensureDefaultSubscription(companyId);
+  async getCurrentPlan(companyId: string): Promise<CurrentPlanSnapshot> {
+    const companyPlan = await this.ensureDefaultSubscription(companyId);
 
     return {
       companyId,
@@ -200,22 +212,28 @@ export class EntitlementsService {
         updatedAt: companyPlan.subscription.updatedAt,
       },
       usage: {
-        users: this.getFeatureUsage(companyId, 'USER_SEATS'),
-        researchSubmissionsMonthly: this.getFeatureUsage(companyId, 'RESEARCH_SUBMISSIONS_MONTHLY'),
-        reportPdfsMonthly: this.getFeatureUsage(companyId, 'REPORT_PDFS_MONTHLY'),
-        activeActionTasks: this.getFeatureUsage(companyId, 'ACTION_TASKS_ACTIVE'),
-        aiQuestionsMonthly: this.getFeatureUsage(companyId, 'AI_QUESTIONS_MONTHLY'),
+        users: await this.getFeatureUsage(companyId, 'USER_SEATS'),
+        researchSubmissionsMonthly: await this.getFeatureUsage(
+          companyId,
+          'RESEARCH_SUBMISSIONS_MONTHLY',
+        ),
+        reportPdfsMonthly: await this.getFeatureUsage(companyId, 'REPORT_PDFS_MONTHLY'),
+        activeActionTasks: await this.getFeatureUsage(companyId, 'ACTION_TASKS_ACTIVE'),
+        aiQuestionsMonthly: await this.getFeatureUsage(companyId, 'AI_QUESTIONS_MONTHLY'),
       },
     };
   }
 
-  private getFeatureUsage(companyId: string, feature: PlanFeature): EntitlementUsageItem {
-    const companyPlan = this.ensureDefaultSubscription(companyId);
+  private async getFeatureUsage(
+    companyId: string,
+    feature: PlanFeature,
+  ): Promise<EntitlementUsageItem> {
+    const companyPlan = await this.ensureDefaultSubscription(companyId);
     const period = getCurrentUsagePeriod();
     const periodRange = getCurrentPeriodRange();
 
     const limit = this.getFeatureLimit(companyPlan, feature);
-    const used = (() => {
+    const used = await (async () => {
       switch (feature) {
         case 'USER_SEATS':
           return this.repository.countActiveUsers(companyId);

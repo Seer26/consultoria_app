@@ -5,25 +5,25 @@ import { DashboardService } from './dashboard.service';
 export class DashboardController {
   constructor(private readonly service: DashboardService) {}
 
-  getAdminDashboard = (request: Request, response: Response): void => {
+  getAdminDashboard = async (request: Request, response: Response): Promise<void> => {
     try {
-      response.json(this.service.getAdminDashboard(request.auth!));
+      response.json(await this.service.getAdminDashboard(request.auth!));
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  getCompanyDashboard = (request: Request, response: Response): void => {
+  getCompanyDashboard = async (request: Request, response: Response): Promise<void> => {
     try {
-      response.json(this.service.getCompanyDashboard(request.auth!));
+      response.json(await this.service.getCompanyDashboard(request.auth!));
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  getEmployeeDashboard = (request: Request, response: Response): void => {
+  getEmployeeDashboard = async (request: Request, response: Response): Promise<void> => {
     try {
-      response.json(this.service.getEmployeeDashboard(request.auth!));
+      response.json(await this.service.getEmployeeDashboard(request.auth!));
     } catch (error) {
       this.handleError(error, response);
     }

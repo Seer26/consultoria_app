@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 import type {
   ActionPlanAssignee,
   ActionPlanCompanyRecord,
@@ -115,9 +115,8 @@ function mapTaskDetails(row: ActionPlanTaskDetailsRow): ActionPlanTaskDetails {
 }
 
 export class ActionPlanRepository {
-  listActiveAssignees(companyId: string): ActionPlanAssignee[] {
-    const rows = database
-      .prepare(
+  async listActiveAssignees(companyId: string): Promise<ActionPlanAssignee[]> {
+    const rows = await dataSource.many<AssigneeRow>(
         `
         SELECT
           u.id,
@@ -154,8 +153,8 @@ export class ActionPlanRepository {
           CASE u.role WHEN 'OWNER' THEN 1 ELSE 2 END,
           u.name ASC
         `,
-      )
-      .all(companyId) as AssigneeRow[];
+      [companyId],
+    );
 
     return rows.map((row) => ({
       id: row.id,
@@ -170,51 +169,47 @@ export class ActionPlanRepository {
     }));
   }
 
-  findUserById(id: string): AuthenticatedActionPlanUser | null {
-    const row = database
-      .prepare(
+  async findUserById(id: string): Promise<AuthenticatedActionPlanUser | null> {
+    const row = await dataSource.one<UserRow>(
         `
         SELECT id, name, email, role, company_id, status
         FROM users
         WHERE id = ?
         `,
-      )
-      .get(id) as UserRow | undefined;
+      [id],
+    );
 
     return row ? mapUser(row) : null;
   }
 
-  findCompanyById(id: string): ActionPlanCompanyRecord | null {
-    const row = database
-      .prepare(
+  async findCompanyById(id: string): Promise<ActionPlanCompanyRecord | null> {
+    const row = await dataSource.one<CompanyRow>(
         `
         SELECT id, name, slug, status
         FROM companies
         WHERE id = ?
         `,
-      )
-      .get(id) as CompanyRow | undefined;
+      [id],
+    );
 
     return row ? mapCompany(row) : null;
   }
 
-  findSubmissionById(id: string): SubmissionRow | null {
-    const row = database
-      .prepare(
+  async findSubmissionById(id: string): Promise<SubmissionRow | null> {
+    const row = await dataSource.one<SubmissionRow>(
         `
         SELECT id, company_id, status
         FROM diagnosis_submissions
         WHERE id = ? AND submission_type = 'RESEARCH'
         `,
-      )
-      .get(id) as SubmissionRow | undefined;
+      [id],
+    );
 
     return row ?? null;
   }
 
-  createTask(input: ActionPlanTaskRecord): ActionPlanTaskRecord {
-    database
-      .prepare(
+  async createTask(input: ActionPlanTaskRecord): Promise<ActionPlanTaskRecord> {
+    await dataSource.execute(
         `
         INSERT INTO action_plan_tasks (
           id,
@@ -249,26 +244,23 @@ export class ActionPlanRepository {
           @completedAt
         )
         `,
-      )
-      .run(input);
+      input,
+    );
 
     return input;
   }
 
-  createTasks(tasks: ActionPlanTaskRecord[]): ActionPlanTaskRecord[] {
-    const insertMany = database.transaction((items: ActionPlanTaskRecord[]) => {
-      for (const item of items) {
-        this.createTask(item);
+  async createTasks(tasks: ActionPlanTaskRecord[]): Promise<ActionPlanTaskRecord[]> {
+    await dataSource.transaction(async () => {
+      for (const item of tasks) {
+        await this.createTask(item);
       }
     });
-
-    insertMany(tasks);
     return tasks;
   }
 
-  findTaskById(id: string): ActionPlanTaskDetails | null {
-    const row = database
-      .prepare(
+  async findTaskById(id: string): Promise<ActionPlanTaskDetails | null> {
+    const row = await dataSource.one<ActionPlanTaskDetailsRow>(
         `
         SELECT
           apt.id,
@@ -293,13 +285,16 @@ export class ActionPlanRepository {
         LEFT JOIN users u ON u.id = apt.responsible_user_id
         WHERE apt.id = ?
         `,
-      )
-      .get(id) as ActionPlanTaskDetailsRow | undefined;
+      [id],
+    );
 
     return row ? mapTaskDetails(row) : null;
   }
 
-  listTasks(filters: { companyId?: string; submissionId?: string }): ActionPlanTaskDetails[] {
+  async listTasks(filters: {
+    companyId?: string;
+    submissionId?: string;
+  }): Promise<ActionPlanTaskDetails[]> {
     const conditions: string[] = [];
     const params: string[] = [];
 
@@ -314,8 +309,7 @@ export class ActionPlanRepository {
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = database
-      .prepare(
+    const rows = await dataSource.many<ActionPlanTaskDetailsRow>(
         `
         SELECT
           apt.id,
@@ -355,15 +349,14 @@ export class ActionPlanRepository {
           COALESCE(apt.due_date, apt.updated_at) ASC,
           apt.created_at DESC
         `,
-      )
-      .all(...params) as ActionPlanTaskDetailsRow[];
+      params,
+    );
 
     return rows.map(mapTaskDetails);
   }
 
-  updateTask(input: ActionPlanTaskRecord): ActionPlanTaskRecord {
-    database
-      .prepare(
+  async updateTask(input: ActionPlanTaskRecord): Promise<ActionPlanTaskRecord> {
+    await dataSource.execute(
         `
         UPDATE action_plan_tasks
         SET company_id = @companyId,
@@ -380,8 +373,8 @@ export class ActionPlanRepository {
             completed_at = @completedAt
         WHERE id = @id
         `,
-      )
-      .run(input);
+      input,
+    );
 
     return input;
   }

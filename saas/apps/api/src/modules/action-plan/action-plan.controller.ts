@@ -11,7 +11,7 @@ export class ActionPlanController {
     return Array.isArray(value) ? value[0] : value;
   }
 
-  listTasks = (request: Request, response: Response): void => {
+  listTasks = async (request: Request, response: Response): Promise<void> => {
     try {
       const companyId = Array.isArray(request.query.companyId)
         ? request.query.companyId[0]
@@ -26,7 +26,7 @@ export class ActionPlanController {
         ? request.query.search[0]
         : request.query.search;
 
-      const result = this.service.listTasks(request.auth!, {
+      const result = await this.service.listTasks(request.auth!, {
         companyId: typeof companyId === 'string' ? companyId : undefined,
         submissionId: typeof submissionId === 'string' ? submissionId : undefined,
         scope:
@@ -41,12 +41,12 @@ export class ActionPlanController {
     }
   };
 
-  listAssignees = (request: Request, response: Response): void => {
+  listAssignees = async (request: Request, response: Response): Promise<void> => {
     try {
       const companyId = Array.isArray(request.query.companyId)
         ? request.query.companyId[0]
         : request.query.companyId;
-      const result = this.service.listAssignees(
+      const result = await this.service.listAssignees(
         request.auth!,
         typeof companyId === 'string' ? companyId : undefined,
       );
@@ -56,27 +56,30 @@ export class ActionPlanController {
     }
   };
 
-  getTaskById = (request: Request, response: Response): void => {
+  getTaskById = async (request: Request, response: Response): Promise<void> => {
     try {
-      const result = this.service.getTaskById(request.auth!, this.getParam(request, 'id'));
+      const result = await this.service.getTaskById(
+        request.auth!,
+        this.getParam(request, 'id'),
+      );
       response.status(200).json(result);
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  createTask = (request: Request, response: Response): void => {
+  createTask = async (request: Request, response: Response): Promise<void> => {
     try {
-      const result = this.service.createTask(request.auth!, request.body ?? {});
+      const result = await this.service.createTask(request.auth!, request.body ?? {});
       response.status(201).json(result);
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  updateTask = (request: Request, response: Response): void => {
+  updateTask = async (request: Request, response: Response): Promise<void> => {
     try {
-      const result = this.service.updateTask(
+      const result = await this.service.updateTask(
         request.auth!,
         this.getParam(request, 'id'),
         request.body ?? {},
@@ -87,9 +90,9 @@ export class ActionPlanController {
     }
   };
 
-  updateTaskStatus = (request: Request, response: Response): void => {
+  updateTaskStatus = async (request: Request, response: Response): Promise<void> => {
     try {
-      const result = this.service.updateTaskStatus(
+      const result = await this.service.updateTaskStatus(
         request.auth!,
         this.getParam(request, 'id'),
         request.body ?? {},

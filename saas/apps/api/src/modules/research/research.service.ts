@@ -93,7 +93,7 @@ export class ResearchService {
     auth: AuthTokenPayload,
     input: CreateResearchSubmissionInput,
   ): Promise<ResearchSubmissionRecord> {
-    const context = this.getAccessContext(auth);
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
     this.ensureRespondent(context);
 
@@ -106,7 +106,7 @@ export class ResearchService {
 
     const companyId = this.resolveCompanyId(context, input.companyId);
     const userId = this.resolveTargetUserId(context, input.userId);
-    const targetUser = this.repository.findUserById(userId);
+    const targetUser = await this.repository.findUserById(userId);
 
     if (!targetUser) {
       throw new Error('USER_NOT_FOUND');
@@ -124,12 +124,12 @@ export class ResearchService {
       throw new Error('USER_COMPANY_MISMATCH');
     }
 
-    const company = this.repository.findCompanyById(companyId);
+    const company = await this.repository.findCompanyById(companyId);
     if (!company) {
       throw new Error('COMPANY_NOT_FOUND');
     }
 
-    this.entitlementsService.assertCanUseFeature(
+    await this.entitlementsService.assertCanUseFeature(
       companyId,
       'RESEARCH_SUBMISSIONS_MONTHLY',
     );
@@ -162,10 +162,10 @@ export class ResearchService {
     submissionId: string,
     input: CreateResearchAnswerInput,
   ): Promise<ResearchAnswerRecord> {
-    const context = this.getAccessContext(auth);
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
     this.ensureRespondent(context);
-    const submission = this.getAuthorizedSubmission(context, submissionId, true);
+    const submission = await this.getAuthorizedSubmission(context, submissionId, true);
 
     const question = input.question?.trim();
     const answer = input.answer?.trim();
@@ -175,11 +175,11 @@ export class ResearchService {
     }
 
     const now = new Date().toISOString();
-    const sequence = this.repository.getNextAnswerSequence(submission.id);
+    const sequence = await this.repository.getNextAnswerSequence(submission.id);
     const normalizedScore =
       typeof input.score === 'number' && Number.isFinite(input.score) ? input.score : null;
 
-    const created = this.repository.createAnswer({
+    const created = await this.repository.createAnswer({
       id: randomUUID(),
       submissionId: submission.id,
       questionId: `research-question-${sequence}`,
@@ -191,7 +191,7 @@ export class ResearchService {
       createdAt: now,
     });
 
-    this.repository.updateSubmission({
+    await this.repository.updateSubmission({
       ...submission,
       updatedAt: now,
     });
@@ -204,11 +204,11 @@ export class ResearchService {
     submissionId: string,
     input: CompleteResearchSubmissionInput,
   ): Promise<ResearchSubmissionDetails> {
-    const context = this.getAccessContext(auth);
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
     this.ensureRespondent(context);
-    const submission = this.getAuthorizedSubmission(context, submissionId, true);
-    const answers = this.repository.listAnswersBySubmissionId(submission.id);
+    const submission = await this.getAuthorizedSubmission(context, submissionId, true);
+    const answers = await this.repository.listAnswersBySubmissionId(submission.id);
 
     if (answers.length === 0) {
       throw new Error('RESEARCH_ANSWERS_REQUIRED');
@@ -216,7 +216,7 @@ export class ResearchService {
 
     const analysis = this.buildInitialResult(submission, answers);
     const now = new Date().toISOString();
-    const updated = this.repository.updateSubmission({
+    const updated = await this.repository.updateSubmission({
       ...submission,
       status: 'COMPLETED',
       overallScore: analysis.overallScore,
@@ -233,8 +233,8 @@ export class ResearchService {
     return this.buildSubmissionDetails(updated, answers);
   }
 
-  listSubmissions(auth: AuthTokenPayload, filters: ResearchListFilters) {
-    const context = this.getAccessContext(auth);
+  async listSubmissions(auth: AuthTokenPayload, filters: ResearchListFilters) {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
 
     if (context.actor.role === 'ADMIN') {
@@ -264,20 +264,23 @@ export class ResearchService {
     });
   }
 
-  getSubmissionById(auth: AuthTokenPayload, submissionId: string): ResearchSubmissionDetails {
-    const context = this.getAccessContext(auth);
+  async getSubmissionById(
+    auth: AuthTokenPayload,
+    submissionId: string,
+  ): Promise<ResearchSubmissionDetails> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
-    const submission = this.getAuthorizedSubmission(context, submissionId, false);
-    const answers = this.repository.listAnswersBySubmissionId(submission.id);
+    const submission = await this.getAuthorizedSubmission(context, submissionId, false);
+    const answers = await this.repository.listAnswersBySubmissionId(submission.id);
 
     return this.buildSubmissionDetails(submission, answers);
   }
 
-  generateActionPlan(auth: AuthTokenPayload, submissionId: string) {
-    const context = this.getAccessContext(auth);
+  async generateActionPlan(auth: AuthTokenPayload, submissionId: string) {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
     this.ensureRespondent(context);
-    const submission = this.getAuthorizedSubmission(context, submissionId, false);
+    const submission = await this.getAuthorizedSubmission(context, submissionId, false);
 
     return this.actionPlanService.generateFromResearch(auth, {
       submissionId: submission.id,
@@ -294,12 +297,12 @@ export class ResearchService {
     });
   }
 
-  private buildSubmissionDetails(
+  private async buildSubmissionDetails(
     submission: ResearchSubmissionRecord,
     answers: ResearchAnswerRecord[],
-  ): ResearchSubmissionDetails {
-    const company = this.repository.findCompanyById(submission.companyId);
-    const user = this.repository.findUserById(submission.userId);
+  ): Promise<ResearchSubmissionDetails> {
+    const company = await this.repository.findCompanyById(submission.companyId);
+    const user = await this.repository.findUserById(submission.userId);
 
     return {
       id: submission.id,
@@ -508,8 +511,10 @@ export class ResearchService {
     return `A empresa apresenta maturidade ${maturity} em seus processos. Os principais pontos de atencao estao em ${critical}. As oportunidades mais evidentes estao em ${opportunities}.`;
   }
 
-  private getAccessContext(auth: AuthTokenPayload): ResearchAccessContext {
-    const actor = this.repository.findUserById(auth.userId);
+  private async getAccessContext(
+    auth: AuthTokenPayload,
+  ): Promise<ResearchAccessContext> {
+    const actor = await this.repository.findUserById(auth.userId);
     if (!actor) {
       throw new Error('USER_NOT_FOUND');
     }
@@ -554,12 +559,12 @@ export class ResearchService {
     return context.actor.id;
   }
 
-  private getAuthorizedSubmission(
+  private async getAuthorizedSubmission(
     context: ResearchAccessContext,
     submissionId: string,
     requireInProgress: boolean,
-  ): ResearchSubmissionRecord {
-    const submission = this.repository.findSubmissionById(submissionId);
+  ): Promise<ResearchSubmissionRecord> {
+    const submission = await this.repository.findSubmissionById(submissionId);
     if (!submission) {
       throw new Error('RESEARCH_SUBMISSION_NOT_FOUND');
     }

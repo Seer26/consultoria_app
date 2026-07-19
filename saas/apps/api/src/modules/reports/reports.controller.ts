@@ -11,18 +11,21 @@ export class ReportsController {
     return Array.isArray(value) ? value[0] : value;
   }
 
-  listResearchReports = (request: Request, response: Response): void => {
+  listResearchReports = async (request: Request, response: Response): Promise<void> => {
     try {
-      const result = this.service.listResearchReports(request.auth!);
+      const result = await this.service.listResearchReports(request.auth!);
       response.status(200).json(result);
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  getExecutiveResearchReport = (request: Request, response: Response): void => {
+  getExecutiveResearchReport = async (
+    request: Request,
+    response: Response,
+  ): Promise<void> => {
     try {
-      const result = this.service.getExecutiveResearchReport(
+      const result = await this.service.getExecutiveResearchReport(
         request.auth!,
         this.getParam(request, 'submissionId'),
       );

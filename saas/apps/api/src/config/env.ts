@@ -61,6 +61,10 @@ const envConfig = {
   databaseUrl: process.env.DATABASE_URL?.trim() || '',
   databasePath: process.env.DATABASE_PATH ?? './data/consultoria.sqlite',
   databaseProvider: process.env.DATABASE_URL?.trim() ? 'postgres' : 'sqlite',
+  runMigrationsOnStartup: parseBoolean(
+    process.env.RUN_MIGRATIONS_ON_STARTUP,
+    false,
+  ),
   sqliteBackupDir: process.env.SQLITE_BACKUP_DIR?.trim() || './backups/sqlite',
   sqliteBackupRetention: parsePositiveInteger(
     'SQLITE_BACKUP_RETENTION',
@@ -173,9 +177,11 @@ export function validateStagingProfile(
     'REQUIRE_AI_IN_READINESS',
     'REQUIRE_LEGAL_ACCEPTANCE',
     'API_REPLICA_COUNT',
-    'SQLITE_VOLUME_ACK',
     'LOG_FORMAT',
   ]);
+  if (config.databaseProvider === 'sqlite') {
+    requireExplicit(rawEnv, ['SQLITE_VOLUME_ACK']);
+  }
   if (
     (rawEnv.ENABLE_EXTERNAL_ALERTS == null ||
       rawEnv.ENABLE_EXTERNAL_ALERTS.trim() === '') &&
@@ -190,26 +196,25 @@ export function validateStagingProfile(
   if (config.nodeEnv !== 'production') {
     throw new Error('STAGING_REQUIRES_NODE_ENV_PRODUCTION');
   }
-  if (config.databaseProvider !== 'sqlite') {
-    throw new Error('STAGING_RUNTIME_MUST_REMAIN_SQLITE');
-  }
-  if (!path.isAbsolute(config.databasePath)) {
-    throw new Error('STAGING_DATABASE_PATH_MUST_BE_ABSOLUTE');
-  }
-  if (!path.isAbsolute(config.sqliteBackupDir)) {
-    throw new Error('STAGING_BACKUP_DIRECTORY_MUST_BE_ABSOLUTE');
-  }
-  if (
-    path.dirname(path.resolve(config.databasePath)) ===
-    path.resolve(config.sqliteBackupDir)
-  ) {
-    throw new Error('STAGING_BACKUP_DIRECTORY_MUST_DIFFER_FROM_DATABASE_DIRECTORY');
-  }
-  if (rawEnv.SQLITE_VOLUME_ACK !== 'single-instance-persistent-volume') {
-    throw new Error('STAGING_SQLITE_PERSISTENT_VOLUME_ACK_REQUIRED');
-  }
-  if (config.apiReplicaCount !== 1) {
-    throw new Error('SQLITE_STAGING_REQUIRES_EXACTLY_ONE_API_REPLICA');
+  if (config.databaseProvider === 'sqlite') {
+    if (!path.isAbsolute(config.databasePath)) {
+      throw new Error('STAGING_DATABASE_PATH_MUST_BE_ABSOLUTE');
+    }
+    if (!path.isAbsolute(config.sqliteBackupDir)) {
+      throw new Error('STAGING_BACKUP_DIRECTORY_MUST_BE_ABSOLUTE');
+    }
+    if (
+      path.dirname(path.resolve(config.databasePath)) ===
+      path.resolve(config.sqliteBackupDir)
+    ) {
+      throw new Error('STAGING_BACKUP_DIRECTORY_MUST_DIFFER_FROM_DATABASE_DIRECTORY');
+    }
+    if (rawEnv.SQLITE_VOLUME_ACK !== 'single-instance-persistent-volume') {
+      throw new Error('STAGING_SQLITE_PERSISTENT_VOLUME_ACK_REQUIRED');
+    }
+    if (config.apiReplicaCount !== 1) {
+      throw new Error('SQLITE_STAGING_REQUIRES_EXACTLY_ONE_API_REPLICA');
+    }
   }
   if (rawEnv.ENABLE_DEMO_SEED?.trim().toLowerCase() !== 'false') {
     throw new Error('STAGING_DEMO_SEED_MUST_BE_FALSE');
@@ -276,16 +281,15 @@ export function validateLocalOperationalProfile(
   if (rawEnv.ENABLE_DEMO_SEED?.trim().toLowerCase() !== 'false') {
     throw new Error('LOCAL_OPERATIONAL_PROFILE_REQUIRES_DEMO_SEED_FALSE');
   }
-  if (config.databaseProvider !== 'sqlite') {
-    throw new Error('LOCAL_OPERATIONAL_PROFILE_REQUIRES_SQLITE');
-  }
-  if (!rawEnv.DATABASE_PATH?.trim() || !path.isAbsolute(config.databasePath)) {
-    throw new Error('LOCAL_OPERATIONAL_DATABASE_PATH_MUST_BE_EXPLICIT_AND_ABSOLUTE');
-  }
+  if (config.databaseProvider === 'sqlite') {
+    if (!rawEnv.DATABASE_PATH?.trim() || !path.isAbsolute(config.databasePath)) {
+      throw new Error('LOCAL_OPERATIONAL_DATABASE_PATH_MUST_BE_EXPLICIT_AND_ABSOLUTE');
+    }
 
-  const databaseFilename = path.basename(config.databasePath).toLowerCase();
-  if (/(demo|e2e|test|staging)/.test(databaseFilename)) {
-    throw new Error('LOCAL_OPERATIONAL_DATABASE_PATH_REJECTED');
+    const databaseFilename = path.basename(config.databasePath).toLowerCase();
+    if (/(demo|e2e|test|staging)/.test(databaseFilename)) {
+      throw new Error('LOCAL_OPERATIONAL_DATABASE_PATH_REJECTED');
+    }
   }
 }
 

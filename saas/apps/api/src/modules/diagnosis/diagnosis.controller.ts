@@ -9,8 +9,8 @@ export class DiagnosisController {
     response.json(this.service.getQuestionnaire());
   };
 
-  submit = (request: Request, response: Response): void => {
-    const result = this.service.submit(request.body);
+  submit = async (request: Request, response: Response): Promise<void> => {
+    const result = await this.service.submit(request.body);
     response.status(201).json(result);
   };
 }

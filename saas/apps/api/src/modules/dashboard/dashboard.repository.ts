@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 import type {
   DashboardCompanyScoreItem,
   DashboardCompanySummary,
@@ -130,20 +130,24 @@ function parsePillarScores(value: string | null): DashboardPillarScore[] {
 
 function mapMetrics(row: MetricsRow | undefined): DashboardMetrics {
   return {
-    companiesTotal: row?.companiesTotal ?? undefined,
-    usersTotal: row?.usersTotal ?? undefined,
-    researchTotal: row?.researchTotal ?? 0,
-    completedResearchTotal: row?.completedResearchTotal ?? 0,
-    averageScore: roundScore(row?.averageScore),
-    openTasks: row?.openTasks ?? 0,
-    inProgressTasks: row?.inProgressTasks ?? undefined,
-    overdueTasks: row?.overdueTasks ?? 0,
-    criticalOverdueTasks: row?.criticalOverdueTasks ?? 0,
-    dueSoonTasks: row?.dueSoonTasks ?? 0,
-    doneTasks: row?.doneTasks ?? 0,
-    assignedTasksTotal: row?.assignedTasksTotal ?? undefined,
-    usersCompanyTotal: row?.usersCompanyTotal ?? undefined,
-    myResearchTotal: row?.myResearchTotal ?? undefined,
+    companiesTotal: row?.companiesTotal == null ? undefined : Number(row.companiesTotal),
+    usersTotal: row?.usersTotal == null ? undefined : Number(row.usersTotal),
+    researchTotal: Number(row?.researchTotal ?? 0),
+    completedResearchTotal: Number(row?.completedResearchTotal ?? 0),
+    averageScore: roundScore(row?.averageScore == null ? null : Number(row.averageScore)),
+    openTasks: Number(row?.openTasks ?? 0),
+    inProgressTasks:
+      row?.inProgressTasks == null ? undefined : Number(row.inProgressTasks),
+    overdueTasks: Number(row?.overdueTasks ?? 0),
+    criticalOverdueTasks: Number(row?.criticalOverdueTasks ?? 0),
+    dueSoonTasks: Number(row?.dueSoonTasks ?? 0),
+    doneTasks: Number(row?.doneTasks ?? 0),
+    assignedTasksTotal:
+      row?.assignedTasksTotal == null ? undefined : Number(row.assignedTasksTotal),
+    usersCompanyTotal:
+      row?.usersCompanyTotal == null ? undefined : Number(row.usersCompanyTotal),
+    myResearchTotal:
+      row?.myResearchTotal == null ? undefined : Number(row.myResearchTotal),
   };
 }
 
@@ -201,37 +205,34 @@ function mapTask(row: TaskRow): DashboardTaskItem {
 }
 
 export class DashboardRepository {
-  findUserById(userId: string): UserRow | null {
-    const row = database
-      .prepare(
+  async findUserById(userId: string): Promise<UserRow | null> {
+    const row = await dataSource.one<UserRow>(
         `
         SELECT id, role, company_id, status
         FROM users
         WHERE id = ?
         `,
-      )
-      .get(userId) as UserRow | undefined;
+      [userId],
+    );
 
     return row ?? null;
   }
 
-  findCompanyById(companyId: string): CompanyRow | null {
-    const row = database
-      .prepare(
+  async findCompanyById(companyId: string): Promise<CompanyRow | null> {
+    const row = await dataSource.one<CompanyRow>(
         `
         SELECT id, name
         FROM companies
         WHERE id = ?
         `,
-      )
-      .get(companyId) as CompanyRow | undefined;
+      [companyId],
+    );
 
     return row ?? null;
   }
 
-  getAdminMetrics(): DashboardMetrics {
-    const row = database
-      .prepare(
+  async getAdminMetrics(): Promise<DashboardMetrics> {
+    const row = await dataSource.one<MetricsRow>(
         `
         SELECT
           (SELECT COUNT(*) FROM companies) AS companiesTotal,
@@ -282,15 +283,13 @@ export class DashboardRepository {
             WHERE status = 'DONE'
           ) AS doneTasks
         `,
-      )
-      .get() as MetricsRow | undefined;
+    );
 
     return mapMetrics(row);
   }
 
-  getCompanyMetrics(companyId: string): DashboardMetrics {
-    const row = database
-      .prepare(
+  async getCompanyMetrics(companyId: string): Promise<DashboardMetrics> {
+    const row = await dataSource.one<MetricsRow>(
         `
         SELECT
           (
@@ -363,15 +362,17 @@ export class DashboardRepository {
               AND status = 'DONE'
           ) AS doneTasks
         `,
-      )
-      .get({ companyId }) as MetricsRow | undefined;
+      { companyId },
+    );
 
     return mapMetrics(row);
   }
 
-  getEmployeeMetrics(companyId: string, userId: string): DashboardMetrics {
-    const row = database
-      .prepare(
+  async getEmployeeMetrics(
+    companyId: string,
+    userId: string,
+  ): Promise<DashboardMetrics> {
+    const row = await dataSource.one<MetricsRow>(
         `
         SELECT
           (
@@ -450,17 +451,17 @@ export class DashboardRepository {
               AND overall_score IS NOT NULL
           ) AS averageScore
         `,
-      )
-      .get({ companyId, userId }) as MetricsRow | undefined;
+      { companyId, userId },
+    );
 
     return mapMetrics(row);
   }
 
-  listRecentResearch(filters: {
+  async listRecentResearch(filters: {
     companyId?: string;
     userId?: string;
     limit: number;
-  }): DashboardResearchItem[] {
+  }): Promise<DashboardResearchItem[]> {
     const conditions = [`ds.submission_type = 'RESEARCH'`];
     const params: Array<string | number> = [];
 
@@ -476,8 +477,7 @@ export class DashboardRepository {
 
     params.push(filters.limit);
 
-    const rows = database
-      .prepare(
+    const rows = await dataSource.many<ResearchRow>(
         `
         SELECT
           ds.id,
@@ -501,18 +501,17 @@ export class DashboardRepository {
         ORDER BY COALESCE(ds.completed_at, ds.created_at) DESC
         LIMIT ?
         `,
-      )
-      .all(...params) as ResearchRow[];
+      params,
+    );
 
     return rows.map(mapResearch);
   }
 
-  getLatestCompletedResearchByCompany(companyId: string): {
+  async getLatestCompletedResearchByCompany(companyId: string): Promise<{
     submission: DashboardResearchItem | null;
     pillarScores: DashboardPillarScore[];
-  } {
-    const row = database
-      .prepare(
+  }> {
+    const row = await dataSource.one<ResearchRow>(
         `
         SELECT
           ds.id,
@@ -538,8 +537,8 @@ export class DashboardRepository {
         ORDER BY COALESCE(ds.completed_at, ds.created_at) DESC
         LIMIT 1
         `,
-      )
-      .get(companyId) as ResearchRow | undefined;
+      [companyId],
+    );
 
     if (!row) {
       return { submission: null, pillarScores: [] };
@@ -551,12 +550,11 @@ export class DashboardRepository {
     };
   }
 
-  getLatestResearchByUser(userId: string): {
+  async getLatestResearchByUser(userId: string): Promise<{
     submission: DashboardResearchItem | null;
     pillarScores: DashboardPillarScore[];
-  } {
-    const row = database
-      .prepare(
+  }> {
+    const row = await dataSource.one<ResearchRow>(
         `
         SELECT
           ds.id,
@@ -581,8 +579,8 @@ export class DashboardRepository {
         ORDER BY COALESCE(ds.completed_at, ds.created_at) DESC
         LIMIT 1
         `,
-      )
-      .get(userId) as ResearchRow | undefined;
+      [userId],
+    );
 
     if (!row) {
       return { submission: null, pillarScores: [] };
@@ -594,12 +592,11 @@ export class DashboardRepository {
     };
   }
 
-  listRecentInsights(companyId: string, limit: number): {
+  async listRecentInsights(companyId: string, limit: number): Promise<{
     criticalPoints: string[];
     opportunities: string[];
-  } {
-    const rows = database
-      .prepare(
+  }> {
+    const rows = await dataSource.many<ResearchRow>(
         `
         SELECT
           ds.id,
@@ -625,8 +622,8 @@ export class DashboardRepository {
         ORDER BY COALESCE(ds.completed_at, ds.created_at) DESC
         LIMIT 3
         `,
-      )
-      .all(companyId) as ResearchRow[];
+      [companyId],
+    );
 
     const criticalPoints = new Set<string>();
     const opportunities = new Set<string>();
@@ -651,12 +648,12 @@ export class DashboardRepository {
     };
   }
 
-  listRecentTasks(filters: {
+  async listRecentTasks(filters: {
     companyId?: string;
     responsibleUserId?: string;
     limit: number;
     onlyOpen?: boolean;
-  }): DashboardTaskItem[] {
+  }): Promise<DashboardTaskItem[]> {
     const conditions: string[] = [];
     const params: Array<string | number> = [];
 
@@ -677,8 +674,7 @@ export class DashboardRepository {
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     params.push(filters.limit);
 
-    const rows = database
-      .prepare(
+    const rows = await dataSource.many<TaskRow>(
         `
         SELECT
           apt.id,
@@ -702,17 +698,17 @@ export class DashboardRepository {
         ORDER BY apt.created_at DESC
         LIMIT ?
         `,
-      )
-      .all(...params) as TaskRow[];
+      params,
+    );
 
     return rows.map(mapTask);
   }
 
-  listUpcomingTasks(filters: {
+  async listUpcomingTasks(filters: {
     companyId?: string;
     responsibleUserId?: string;
     limit: number;
-  }): DashboardTaskItem[] {
+  }): Promise<DashboardTaskItem[]> {
     const conditions = [`apt.status NOT IN ('DONE', 'CANCELED')`];
     const params: Array<string | number> = [];
 
@@ -728,8 +724,7 @@ export class DashboardRepository {
 
     params.push(filters.limit);
 
-    const rows = database
-      .prepare(
+    const rows = await dataSource.many<TaskRow>(
         `
         SELECT
           apt.id,
@@ -756,15 +751,14 @@ export class DashboardRepository {
           apt.created_at DESC
         LIMIT ?
         `,
-      )
-      .all(...params) as TaskRow[];
+      params,
+    );
 
     return rows.map(mapTask);
   }
 
-  listLowestScoreCompanies(limit: number): DashboardCompanyScoreItem[] {
-    const rows = database
-      .prepare(
+  async listLowestScoreCompanies(limit: number): Promise<DashboardCompanyScoreItem[]> {
+    const rows = await dataSource.many<CompanyScoreRow>(
         `
         SELECT
           c.id AS company_id,
@@ -786,8 +780,8 @@ export class DashboardRepository {
         ORDER BY AVG(ds.overall_score) ASC, c.name ASC
         LIMIT ?
         `,
-      )
-      .all(limit) as CompanyScoreRow[];
+      [limit],
+    );
 
     return rows.map((row) => ({
       companyId: row.company_id,
@@ -798,13 +792,13 @@ export class DashboardRepository {
     }));
   }
 
-  getCompanySummary(companyId: string): DashboardCompanySummary | null {
-    const company = this.findCompanyById(companyId);
+  async getCompanySummary(companyId: string): Promise<DashboardCompanySummary | null> {
+    const company = await this.findCompanyById(companyId);
     if (!company) {
       return null;
     }
 
-    const metrics = this.getCompanyMetrics(companyId);
+    const metrics = await this.getCompanyMetrics(companyId);
     return {
       id: company.id,
       name: company.name,

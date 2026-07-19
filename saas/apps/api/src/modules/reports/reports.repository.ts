@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 
 interface UserRow {
   id: string;
@@ -55,24 +55,23 @@ interface TaskRow {
 }
 
 export class ReportsRepository {
-  findUserById(userId: string): UserRow | null {
-    const row = database
-      .prepare(
+  async findUserById(userId: string): Promise<UserRow | null> {
+    const row = await dataSource.one<UserRow>(
         `
         SELECT id, role, company_id, status
         FROM users
         WHERE id = ?
         `,
-      )
-      .get(userId) as UserRow | undefined;
+      [userId],
+    );
 
     return row ?? null;
   }
 
-  listCompletedResearchReports(filters: {
+  async listCompletedResearchReports(filters: {
     companyId?: string;
     userId?: string;
-  }): ReportSummaryRow[] {
+  }): Promise<ReportSummaryRow[]> {
     const conditions = [`ds.submission_type = 'RESEARCH'`, `ds.status = 'COMPLETED'`];
     const params: string[] = [];
 
@@ -86,8 +85,7 @@ export class ReportsRepository {
       params.push(filters.userId);
     }
 
-    return database
-      .prepare(
+    return dataSource.many<ReportSummaryRow>(
         `
         SELECT
           ds.id AS submission_id,
@@ -112,13 +110,14 @@ export class ReportsRepository {
         WHERE ${conditions.join(' AND ')}
         ORDER BY COALESCE(ds.completed_at, ds.created_at) DESC
         `,
-      )
-      .all(...params) as ReportSummaryRow[];
+      params,
+    );
   }
 
-  findExecutiveReportBySubmissionId(submissionId: string): ExecutiveReportRow | null {
-    const row = database
-      .prepare(
+  async findExecutiveReportBySubmissionId(
+    submissionId: string,
+  ): Promise<ExecutiveReportRow | null> {
+    const row = await dataSource.one<ExecutiveReportRow>(
         `
         SELECT
           ds.id AS submission_id,
@@ -147,15 +146,14 @@ export class ReportsRepository {
           AND ds.submission_type = 'RESEARCH'
         LIMIT 1
         `,
-      )
-      .get(submissionId) as ExecutiveReportRow | undefined;
+      [submissionId],
+    );
 
     return row ?? null;
   }
 
-  listTasksBySubmissionId(submissionId: string): TaskRow[] {
-    return database
-      .prepare(
+  async listTasksBySubmissionId(submissionId: string): Promise<TaskRow[]> {
+    return dataSource.many<TaskRow>(
         `
         SELECT
           apt.id,
@@ -186,7 +184,7 @@ export class ReportsRepository {
           END,
           COALESCE(apt.due_date, apt.created_at) ASC
         `,
-      )
-      .all(submissionId) as TaskRow[];
+      [submissionId],
+    );
   }
 }

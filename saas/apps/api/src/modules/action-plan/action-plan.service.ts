@@ -31,12 +31,15 @@ export class ActionPlanService {
     ),
   ) {}
 
-  listTasks(auth: AuthTokenPayload, filters: ActionPlanListFilters): ActionPlanTaskDetails[] {
-    const context = this.getAccessContext(auth);
+  async listTasks(
+    auth: AuthTokenPayload,
+    filters: ActionPlanListFilters,
+  ): Promise<ActionPlanTaskDetails[]> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
 
     if (context.actor.role === 'ADMIN') {
-      return this.applyListFilters(auth, filters, this.repository.listTasks({
+      return this.applyListFilters(auth, filters, await this.repository.listTasks({
         companyId: filters.companyId?.trim() || undefined,
         submissionId: filters.submissionId?.trim() || undefined,
       }));
@@ -47,23 +50,29 @@ export class ActionPlanService {
       throw new Error('FORBIDDEN');
     }
 
-    return this.applyListFilters(auth, filters, this.repository.listTasks({
+    return this.applyListFilters(auth, filters, await this.repository.listTasks({
       companyId,
       submissionId: filters.submissionId?.trim() || undefined,
     }));
   }
 
-  listAssignees(auth: AuthTokenPayload, requestedCompanyId?: string): ActionPlanAssignee[] {
-    const context = this.getAccessContext(auth);
+  async listAssignees(
+    auth: AuthTokenPayload,
+    requestedCompanyId?: string,
+  ): Promise<ActionPlanAssignee[]> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
-    const companyId = this.resolveCompanyId(context, requestedCompanyId);
+    const companyId = await this.resolveCompanyId(context, requestedCompanyId);
     return this.repository.listActiveAssignees(companyId);
   }
 
-  getTaskById(auth: AuthTokenPayload, taskId: string): ActionPlanTaskDetails {
-    const context = this.getAccessContext(auth);
+  async getTaskById(
+    auth: AuthTokenPayload,
+    taskId: string,
+  ): Promise<ActionPlanTaskDetails> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
-    const task = this.repository.findTaskById(taskId);
+    const task = await this.repository.findTaskById(taskId);
 
     if (!task) {
       throw new Error('ACTION_PLAN_TASK_NOT_FOUND');
@@ -73,11 +82,14 @@ export class ActionPlanService {
     return this.decorateTask(task);
   }
 
-  createTask(auth: AuthTokenPayload, input: CreateActionPlanTaskInput): ActionPlanTaskDetails {
-    const context = this.getAccessContext(auth);
+  async createTask(
+    auth: AuthTokenPayload,
+    input: CreateActionPlanTaskInput,
+  ): Promise<ActionPlanTaskDetails> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
 
-    const companyId = this.resolveCompanyId(context, input.companyId);
+    const companyId = await this.resolveCompanyId(context, input.companyId);
     const title = input.title?.trim();
     if (!title) {
       throw new Error('ACTION_PLAN_TITLE_REQUIRED');
@@ -86,16 +98,25 @@ export class ActionPlanService {
     const priority = this.validatePriority(input.priority ?? 'MEDIUM');
     const status = this.validateStatus(input.status ?? 'TODO');
     const dueDate = this.validateDate(input.dueDate);
-    const responsibleUserId = this.validateResponsibleUser(companyId, input.responsibleUserId);
+    const responsibleUserId = await this.validateResponsibleUser(
+      companyId,
+      input.responsibleUserId,
+    );
     const source = this.validateSource(input.source ?? 'MANUAL');
-    const submissionId = this.validateSubmission(companyId, input.submissionId ?? null);
+    const submissionId = await this.validateSubmission(
+      companyId,
+      input.submissionId ?? null,
+    );
     const now = new Date().toISOString();
 
     if (this.isActiveTaskStatus(status)) {
-      this.entitlementsService.assertCanUseFeature(companyId, 'ACTION_TASKS_ACTIVE');
+      await this.entitlementsService.assertCanUseFeature(
+        companyId,
+        'ACTION_TASKS_ACTIVE',
+      );
     }
 
-    const created = this.repository.createTask({
+    const created = await this.repository.createTask({
       id: randomUUID(),
       companyId,
       submissionId,
@@ -112,17 +133,17 @@ export class ActionPlanService {
       completedAt: status === 'DONE' ? now : null,
     });
 
-    return this.decorateTask(this.repository.findTaskById(created.id)!);
+    return this.decorateTask((await this.repository.findTaskById(created.id))!);
   }
 
-  updateTask(
+  async updateTask(
     auth: AuthTokenPayload,
     taskId: string,
     input: UpdateActionPlanTaskInput,
-  ): ActionPlanTaskDetails {
-    const context = this.getAccessContext(auth);
+  ): Promise<ActionPlanTaskDetails> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
-    const existing = this.getTaskRecordOrThrow(taskId);
+    const existing = await this.getTaskRecordOrThrow(taskId);
     this.ensureTaskAccess(context, existing.companyId);
 
     const nextTitle = input.title === undefined ? existing.title : input.title.trim();
@@ -134,13 +155,13 @@ export class ActionPlanService {
     const updatedAt = new Date().toISOString();
 
     if (!this.isActiveTaskStatus(existing.status) && this.isActiveTaskStatus(nextStatus)) {
-      this.entitlementsService.assertCanUseFeature(
+      await this.entitlementsService.assertCanUseFeature(
         existing.companyId,
         'ACTION_TASKS_ACTIVE',
       );
     }
 
-    this.repository.updateTask({
+    await this.repository.updateTask({
       ...existing,
       title: nextTitle,
       description: input.description === undefined ? existing.description : input.description.trim(),
@@ -151,45 +172,48 @@ export class ActionPlanService {
       responsibleUserId:
         input.responsibleUserId === undefined
           ? existing.responsibleUserId
-          : this.validateResponsibleUser(existing.companyId, input.responsibleUserId),
+          : await this.validateResponsibleUser(
+              existing.companyId,
+              input.responsibleUserId,
+            ),
       updatedAt,
       completedAt: this.resolveCompletedAt(existing.completedAt, nextStatus, updatedAt),
     });
 
-    return this.decorateTask(this.repository.findTaskById(taskId)!);
+    return this.decorateTask((await this.repository.findTaskById(taskId))!);
   }
 
-  updateTaskStatus(
+  async updateTaskStatus(
     auth: AuthTokenPayload,
     taskId: string,
     input: UpdateActionPlanTaskStatusInput,
-  ): ActionPlanTaskDetails {
-    const context = this.getAccessContext(auth);
+  ): Promise<ActionPlanTaskDetails> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
-    const existing = this.getTaskRecordOrThrow(taskId);
+    const existing = await this.getTaskRecordOrThrow(taskId);
     this.ensureTaskAccess(context, existing.companyId);
 
     const status = this.validateStatus(input.status);
     const updatedAt = new Date().toISOString();
 
     if (!this.isActiveTaskStatus(existing.status) && this.isActiveTaskStatus(status)) {
-      this.entitlementsService.assertCanUseFeature(
+      await this.entitlementsService.assertCanUseFeature(
         existing.companyId,
         'ACTION_TASKS_ACTIVE',
       );
     }
 
-    this.repository.updateTask({
+    await this.repository.updateTask({
       ...existing,
       status,
       updatedAt,
       completedAt: this.resolveCompletedAt(existing.completedAt, status, updatedAt),
     });
 
-    return this.decorateTask(this.repository.findTaskById(taskId)!);
+    return this.decorateTask((await this.repository.findTaskById(taskId))!);
   }
 
-  generateFromResearch(
+  async generateFromResearch(
     auth: AuthTokenPayload,
     input: {
       submissionId: string;
@@ -201,8 +225,8 @@ export class ActionPlanService {
       nextSteps: string[];
       pillarScores: Array<{ pillar: string; score: number }>;
     },
-  ): ActionPlanGenerationResult {
-    const context = this.getAccessContext(auth);
+  ): Promise<ActionPlanGenerationResult> {
+    const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
     this.ensureTaskAccess(context, input.companyId);
 
@@ -210,7 +234,9 @@ export class ActionPlanService {
       throw new Error('ACTION_PLAN_SUBMISSION_NOT_COMPLETED');
     }
 
-    const existing = this.repository.listTasks({ submissionId: input.submissionId });
+    const existing = await this.repository.listTasks({
+      submissionId: input.submissionId,
+    });
     if (existing.length > 0) {
       return {
         submissionId: input.submissionId,
@@ -223,22 +249,22 @@ export class ActionPlanService {
 
     const generated = this.buildTasksFromResearch(input);
     if (generated.length > 0) {
-      this.entitlementsService.assertCanUseFeature(
+      await this.entitlementsService.assertCanUseFeature(
         input.companyId,
         'ACTION_TASKS_ACTIVE',
         generated.length,
       );
     }
 
-    this.repository.createTasks(generated);
+    await this.repository.createTasks(generated);
 
     return {
       submissionId: input.submissionId,
       companyId: input.companyId,
       alreadyGenerated: false,
       createdCount: generated.length,
-      tasks: this.repository
-        .listTasks({ submissionId: input.submissionId })
+      tasks: (await this.repository
+        .listTasks({ submissionId: input.submissionId }))
         .map((task) => this.decorateTask(task)),
     };
   }
@@ -369,8 +395,8 @@ export class ActionPlanService {
     return match?.pillar ?? null;
   }
 
-  private getTaskRecordOrThrow(taskId: string): ActionPlanTaskRecord {
-    const task = this.repository.findTaskById(taskId);
+  private async getTaskRecordOrThrow(taskId: string): Promise<ActionPlanTaskRecord> {
+    const task = await this.repository.findTaskById(taskId);
     if (!task) {
       throw new Error('ACTION_PLAN_TASK_NOT_FOUND');
     }
@@ -419,13 +445,16 @@ export class ActionPlanService {
     return parsed.toISOString();
   }
 
-  private validateResponsibleUser(companyId: string, userId?: string | null): string | null {
+  private async validateResponsibleUser(
+    companyId: string,
+    userId?: string | null,
+  ): Promise<string | null> {
     const normalized = userId?.trim();
     if (!normalized) {
       return null;
     }
 
-    const user = this.repository.findUserById(normalized);
+    const user = await this.repository.findUserById(normalized);
     if (!user) {
       throw new Error('RESPONSIBLE_USER_NOT_FOUND');
     }
@@ -515,12 +544,15 @@ export class ActionPlanService {
     };
   }
 
-  private validateSubmission(companyId: string, submissionId: string | null): string | null {
+  private async validateSubmission(
+    companyId: string,
+    submissionId: string | null,
+  ): Promise<string | null> {
     if (!submissionId) {
       return null;
     }
 
-    const submission = this.repository.findSubmissionById(submissionId);
+    const submission = await this.repository.findSubmissionById(submissionId);
     if (!submission) {
       throw new Error('RESEARCH_SUBMISSION_NOT_FOUND');
     }
@@ -544,14 +576,17 @@ export class ActionPlanService {
     return null;
   }
 
-  private resolveCompanyId(context: ActionPlanAccessContext, companyId?: string): string {
+  private async resolveCompanyId(
+    context: ActionPlanAccessContext,
+    companyId?: string,
+  ): Promise<string> {
     if (context.actor.role === 'ADMIN') {
       const normalized = companyId?.trim();
       if (!normalized) {
         throw new Error('COMPANY_ID_REQUIRED');
       }
 
-      const company = this.repository.findCompanyById(normalized);
+      const company = await this.repository.findCompanyById(normalized);
       if (!company) {
         throw new Error('COMPANY_NOT_FOUND');
       }
@@ -591,8 +626,10 @@ export class ActionPlanService {
     }
   }
 
-  private getAccessContext(auth: AuthTokenPayload): ActionPlanAccessContext {
-    const actor = this.repository.findUserById(auth.userId);
+  private async getAccessContext(
+    auth: AuthTokenPayload,
+  ): Promise<ActionPlanAccessContext> {
+    const actor = await this.repository.findUserById(auth.userId);
     if (!actor) {
       throw new Error('USER_NOT_FOUND');
     }

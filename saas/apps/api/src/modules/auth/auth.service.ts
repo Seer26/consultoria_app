@@ -66,7 +66,7 @@ export class AuthService {
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    const user = this.repository.findUserByEmail(input.email.trim().toLowerCase());
+    const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
 
     if (!user) {
       throw new Error('INVALID_CREDENTIALS');
@@ -83,7 +83,7 @@ export class AuthService {
     }
 
     if (user.companyId) {
-      const company = this.repository.findCompanyById(user.companyId);
+      const company = await this.repository.findCompanyById(user.companyId);
       if (!company) {
         throw new Error('COMPANY_NOT_FOUND');
       }
@@ -100,8 +100,8 @@ export class AuthService {
     return decoded;
   }
 
-  resolveAuthenticatedUser(payload: AuthTokenPayload): AuthTokenPayload {
-    const user = this.repository.findUserById(payload.userId);
+  async resolveAuthenticatedUser(payload: AuthTokenPayload): Promise<AuthTokenPayload> {
+    const user = await this.repository.findUserById(payload.userId);
     if (!user) {
       throw new Error('INVALID_TOKEN');
     }
@@ -124,7 +124,7 @@ export class AuthService {
     if (!user.companyId) {
       throw new Error('INVALID_COMPANY_MEMBERSHIP');
     }
-    const company = this.repository.findCompanyById(user.companyId);
+    const company = await this.repository.findCompanyById(user.companyId);
     if (!company) {
       throw new Error('INVALID_COMPANY_MEMBERSHIP');
     }
@@ -146,7 +146,9 @@ export class AuthService {
     ip?: string;
   }): Promise<{ message: string }> {
     const normalizedEmail = input.email?.trim().toLowerCase() ?? '';
-    const user = normalizedEmail ? this.repository.findUserByEmail(normalizedEmail) : null;
+    const user = normalizedEmail
+      ? await this.repository.findUserByEmail(normalizedEmail)
+      : null;
 
     if (user && user.status === 'ACTIVE') {
       const token = randomBytes(32).toString('base64url');
@@ -154,7 +156,7 @@ export class AuthService {
       const expiresAt = new Date(
         now.getTime() + env.passwordResetTokenTtlMinutes * 60 * 1000,
       );
-      this.repository.createPasswordResetToken({
+      await this.repository.createPasswordResetToken({
         id: randomUUID(),
         userId: user.id,
         tokenHash: hashResetToken(token),
@@ -211,7 +213,9 @@ export class AuthService {
   }): Promise<{ message: string }> {
     const token = input.token?.trim() ?? '';
     const newPassword = input.newPassword ?? '';
-    const record = token ? this.repository.findPasswordResetToken(hashResetToken(token)) : null;
+    const record = token
+      ? await this.repository.findPasswordResetToken(hashResetToken(token))
+      : null;
     const invalid = !record || record.status !== 'PENDING' || record.usedAt !== null ||
       new Date(record.expiresAt).getTime() <= Date.now();
 
@@ -224,7 +228,7 @@ export class AuthService {
       throw new Error('INVALID_OR_EXPIRED_RESET_TOKEN');
     }
 
-    const user = this.repository.findUserById(record.userId);
+    const user = await this.repository.findUserById(record.userId);
     if (!user || user.status !== 'ACTIVE') {
       throw new Error('INVALID_OR_EXPIRED_RESET_TOKEN');
     }
@@ -232,7 +236,7 @@ export class AuthService {
 
     const usedAt = new Date().toISOString();
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    this.repository.resetPassword(user.id, record.id, passwordHash, usedAt);
+    await this.repository.resetPassword(user.id, record.id, passwordHash, usedAt);
     audit('password_reset_completed', {
       requestId: input.requestId,
       userId: user.id,
@@ -244,7 +248,7 @@ export class AuthService {
     return { message: 'Senha redefinida com sucesso. Entre novamente com a nova senha.' };
   }
 
-  private buildAuthResponse(user: AuthUserRecord): AuthResponse {
+  private async buildAuthResponse(user: AuthUserRecord): Promise<AuthResponse> {
     const payload: AuthTokenPayload = {
       userId: user.id,
       role: user.role,
@@ -256,7 +260,7 @@ export class AuthService {
       expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'],
     });
     const company = user.companyId
-      ? this.repository.findCompanyById(user.companyId)
+      ? await this.repository.findCompanyById(user.companyId)
       : null;
 
     return {

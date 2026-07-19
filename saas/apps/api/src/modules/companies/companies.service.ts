@@ -87,12 +87,12 @@ export class CompaniesService {
     ),
   ) {}
 
-  listCompanies() {
-    return this.repository.listCompanies().map(sanitizeCompany);
+  async listCompanies() {
+    return (await this.repository.listCompanies()).map(sanitizeCompany);
   }
 
-  getCompanyById(companyId: string) {
-    const company = this.repository.findCompanyById(companyId);
+  async getCompanyById(companyId: string) {
+    const company = await this.repository.findCompanyById(companyId);
     if (!company) {
       throw new Error('COMPANY_NOT_FOUND');
     }
@@ -100,15 +100,15 @@ export class CompaniesService {
     return sanitizeCompany(company);
   }
 
-  createCompany(input: CreateCompanyInput) {
+  async createCompany(input: CreateCompanyInput) {
     const name = input.name?.trim();
     if (!name) {
       throw new Error('INVALID_COMPANY_NAME');
     }
 
-    const slug = this.buildUniqueCompanySlug(input.slug?.trim() || name);
+    const slug = await this.buildUniqueCompanySlug(input.slug?.trim() || name);
     const now = new Date().toISOString();
-    const company = this.repository.createCompany({
+    const company = await this.repository.createCompany({
       id: randomUUID(),
       name,
       slug,
@@ -146,7 +146,7 @@ export class CompaniesService {
 
     const normalizedEmail = ownerInput.email.trim().toLowerCase();
     assertPasswordPolicy(ownerInput.password, normalizedEmail);
-    const existingUser = this.repository.findUserByEmail(normalizedEmail);
+    const existingUser = await this.repository.findUserByEmail(normalizedEmail);
     if (existingUser) {
       throw new Error('EMAIL_ALREADY_IN_USE');
     }
@@ -155,7 +155,7 @@ export class CompaniesService {
     const company: CompanyRecord = {
       id: randomUUID(),
       name: companyName,
-      slug: this.buildUniqueCompanySlug(companyInput.slug?.trim() || companyName),
+      slug: await this.buildUniqueCompanySlug(companyInput.slug?.trim() || companyName),
       status: 'ACTIVE',
       sector: null,
       size: null,
@@ -177,7 +177,7 @@ export class CompaniesService {
       updatedAt: now,
     };
 
-    const created = this.repository.createCompanyWithOwner({ company, owner });
+    const created = await this.repository.createCompanyWithOwner({ company, owner });
 
     audit('company_created', {
       companyId: created.company.id,
@@ -199,8 +199,8 @@ export class CompaniesService {
     };
   }
 
-  updateCompany(companyId: string, input: UpdateCompanyInput) {
-    const existing = this.repository.findCompanyById(companyId);
+  async updateCompany(companyId: string, input: UpdateCompanyInput) {
+    const existing = await this.repository.findCompanyById(companyId);
     if (!existing) {
       throw new Error('COMPANY_NOT_FOUND');
     }
@@ -210,12 +210,12 @@ export class CompaniesService {
       throw new Error('INVALID_COMPANY_NAME');
     }
 
-    const slug = this.buildUniqueCompanySlug(
+    const slug = await this.buildUniqueCompanySlug(
       input.slug?.trim() || name,
       existing.id,
     );
 
-    const updated = this.repository.updateCompany({
+    const updated = await this.repository.updateCompany({
       id: existing.id,
       name,
       slug,
@@ -235,15 +235,15 @@ export class CompaniesService {
     });
   }
 
-  updateCompanyStatus(companyId: string, input: UpdateCompanyStatusInput) {
-    const existing = this.repository.findCompanyById(companyId);
+  async updateCompanyStatus(companyId: string, input: UpdateCompanyStatusInput) {
+    const existing = await this.repository.findCompanyById(companyId);
     if (!existing) {
       throw new Error('COMPANY_NOT_FOUND');
     }
 
     this.assertValidStatus(input.status);
     const updatedAt = new Date().toISOString();
-    this.repository.updateCompanyStatus(companyId, input.status, updatedAt);
+    await this.repository.updateCompanyStatus(companyId, input.status, updatedAt);
 
     return sanitizeCompany({
       ...existing,
@@ -252,18 +252,18 @@ export class CompaniesService {
     });
   }
 
-  listUsersByCompany(companyId: string) {
-    this.ensureCompanyExists(companyId);
-    return this.repository.listUsersByCompany(companyId).map(sanitizeUser);
+  async listUsersByCompany(companyId: string) {
+    await this.ensureCompanyExists(companyId);
+    return (await this.repository.listUsersByCompany(companyId)).map(sanitizeUser);
   }
 
   async createUser(companyId: string, input: CreateCompanyUserInput) {
-    this.ensureCompanyExists(companyId);
+    await this.ensureCompanyExists(companyId);
     this.validateUserPayload(input, true);
 
     const normalizedEmail = input.email.trim().toLowerCase();
     assertPasswordPolicy(input.password, normalizedEmail);
-    const existingUser = this.repository.findUserByEmail(normalizedEmail);
+    const existingUser = await this.repository.findUserByEmail(normalizedEmail);
     if (existingUser) {
       throw new Error('EMAIL_ALREADY_IN_USE');
     }
@@ -272,7 +272,7 @@ export class CompaniesService {
       throw new Error('INVALID_COMPANY_USER_ROLE');
     }
 
-    this.entitlementsService.assertCanUseFeature(companyId, 'USER_SEATS');
+    await this.entitlementsService.assertCanUseFeature(companyId, 'USER_SEATS');
 
     const now = new Date().toISOString();
     const user = await this.repository.createUser({
@@ -297,7 +297,7 @@ export class CompaniesService {
   }
 
   async updateUser(userId: string, input: UpdateUserInput) {
-    const existing = this.repository.findUserById(userId);
+    const existing = await this.repository.findUserById(userId);
     if (!existing) {
       throw new Error('USER_NOT_FOUND');
     }
@@ -308,7 +308,7 @@ export class CompaniesService {
     }
 
     const normalizedEmail = input.email.trim().toLowerCase();
-    const duplicate = this.repository.findUserByEmail(normalizedEmail);
+    const duplicate = await this.repository.findUserByEmail(normalizedEmail);
     if (duplicate && duplicate.id !== userId) {
       throw new Error('EMAIL_ALREADY_IN_USE');
     }
@@ -323,7 +323,7 @@ export class CompaniesService {
       passwordHash = await bcrypt.hash(input.password, 10);
     }
 
-    const updated = this.repository.updateUser({
+    const updated = await this.repository.updateUser({
       ...existing,
       name: input.name.trim(),
       email: normalizedEmail,
@@ -336,15 +336,15 @@ export class CompaniesService {
     return sanitizeUser(updated);
   }
 
-  updateUserStatus(userId: string, input: UpdateUserStatusInput) {
-    const existing = this.repository.findUserById(userId);
+  async updateUserStatus(userId: string, input: UpdateUserStatusInput) {
+    const existing = await this.repository.findUserById(userId);
     if (!existing) {
       throw new Error('USER_NOT_FOUND');
     }
 
     this.assertValidStatus(input.status);
     const updatedAt = new Date().toISOString();
-    this.repository.updateUserStatus(userId, input.status, updatedAt);
+    await this.repository.updateUserStatus(userId, input.status, updatedAt);
 
     return sanitizeUser({
       ...existing,
@@ -353,7 +353,7 @@ export class CompaniesService {
     });
   }
 
-  getOwnCompanySettings(auth: AuthTokenPayload): CompanySettingsRecord {
+  async getOwnCompanySettings(auth: AuthTokenPayload): Promise<CompanySettingsRecord> {
     if (auth.role !== 'OWNER') {
       throw new Error('FORBIDDEN');
     }
@@ -362,7 +362,7 @@ export class CompaniesService {
       throw new Error('COMPANY_ID_REQUIRED');
     }
 
-    const company = this.repository.findCompanyById(auth.companyId);
+    const company = await this.repository.findCompanyById(auth.companyId);
     if (!company) {
       throw new Error('COMPANY_NOT_FOUND');
     }
@@ -370,10 +370,10 @@ export class CompaniesService {
     return sanitizeCompanySettings(company);
   }
 
-  updateOwnCompanySettings(
+  async updateOwnCompanySettings(
     auth: AuthTokenPayload,
     input: UpdateCompanySettingsInput,
-  ): CompanySettingsRecord {
+  ): Promise<CompanySettingsRecord> {
     if (auth.role !== 'OWNER') {
       throw new Error('FORBIDDEN');
     }
@@ -382,7 +382,7 @@ export class CompaniesService {
       throw new Error('COMPANY_ID_REQUIRED');
     }
 
-    const existing = this.repository.findCompanyById(auth.companyId);
+    const existing = await this.repository.findCompanyById(auth.companyId);
     if (!existing) {
       throw new Error('COMPANY_NOT_FOUND');
     }
@@ -392,7 +392,7 @@ export class CompaniesService {
       throw new Error('INVALID_COMPANY_NAME');
     }
 
-    const updated = this.repository.updateCompanySettings({
+    const updated = await this.repository.updateCompanySettings({
       ...existing,
       name,
       sector: this.cleanOptionalText(input.sector, existing.sector),
@@ -409,14 +409,17 @@ export class CompaniesService {
     return sanitizeCompanySettings(updated);
   }
 
-  private ensureCompanyExists(companyId: string): void {
-    const company = this.repository.findCompanyById(companyId);
+  private async ensureCompanyExists(companyId: string): Promise<void> {
+    const company = await this.repository.findCompanyById(companyId);
     if (!company) {
       throw new Error('COMPANY_NOT_FOUND');
     }
   }
 
-  private buildUniqueCompanySlug(rawValue: string, currentCompanyId?: string): string {
+  private async buildUniqueCompanySlug(
+    rawValue: string,
+    currentCompanyId?: string,
+  ): Promise<string> {
     const base = slugify(rawValue);
     if (!base) {
       throw new Error('INVALID_COMPANY_SLUG');
@@ -426,7 +429,7 @@ export class CompaniesService {
     let suffix = 1;
 
     while (true) {
-      const existing = this.repository.findCompanyBySlug(candidate);
+      const existing = await this.repository.findCompanyBySlug(candidate);
       if (!existing || existing.id === currentCompanyId) {
         return candidate;
       }

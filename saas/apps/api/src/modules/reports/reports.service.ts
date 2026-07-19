@@ -82,8 +82,8 @@ export class ReportsService {
     ),
   ) {}
 
-  listResearchReports(auth: AuthTokenPayload): ReportSummary[] {
-    const actor = this.getActor(auth);
+  async listResearchReports(auth: AuthTokenPayload): Promise<ReportSummary[]> {
+    const actor = await this.getActor(auth);
     this.ensureActive(actor);
 
     const filters =
@@ -95,7 +95,7 @@ export class ReportsService {
             ? { companyId: actor.companyId }
             : {};
 
-    return this.repository.listCompletedResearchReports(filters).map((item) => {
+    return (await this.repository.listCompletedResearchReports(filters)).map((item) => {
       const maturityLevel = this.getMaturityLevel(item.overall_score);
       return {
         submissionId: item.submission_id,
@@ -113,14 +113,14 @@ export class ReportsService {
     });
   }
 
-  getExecutiveResearchReport(
+  async getExecutiveResearchReport(
     auth: AuthTokenPayload,
     submissionId: string,
-  ): ExecutiveReport {
-    const actor = this.getActor(auth);
+  ): Promise<ExecutiveReport> {
+    const actor = await this.getActor(auth);
     this.ensureActive(actor);
 
-    const report = this.repository.findExecutiveReportBySubmissionId(submissionId);
+    const report = await this.repository.findExecutiveReportBySubmissionId(submissionId);
     if (!report) {
       throw new Error('REPORT_NOT_FOUND');
     }
@@ -132,7 +132,7 @@ export class ReportsService {
     }
 
     const maturityLevel = this.getMaturityLevel(report.overall_score);
-    const tasks = this.repository.listTasksBySubmissionId(submissionId).map<ReportTask>((item) => ({
+    const tasks = (await this.repository.listTasksBySubmissionId(submissionId)).map<ReportTask>((item) => ({
       id: item.id,
       title: item.title,
       description: item.description,
@@ -204,8 +204,8 @@ export class ReportsService {
     auth: AuthTokenPayload,
     submissionId: string,
   ): Promise<ExecutiveReportPdfFile> {
-    const report = this.getExecutiveResearchReport(auth, submissionId);
-    this.entitlementsService.assertCanUseFeature(
+    const report = await this.getExecutiveResearchReport(auth, submissionId);
+    await this.entitlementsService.assertCanUseFeature(
       report.company.companyId,
       'REPORT_PDFS_MONTHLY',
     );
@@ -213,7 +213,10 @@ export class ReportsService {
     try {
       const filename = `relatorio-executivo-${slugify(report.company.companyName)}-${slugify(report.research.submissionId)}.pdf`;
       const buffer = await this.buildPdfBuffer(report);
-      this.entitlementsService.recordUsage(report.company.companyId, 'REPORT_PDFS_MONTHLY');
+      await this.entitlementsService.recordUsage(
+        report.company.companyId,
+        'REPORT_PDFS_MONTHLY',
+      );
       audit('report_pdf_generated', {
         companyId: report.company.companyId,
         submissionId,
@@ -266,8 +269,8 @@ export class ReportsService {
     }
   }
 
-  private getActor(auth: AuthTokenPayload): ReportActor {
-    const actor = this.repository.findUserById(auth.userId);
+  private async getActor(auth: AuthTokenPayload): Promise<ReportActor> {
+    const actor = await this.repository.findUserById(auth.userId);
     if (!actor) {
       throw new Error('USER_NOT_FOUND');
     }

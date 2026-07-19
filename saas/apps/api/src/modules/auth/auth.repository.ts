@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 import type { AuthUserRecord, CompanyRecord, PasswordResetTokenRecord, RegisterInput } from './auth.types';
 
 interface UserRow {
@@ -66,43 +66,40 @@ function mapCompany(row: CompanyRow): CompanyRecord {
 }
 
 export class AuthRepository {
-  findUserByEmail(email: string): AuthUserRecord | null {
-    const statement = database.prepare(`
+  async findUserByEmail(email: string): Promise<AuthUserRecord | null> {
+    const row = await dataSource.one<UserRow>(`
       SELECT id, name, email, password_hash, role, company_id, created_at
            , status, updated_at, auth_version
       FROM users
       WHERE email = ?
-    `);
-
-    const row = statement.get(email) as UserRow | undefined;
+    `, [email]);
     return row ? mapUser(row) : null;
   }
 
-  findUserById(id: string): AuthUserRecord | null {
-    const statement = database.prepare(`
+  async findUserById(id: string): Promise<AuthUserRecord | null> {
+    const row = await dataSource.one<UserRow>(`
       SELECT id, name, email, password_hash, role, company_id, created_at
            , status, updated_at, auth_version
       FROM users
       WHERE id = ?
-    `);
-
-    const row = statement.get(id) as UserRow | undefined;
+    `, [id]);
     return row ? mapUser(row) : null;
   }
 
-  findCompanyById(id: string): CompanyRecord | null {
-    const statement = database.prepare(`
+  async findCompanyById(id: string): Promise<CompanyRecord | null> {
+    const row = await dataSource.one<CompanyRow>(`
       SELECT id, name, slug, status, sector, size, created_at, updated_at
       FROM companies
       WHERE id = ?
-    `);
-
-    const row = statement.get(id) as CompanyRow | undefined;
+    `, [id]);
     return row ? mapCompany(row) : null;
   }
 
-  createUser(input: RegisterInput & { id: string; passwordHash: string }): AuthUserRecord {
-    const statement = database.prepare(`
+  async createUser(
+    input: RegisterInput & { id: string; passwordHash: string },
+  ): Promise<AuthUserRecord> {
+    const createdAt = new Date().toISOString();
+    await dataSource.execute(`
       INSERT INTO users (
         id,
         name,
@@ -125,11 +122,7 @@ export class AuthRepository {
         @updatedAt,
         @status
       )
-    `);
-
-    const createdAt = new Date().toISOString();
-
-    statement.run({
+    `, {
       id: input.id,
       name: input.name,
       email: input.email,
@@ -155,15 +148,15 @@ export class AuthRepository {
     };
   }
 
-  createPasswordResetToken(input: PasswordResetTokenRecord): void {
-    const transaction = database.transaction(() => {
-      database.prepare(`
+  async createPasswordResetToken(input: PasswordResetTokenRecord): Promise<void> {
+    await dataSource.transaction(async () => {
+      await dataSource.execute(`
         UPDATE password_reset_tokens
         SET status = 'REVOKED'
         WHERE user_id = ? AND status = 'PENDING'
-      `).run(input.userId);
+      `, [input.userId]);
 
-      database.prepare(`
+      await dataSource.execute(`
         INSERT INTO password_reset_tokens (
           id, user_id, token_hash, created_at, expires_at, used_at,
           requested_ip_hash, request_id, status
@@ -171,18 +164,17 @@ export class AuthRepository {
           @id, @userId, @tokenHash, @createdAt, @expiresAt, @usedAt,
           @requestedIpHash, @requestId, @status
         )
-      `).run(input);
+      `, input);
     });
-    transaction();
   }
 
-  findPasswordResetToken(tokenHash: string): PasswordResetTokenRecord | null {
-    const row = database.prepare(`
+  async findPasswordResetToken(tokenHash: string): Promise<PasswordResetTokenRecord | null> {
+    const row = await dataSource.one<PasswordResetTokenRow>(`
       SELECT id, user_id, token_hash, created_at, expires_at, used_at,
              requested_ip_hash, request_id, status
       FROM password_reset_tokens
       WHERE token_hash = ?
-    `).get(tokenHash) as PasswordResetTokenRow | undefined;
+    `, [tokenHash]);
 
     return row ? {
       id: row.id,
@@ -197,20 +189,24 @@ export class AuthRepository {
     } : null;
   }
 
-  resetPassword(userId: string, tokenId: string, passwordHash: string, usedAt: string): void {
-    const transaction = database.transaction(() => {
-      database.prepare(`
+  async resetPassword(
+    userId: string,
+    tokenId: string,
+    passwordHash: string,
+    usedAt: string,
+  ): Promise<void> {
+    await dataSource.transaction(async () => {
+      await dataSource.execute(`
         UPDATE users
         SET password_hash = ?, auth_version = auth_version + 1, updated_at = ?
         WHERE id = ?
-      `).run(passwordHash, usedAt, userId);
-      database.prepare(`
+      `, [passwordHash, usedAt, userId]);
+      await dataSource.execute(`
         UPDATE password_reset_tokens
         SET status = CASE WHEN id = ? THEN 'USED' ELSE 'REVOKED' END,
             used_at = CASE WHEN id = ? THEN ? ELSE used_at END
         WHERE user_id = ? AND status = 'PENDING'
-      `).run(tokenId, tokenId, usedAt, userId);
+      `, [tokenId, tokenId, usedAt, userId]);
     });
-    transaction();
   }
 }

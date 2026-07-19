@@ -39,12 +39,13 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json());
 
-app.get('/health', (_request, response) => {
-  response.status(200).json(getHealth());
+app.get('/health', async (_request, response) => {
+  const health = await getHealth();
+  response.status(health.status === 'error' ? 503 : 200).json(health);
 });
 
-app.get('/ready', (_request, response) => {
-  const readiness = getReadiness();
+app.get('/ready', async (_request, response) => {
+  const readiness = await getReadiness();
   response.status(readiness.status === 'not_ready' ? 503 : 200).json(readiness);
 });
 

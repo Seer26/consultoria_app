@@ -8,15 +8,15 @@ import {
 export class EntitlementsController {
   constructor(private readonly service: EntitlementsService) {}
 
-  listPlans = (_request: Request, response: Response): void => {
+  listPlans = async (_request: Request, response: Response): Promise<void> => {
     try {
-      response.status(200).json(this.service.listPlans());
+      response.status(200).json(await this.service.listPlans());
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  getCurrentPlan = (request: Request, response: Response): void => {
+  getCurrentPlan = async (request: Request, response: Response): Promise<void> => {
     try {
       const requestedCompanyId = Array.isArray(request.query.companyId)
         ? request.query.companyId[0]
@@ -33,21 +33,23 @@ export class EntitlementsController {
         return;
       }
 
-      response.status(200).json(this.service.getCurrentPlan(companyId));
+      response.status(200).json(await this.service.getCurrentPlan(companyId));
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  getAdminCompanyPlan = (request: Request, response: Response): void => {
+  getAdminCompanyPlan = async (request: Request, response: Response): Promise<void> => {
     try {
-      response.status(200).json(this.service.getCurrentPlan(this.getParam(request, 'companyId')));
+      response.status(200).json(
+        await this.service.getCurrentPlan(this.getParam(request, 'companyId')),
+      );
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  updateAdminCompanyPlan = (request: Request, response: Response): void => {
+  updateAdminCompanyPlan = async (request: Request, response: Response): Promise<void> => {
     try {
       const planSlug = request.body?.planSlug;
       if (typeof planSlug !== 'string') {
@@ -57,7 +59,7 @@ export class EntitlementsController {
 
       response
         .status(200)
-        .json(this.service.changeCompanyPlan({
+        .json(await this.service.changeCompanyPlan({
           companyId: this.getParam(request, 'companyId'),
           planSlug,
           actorUserId: request.auth!.userId,
@@ -68,11 +70,14 @@ export class EntitlementsController {
     }
   };
 
-  listAdminCompanyPlanEvents = (request: Request, response: Response): void => {
+  listAdminCompanyPlanEvents = async (
+    request: Request,
+    response: Response,
+  ): Promise<void> => {
     try {
       response
         .status(200)
-        .json(this.service.listCompanyPlanEvents(this.getParam(request, 'companyId')));
+        .json(await this.service.listCompanyPlanEvents(this.getParam(request, 'companyId')));
     } catch (error) {
       this.handleError(error, response);
     }

@@ -26,7 +26,11 @@ export function writePlanLimitResponse(error: unknown, response: Response): bool
 }
 
 export function requireCompanyEntitlement(feature: PlanFeature) {
-  return (request: Request, response: Response, next: NextFunction): void => {
+  return async (
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const companyId = request.auth?.companyId;
       if (!companyId) {
@@ -34,7 +38,7 @@ export function requireCompanyEntitlement(feature: PlanFeature) {
         return;
       }
 
-      service.assertCanUseFeature(companyId, feature);
+      await service.assertCanUseFeature(companyId, feature);
       next();
     } catch (error) {
       if (writePlanLimitResponse(error, response)) {

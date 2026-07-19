@@ -24,8 +24,13 @@ export class AiQuestionService {
       throw new Error('INVALID_ANSWER');
     }
 
-    const companyId = auth.companyId ?? this.entitlementsService.resolveUserCompanyId(auth.userId);
-    this.entitlementsService.assertCanUseFeature(companyId, 'AI_QUESTIONS_MONTHLY');
+    const companyId =
+      auth.companyId ??
+      await this.entitlementsService.resolveUserCompanyId(auth.userId);
+    await this.entitlementsService.assertCanUseFeature(
+      companyId,
+      'AI_QUESTIONS_MONTHLY',
+    );
 
     if (!env.aiApiKey) {
       throw new Error('AI_API_KEY_NOT_CONFIGURED');
@@ -71,7 +76,7 @@ export class AiQuestionService {
       throw new Error('EMPTY_AI_RESPONSE');
     }
 
-    this.entitlementsService.recordUsage(companyId, 'AI_QUESTIONS_MONTHLY');
+    await this.entitlementsService.recordUsage(companyId, 'AI_QUESTIONS_MONTHLY');
     return nextQuestion;
   }
 }

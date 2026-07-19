@@ -11,25 +11,27 @@ export class CompaniesController {
     return Array.isArray(value) ? value[0] : value;
   }
 
-  listCompanies = (request: Request, response: Response): void => {
+  listCompanies = async (_request: Request, response: Response): Promise<void> => {
     try {
-      response.status(200).json(this.service.listCompanies());
+      response.status(200).json(await this.service.listCompanies());
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  getCompanyById = (request: Request, response: Response): void => {
+  getCompanyById = async (request: Request, response: Response): Promise<void> => {
     try {
-      response.status(200).json(this.service.getCompanyById(this.getParam(request, 'id')));
+      response.status(200).json(
+        await this.service.getCompanyById(this.getParam(request, 'id')),
+      );
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  createCompany = (request: Request, response: Response): void => {
+  createCompany = async (request: Request, response: Response): Promise<void> => {
     try {
-      response.status(201).json(this.service.createCompany(request.body));
+      response.status(201).json(await this.service.createCompany(request.body));
     } catch (error) {
       this.handleError(error, response);
     }
@@ -43,31 +45,40 @@ export class CompaniesController {
     }
   };
 
-  updateCompany = (request: Request, response: Response): void => {
+  updateCompany = async (request: Request, response: Response): Promise<void> => {
     try {
       response
         .status(200)
-        .json(this.service.updateCompany(this.getParam(request, 'id'), request.body));
+        .json(await this.service.updateCompany(this.getParam(request, 'id'), request.body));
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  updateCompanyStatus = (request: Request, response: Response): void => {
+  updateCompanyStatus = async (
+    request: Request,
+    response: Response,
+  ): Promise<void> => {
     try {
       response
         .status(200)
-        .json(this.service.updateCompanyStatus(this.getParam(request, 'id'), request.body));
+        .json(await this.service.updateCompanyStatus(
+          this.getParam(request, 'id'),
+          request.body,
+        ));
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  listUsersByCompany = (request: Request, response: Response): void => {
+  listUsersByCompany = async (
+    request: Request,
+    response: Response,
+  ): Promise<void> => {
     try {
       response
         .status(200)
-        .json(this.service.listUsersByCompany(this.getParam(request, 'companyId')));
+        .json(await this.service.listUsersByCompany(this.getParam(request, 'companyId')));
     } catch (error) {
       this.handleError(error, response);
     }
@@ -93,29 +104,43 @@ export class CompaniesController {
     }
   };
 
-  updateUserStatus = (request: Request, response: Response): void => {
+  updateUserStatus = async (request: Request, response: Response): Promise<void> => {
     try {
       response
         .status(200)
-        .json(this.service.updateUserStatus(this.getParam(request, 'id'), request.body));
+        .json(await this.service.updateUserStatus(
+          this.getParam(request, 'id'),
+          request.body,
+        ));
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  getOwnCompanySettings = (request: Request, response: Response): void => {
+  getOwnCompanySettings = async (
+    request: Request,
+    response: Response,
+  ): Promise<void> => {
     try {
-      response.status(200).json(this.service.getOwnCompanySettings(request.auth!));
+      response.status(200).json(
+        await this.service.getOwnCompanySettings(request.auth!),
+      );
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  updateOwnCompanySettings = (request: Request, response: Response): void => {
+  updateOwnCompanySettings = async (
+    request: Request,
+    response: Response,
+  ): Promise<void> => {
     try {
       response
         .status(200)
-        .json(this.service.updateOwnCompanySettings(request.auth!, request.body ?? {}));
+        .json(await this.service.updateOwnCompanySettings(
+          request.auth!,
+          request.body ?? {},
+        ));
     } catch (error) {
       this.handleError(error, response);
     }

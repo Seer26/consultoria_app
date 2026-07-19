@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 import type {
   CompanyPlanRecord,
   CompanySubscriptionEventRecord,
@@ -70,30 +70,30 @@ function mapPlan(row: PlanRow): PlanRecord {
 }
 
 export class EntitlementsRepository {
-  listPlans(): PlanRecord[] {
-    const rows = database.prepare(`
+  async listPlans(): Promise<PlanRecord[]> {
+    const rows = await dataSource.many<PlanRow>(`
       SELECT *
       FROM plans
       WHERE status = 'ACTIVE'
       ORDER BY max_users ASC, name ASC
-    `).all() as PlanRow[];
+    `);
 
     return rows.map(mapPlan);
   }
 
-  findPlanBySlug(slug: string): PlanRecord | null {
-    const row = database.prepare(`
+  async findPlanBySlug(slug: string): Promise<PlanRecord | null> {
+    const row = await dataSource.one<PlanRow>(`
       SELECT *
       FROM plans
       WHERE slug = ?
       LIMIT 1
-    `).get(slug) as PlanRow | undefined;
+    `, [slug]);
 
     return row ? mapPlan(row) : null;
   }
 
-  findCompanyPlan(companyId: string): CompanyPlanRecord | null {
-    const row = database.prepare(`
+  async findCompanyPlan(companyId: string): Promise<CompanyPlanRecord | null> {
+    const row = await dataSource.one<CompanyPlanRow>(`
       SELECT
         p.*,
         cs.id AS subscription_id,
@@ -108,7 +108,7 @@ export class EntitlementsRepository {
       INNER JOIN plans p ON p.id = cs.plan_id
       WHERE cs.company_id = ?
       LIMIT 1
-    `).get(companyId) as CompanyPlanRow | undefined;
+    `, [companyId]);
 
     if (!row) {
       return null;
@@ -129,10 +129,14 @@ export class EntitlementsRepository {
     };
   }
 
-  createDefaultSubscription(companyId: string, periodStart: string, periodEnd: string): void {
+  async createDefaultSubscription(
+    companyId: string,
+    periodStart: string,
+    periodEnd: string,
+  ): Promise<void> {
     const now = new Date().toISOString();
 
-    database.prepare(`
+    await dataSource.execute(`
       INSERT OR IGNORE INTO company_subscriptions (
         id, company_id, plan_id, status,
         current_period_start, current_period_end,
@@ -143,7 +147,7 @@ export class EntitlementsRepository {
         @periodStart, @periodEnd,
         @createdAt, @updatedAt
       )
-    `).run({
+    `, {
       id: `subscription-${companyId}`,
       companyId,
       periodStart,
@@ -153,89 +157,97 @@ export class EntitlementsRepository {
     });
   }
 
-  companyExists(companyId: string): boolean {
-    const row = database.prepare(`
+  async companyExists(companyId: string): Promise<boolean> {
+    const row = await dataSource.one<{ id: string }>(`
       SELECT id
       FROM companies
       WHERE id = ?
       LIMIT 1
-    `).get(companyId) as { id: string } | undefined;
+    `, [companyId]);
 
     return Boolean(row);
   }
 
-  findUserCompanyId(userId: string): string | null {
-    const row = database.prepare(`
+  async findUserCompanyId(userId: string): Promise<string | null> {
+    const row = await dataSource.one<{ company_id: string | null }>(`
       SELECT company_id
       FROM users
       WHERE id = ?
       LIMIT 1
-    `).get(userId) as { company_id: string | null } | undefined;
+    `, [userId]);
 
     return row?.company_id ?? null;
   }
 
-  countActiveUsers(companyId: string): number {
-    const row = database.prepare(`
+  async countActiveUsers(companyId: string): Promise<number> {
+    const row = await dataSource.one<{ total: number }>(`
       SELECT COUNT(*) AS total
       FROM users
       WHERE company_id = ?
         AND status = 'ACTIVE'
-    `).get(companyId) as { total: number } | undefined;
+    `, [companyId]);
 
     return Number(row?.total ?? 0);
   }
 
-  countResearchSubmissions(companyId: string, periodStart: string, periodEnd: string): number {
-    const row = database.prepare(`
+  async countResearchSubmissions(
+    companyId: string,
+    periodStart: string,
+    periodEnd: string,
+  ): Promise<number> {
+    const row = await dataSource.one<{ total: number }>(`
       SELECT COUNT(*) AS total
       FROM diagnosis_submissions
       WHERE company_id = ?
         AND submission_type = 'RESEARCH'
         AND created_at >= ?
         AND created_at < ?
-    `).get(companyId, periodStart, periodEnd) as { total: number } | undefined;
+    `, [companyId, periodStart, periodEnd]);
 
     return Number(row?.total ?? 0);
   }
 
-  countActiveActionTasks(companyId: string): number {
-    const row = database.prepare(`
+  async countActiveActionTasks(companyId: string): Promise<number> {
+    const row = await dataSource.one<{ total: number }>(`
       SELECT COUNT(*) AS total
       FROM action_plan_tasks
       WHERE company_id = ?
         AND status NOT IN ('DONE', 'CANCELED')
-    `).get(companyId) as { total: number } | undefined;
+    `, [companyId]);
 
     return Number(row?.total ?? 0);
   }
 
-  getUsageCounter(companyId: string, feature: PlanFeature, period: string): number {
-    const row = database.prepare(`
+  async getUsageCounter(
+    companyId: string,
+    feature: PlanFeature,
+    period: string,
+  ): Promise<number> {
+    const row = await dataSource.one<{ quantity: number }>(`
       SELECT quantity
       FROM usage_counters
       WHERE company_id = ?
         AND feature = ?
         AND period = ?
       LIMIT 1
-    `).get(companyId, feature, period) as { quantity: number } | undefined;
+    `, [companyId, feature, period]);
 
     return Number(row?.quantity ?? 0);
   }
 
-  incrementUsageCounter(
+  async incrementUsageCounter(
     companyId: string,
     feature: PlanFeature,
     period: string,
     quantity: number,
-  ): void {
-    database.prepare(`
+  ): Promise<void> {
+    await dataSource.execute(`
       INSERT INTO usage_counters (id, company_id, feature, period, quantity, updated_at)
       VALUES (@id, @companyId, @feature, @period, @quantity, @updatedAt)
       ON CONFLICT(company_id, feature, period) DO UPDATE SET
         quantity = usage_counters.quantity + excluded.quantity,
         updated_at = excluded.updated_at
-    `).run({
+    `, {
       id: randomUUID(),
       companyId,
       feature,
@@ -245,17 +257,21 @@ export class EntitlementsRepository {
     });
   }
 
-  updateCompanyPlan(companyId: string, planId: string, updatedAt: string): void {
-    database.prepare(`
+  async updateCompanyPlan(
+    companyId: string,
+    planId: string,
+    updatedAt: string,
+  ): Promise<void> {
+    await dataSource.execute(`
       UPDATE company_subscriptions
       SET plan_id = ?,
           status = 'ACTIVE',
           updated_at = ?
       WHERE company_id = ?
-    `).run(planId, updatedAt, companyId);
+    `, [planId, updatedAt, companyId]);
   }
 
-  createSubscriptionEvent(input: {
+  async createSubscriptionEvent(input: {
     companyId: string;
     previousPlanId: string | null;
     newPlanId: string;
@@ -263,8 +279,8 @@ export class EntitlementsRepository {
     origin: CompanySubscriptionEventRecord['origin'];
     reason: string | null;
     createdAt: string;
-  }): void {
-    database.prepare(`
+  }): Promise<void> {
+    await dataSource.execute(`
       INSERT INTO company_subscription_events (
         id, company_id, previous_plan_id, new_plan_id, actor_user_id,
         origin, reason, created_at
@@ -273,14 +289,16 @@ export class EntitlementsRepository {
         @id, @companyId, @previousPlanId, @newPlanId, @actorUserId,
         @origin, @reason, @createdAt
       )
-    `).run({
+    `, {
       id: randomUUID(),
       ...input,
     });
   }
 
-  listSubscriptionEvents(companyId: string): CompanySubscriptionEventRecord[] {
-    const rows = database.prepare(`
+  async listSubscriptionEvents(
+    companyId: string,
+  ): Promise<CompanySubscriptionEventRecord[]> {
+    const rows = await dataSource.many<SubscriptionEventRow>(`
       SELECT
         e.id,
         e.company_id,
@@ -302,7 +320,7 @@ export class EntitlementsRepository {
       LEFT JOIN users u ON u.id = e.actor_user_id
       WHERE e.company_id = ?
       ORDER BY e.created_at DESC
-    `).all(companyId) as SubscriptionEventRow[];
+    `, [companyId]);
 
     return rows.map((row) => ({
       id: row.id,
@@ -320,5 +338,28 @@ export class EntitlementsRepository {
       reason: row.reason,
       createdAt: row.created_at,
     }));
+  }
+
+  async changeCompanyPlanWithEvent(input: {
+    companyId: string;
+    planId: string;
+    previousPlanId: string | null;
+    actorUserId: string | null;
+    origin: CompanySubscriptionEventRecord['origin'];
+    reason: string | null;
+    createdAt: string;
+  }): Promise<void> {
+    await dataSource.transaction(async () => {
+      await this.updateCompanyPlan(input.companyId, input.planId, input.createdAt);
+      await this.createSubscriptionEvent({
+        companyId: input.companyId,
+        previousPlanId: input.previousPlanId,
+        newPlanId: input.planId,
+        actorUserId: input.actorUserId,
+        origin: input.origin,
+        reason: input.reason,
+        createdAt: input.createdAt,
+      });
+    });
   }
 }

@@ -46,13 +46,13 @@ export class ResearchController {
     }
   };
 
-  listSubmissions = (request: Request, response: Response): void => {
+  listSubmissions = async (request: Request, response: Response): Promise<void> => {
     try {
       const companyId = Array.isArray(request.query.companyId)
         ? request.query.companyId[0]
         : request.query.companyId;
 
-      const result = this.service.listSubmissions(request.auth!, {
+      const result = await this.service.listSubmissions(request.auth!, {
         companyId: typeof companyId === 'string' ? companyId : undefined,
       });
       response.status(200).json(result);
@@ -61,18 +61,24 @@ export class ResearchController {
     }
   };
 
-  getSubmissionById = (request: Request, response: Response): void => {
+  getSubmissionById = async (request: Request, response: Response): Promise<void> => {
     try {
-      const result = this.service.getSubmissionById(request.auth!, this.getParam(request, 'id'));
+      const result = await this.service.getSubmissionById(
+        request.auth!,
+        this.getParam(request, 'id'),
+      );
       response.status(200).json(result);
     } catch (error) {
       this.handleError(error, response);
     }
   };
 
-  generateActionPlan = (request: Request, response: Response): void => {
+  generateActionPlan = async (request: Request, response: Response): Promise<void> => {
     try {
-      const result = this.service.generateActionPlan(request.auth!, this.getParam(request, 'id'));
+      const result = await this.service.generateActionPlan(
+        request.auth!,
+        this.getParam(request, 'id'),
+      );
       response.status(200).json(result);
     } catch (error) {
       this.handleError(error, response);

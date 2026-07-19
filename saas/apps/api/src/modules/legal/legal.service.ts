@@ -17,8 +17,8 @@ const requiredDocuments = (): Array<{
 export class LegalService {
   constructor(private readonly repository = new LegalRepository()) {}
 
-  listCurrent(auth: AuthTokenPayload) {
-    return this.repository.listForUser(auth.userId).map((row) => ({
+  async listCurrent(auth: AuthTokenPayload) {
+    return (await this.repository.listForUser(auth.userId)).map((row) => ({
       documentType: row.document_type,
       documentVersion: row.document_version,
       acceptedAt: row.accepted_at,
@@ -26,10 +26,10 @@ export class LegalService {
     }));
   }
 
-  listPending(auth: AuthTokenPayload) {
+  async listPending(auth: AuthTokenPayload) {
     if (auth.role === 'ADMIN') return [];
     const accepted = new Set(
-      this.repository.listForUser(auth.userId)
+      (await this.repository.listForUser(auth.userId))
         .map((row) => `${row.document_type}:${row.document_version}`),
     );
     return requiredDocuments().filter(
@@ -37,11 +37,11 @@ export class LegalService {
     );
   }
 
-  hasPending(auth: AuthTokenPayload): boolean {
-    return env.requireLegalAcceptance && this.listPending(auth).length > 0;
+  async hasPending(auth: AuthTokenPayload): Promise<boolean> {
+    return env.requireLegalAcceptance && (await this.listPending(auth)).length > 0;
   }
 
-  accept(auth: AuthTokenPayload, input: {
+  async accept(auth: AuthTokenPayload, input: {
     documentType?: string;
     documentVersion?: string;
     origin?: string;
@@ -57,7 +57,7 @@ export class LegalService {
     const origin = input.origin === 'FLUTTER_WEB' || input.origin === 'FLUTTER_APP'
       ? input.origin
       : 'API';
-    this.repository.create({
+    await this.repository.create({
       id: randomUUID(),
       userId: auth.userId,
       companyId: auth.companyId,

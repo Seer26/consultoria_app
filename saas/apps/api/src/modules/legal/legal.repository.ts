@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 
 export type LegalDocumentType = 'TERMS_OF_USE' | 'PRIVACY_POLICY';
 
@@ -15,17 +15,17 @@ interface LegalAcceptanceRow {
 }
 
 export class LegalRepository {
-  listForUser(userId: string): LegalAcceptanceRow[] {
-    return database.prepare(`
+  async listForUser(userId: string): Promise<LegalAcceptanceRow[]> {
+    return dataSource.many<LegalAcceptanceRow>(`
       SELECT id, user_id, company_id, document_type, document_version,
              accepted_at, ip_hash, request_id, origin
       FROM legal_acceptances
       WHERE user_id = ?
       ORDER BY accepted_at DESC
-    `).all(userId) as LegalAcceptanceRow[];
+    `, [userId]);
   }
 
-  create(input: {
+  async create(input: {
     id: string;
     userId: string;
     companyId: string | null;
@@ -35,8 +35,8 @@ export class LegalRepository {
     ipHash: string | null;
     requestId: string | null;
     origin: string;
-  }): void {
-    database.prepare(`
+  }): Promise<void> {
+    await dataSource.execute(`
       INSERT INTO legal_acceptances (
         id, user_id, company_id, document_type, document_version,
         accepted_at, ip_hash, request_id, origin, metadata
@@ -45,6 +45,6 @@ export class LegalRepository {
         @acceptedAt, @ipHash, @requestId, @origin, NULL
       )
       ON CONFLICT(user_id, document_type, document_version) DO NOTHING
-    `).run(input);
+    `, input);
   }
 }

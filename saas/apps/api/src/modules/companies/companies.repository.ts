@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { dataSource } from '../../database/data-source';
 import type {
   CompanyRecord,
   EntityStatus,
@@ -73,8 +73,8 @@ function getCurrentPeriodRange(now = new Date()): { start: string; end: string }
 }
 
 export class CompaniesRepository {
-  listCompanies(): Array<CompanyRecord & { userCount: number }> {
-    const rows = database.prepare(`
+  async listCompanies(): Promise<Array<CompanyRecord & { userCount: number }>> {
+    const rows = await dataSource.many<CompanyRow>(`
       SELECT
         c.id,
         c.name,
@@ -92,7 +92,7 @@ export class CompaniesRepository {
       LEFT JOIN users u ON u.company_id = c.id
       GROUP BY c.id, c.name, c.slug, c.status, c.sector, c.size, c.phone, c.responsible_name, c.notes, c.created_at, c.updated_at
       ORDER BY c.created_at DESC
-    `).all() as CompanyRow[];
+    `);
 
     return rows.map((row) => ({
       ...mapCompany(row),
@@ -100,8 +100,10 @@ export class CompaniesRepository {
     }));
   }
 
-  findCompanyById(id: string): (CompanyRecord & { userCount: number }) | null {
-    const row = database.prepare(`
+  async findCompanyById(
+    id: string,
+  ): Promise<(CompanyRecord & { userCount: number }) | null> {
+    const row = await dataSource.one<CompanyRow>(`
       SELECT
         c.id,
         c.name,
@@ -119,7 +121,7 @@ export class CompaniesRepository {
       LEFT JOIN users u ON u.company_id = c.id
       WHERE c.id = ?
       GROUP BY c.id, c.name, c.slug, c.status, c.sector, c.size, c.phone, c.responsible_name, c.notes, c.created_at, c.updated_at
-    `).get(id) as CompanyRow | undefined;
+    `, [id]);
 
     if (!row) {
       return null;
@@ -131,46 +133,41 @@ export class CompaniesRepository {
     };
   }
 
-  findCompanyBySlug(slug: string): CompanyRecord | null {
-    const row = database.prepare(`
+  async findCompanyBySlug(slug: string): Promise<CompanyRecord | null> {
+    const row = await dataSource.one<CompanyRow>(`
       SELECT id, name, slug, status, sector, size, phone, responsible_name, notes, created_at, updated_at
       FROM companies
       WHERE slug = ?
-    `).get(slug) as CompanyRow | undefined;
+    `, [slug]);
 
     return row ? mapCompany(row) : null;
   }
 
-  createCompany(input: CompanyRecord): CompanyRecord {
-    const insert = database.transaction(() => {
-      this.insertCompany(input);
-      this.createDefaultSubscription(input.id);
+  async createCompany(input: CompanyRecord): Promise<CompanyRecord> {
+    await dataSource.transaction(async () => {
+      await this.insertCompany(input);
+      await this.createDefaultSubscription(input.id);
     });
-
-    insert();
-
     return input;
   }
 
-  createCompanyWithOwner(input: {
+  async createCompanyWithOwner(input: {
     company: CompanyRecord;
     owner: ManagedUserRecord;
-  }): {
+  }): Promise<{
     company: CompanyRecord;
     owner: ManagedUserRecord;
-  } {
-    const insert = database.transaction(() => {
-      this.insertCompany(input.company);
-      this.createDefaultSubscription(input.company.id);
-      this.createUser(input.owner);
+  }> {
+    await dataSource.transaction(async () => {
+      await this.insertCompany(input.company);
+      await this.createDefaultSubscription(input.company.id);
+      await this.createUser(input.owner);
     });
-
-    insert();
     return input;
   }
 
-  updateCompany(input: CompanyRecord): CompanyRecord {
-    database.prepare(`
+  async updateCompany(input: CompanyRecord): Promise<CompanyRecord> {
+    await dataSource.execute(`
       UPDATE companies
       SET name = @name,
           slug = @slug,
@@ -182,13 +179,13 @@ export class CompaniesRepository {
           notes = @notes,
           updated_at = @updatedAt
       WHERE id = @id
-    `).run(input);
+    `, input);
 
     return input;
   }
 
-  updateCompanySettings(input: CompanyRecord): CompanyRecord {
-    database.prepare(`
+  async updateCompanySettings(input: CompanyRecord): Promise<CompanyRecord> {
+    await dataSource.execute(`
       UPDATE companies
       SET name = @name,
           sector = @sector,
@@ -198,52 +195,56 @@ export class CompaniesRepository {
           notes = @notes,
           updated_at = @updatedAt
       WHERE id = @id
-    `).run(input);
+    `, input);
 
     return input;
   }
 
-  updateCompanyStatus(id: string, status: EntityStatus, updatedAt: string): void {
-    database.prepare(`
+  async updateCompanyStatus(
+    id: string,
+    status: EntityStatus,
+    updatedAt: string,
+  ): Promise<void> {
+    await dataSource.execute(`
       UPDATE companies
       SET status = ?, updated_at = ?
       WHERE id = ?
-    `).run(status, updatedAt, id);
+    `, [status, updatedAt, id]);
   }
 
-  listUsersByCompany(companyId: string): ManagedUserRecord[] {
-    const rows = database.prepare(`
+  async listUsersByCompany(companyId: string): Promise<ManagedUserRecord[]> {
+    const rows = await dataSource.many<UserRow>(`
       SELECT id, name, email, password_hash, role, company_id, status, created_at, updated_at
       FROM users
       WHERE company_id = ?
       ORDER BY created_at DESC
-    `).all(companyId) as UserRow[];
+    `, [companyId]);
 
     return rows.map(mapUser);
   }
 
-  findUserById(id: string): ManagedUserRecord | null {
-    const row = database.prepare(`
+  async findUserById(id: string): Promise<ManagedUserRecord | null> {
+    const row = await dataSource.one<UserRow>(`
       SELECT id, name, email, password_hash, role, company_id, status, created_at, updated_at
       FROM users
       WHERE id = ?
-    `).get(id) as UserRow | undefined;
+    `, [id]);
 
     return row ? mapUser(row) : null;
   }
 
-  findUserByEmail(email: string): ManagedUserRecord | null {
-    const row = database.prepare(`
+  async findUserByEmail(email: string): Promise<ManagedUserRecord | null> {
+    const row = await dataSource.one<UserRow>(`
       SELECT id, name, email, password_hash, role, company_id, status, created_at, updated_at
       FROM users
       WHERE email = ?
-    `).get(email) as UserRow | undefined;
+    `, [email]);
 
     return row ? mapUser(row) : null;
   }
 
-  createUser(input: ManagedUserRecord): ManagedUserRecord {
-    database.prepare(`
+  async createUser(input: ManagedUserRecord): Promise<ManagedUserRecord> {
+    await dataSource.execute(`
       INSERT INTO users (
         id,
         name,
@@ -266,13 +267,13 @@ export class CompaniesRepository {
         @createdAt,
         @updatedAt
       )
-    `).run(input);
+    `, input);
 
     return input;
   }
 
-  updateUser(input: ManagedUserRecord): ManagedUserRecord {
-    database.prepare(`
+  async updateUser(input: ManagedUserRecord): Promise<ManagedUserRecord> {
+    await dataSource.execute(`
       UPDATE users
       SET name = @name,
           email = @email,
@@ -282,21 +283,25 @@ export class CompaniesRepository {
           status = @status,
           updated_at = @updatedAt
       WHERE id = @id
-    `).run(input);
+    `, input);
 
     return input;
   }
 
-  updateUserStatus(id: string, status: EntityStatus, updatedAt: string): void {
-    database.prepare(`
+  async updateUserStatus(
+    id: string,
+    status: EntityStatus,
+    updatedAt: string,
+  ): Promise<void> {
+    await dataSource.execute(`
       UPDATE users
       SET status = ?, updated_at = ?
       WHERE id = ?
-    `).run(status, updatedAt, id);
+    `, [status, updatedAt, id]);
   }
 
-  private insertCompany(input: CompanyRecord): void {
-    database.prepare(`
+  private async insertCompany(input: CompanyRecord): Promise<void> {
+    await dataSource.execute(`
       INSERT INTO companies (
         id, name, slug, status, sector, size, phone, responsible_name, notes,
         created_at, updated_at
@@ -305,14 +310,14 @@ export class CompaniesRepository {
         @id, @name, @slug, @status, @sector, @size, @phone, @responsibleName, @notes,
         @createdAt, @updatedAt
       )
-    `).run(input);
+    `, input);
   }
 
-  private createDefaultSubscription(companyId: string): void {
+  private async createDefaultSubscription(companyId: string): Promise<void> {
     const period = getCurrentPeriodRange();
     const now = new Date().toISOString();
 
-    database.prepare(`
+    await dataSource.execute(`
       INSERT OR IGNORE INTO company_subscriptions (
         id, company_id, plan_id, status,
         current_period_start, current_period_end,
@@ -323,7 +328,7 @@ export class CompaniesRepository {
         @periodStart, @periodEnd,
         @createdAt, @updatedAt
       )
-    `).run({
+    `, {
       id: `subscription-${companyId}`,
       companyId,
       periodStart: period.start,
