@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { database } from '../db/database';
 import { createPostgresClient } from './postgres';
 import { env } from '../config/env';
+import { getPostgresMigrationStatus } from './migrate';
 
 const requiredTables = [
   'companies',
@@ -16,6 +16,8 @@ const requiredTables = [
   'company_subscriptions',
   'usage_counters',
   'company_subscription_events',
+  'password_reset_tokens',
+  'legal_acceptances',
 ];
 
 async function validatePostgres(): Promise<void> {
@@ -45,12 +47,26 @@ async function validatePostgres(): Promise<void> {
     if (!planSlugs.has('starter') || !planSlugs.has('growth')) {
       throw new Error('MISSING_REQUIRED_PLANS');
     }
+
+    const postgresOnlyTables = ['schema_migrations', 'audit_events'];
+    const missingPostgresTables = postgresOnlyTables.filter(
+      (table) => !existing.has(table),
+    );
+    if (missingPostgresTables.length > 0) {
+      throw new Error(`MISSING_TABLES:${missingPostgresTables.join(',')}`);
+    }
+
+    const migrationStatus = await getPostgresMigrationStatus();
+    if (migrationStatus.pending.length > 0) {
+      throw new Error(`PENDING_MIGRATIONS:${migrationStatus.pending.join(',')}`);
+    }
   } finally {
     await client.end();
   }
 }
 
-function validateSqlite(): void {
+async function validateSqlite(): Promise<void> {
+  const { database } = await import('../db/database');
   const rows = database
     .prepare(
       `
@@ -68,11 +84,11 @@ function validateSqlite(): void {
   }
 }
 
-async function validateDatabase(): Promise<void> {
+export async function validateDatabase(): Promise<void> {
   if (env.databaseProvider === 'postgres') {
     await validatePostgres();
   } else {
-    validateSqlite();
+    await validateSqlite();
   }
 }
 

@@ -17,6 +17,8 @@ COPY . .
 
 RUN npm run build --workspace @consultoria/domain
 RUN npm run build --workspace @consultoria/api
+RUN mkdir -p apps/api/dist/database/migrations \
+  && cp apps/api/src/database/migrations/*.sql apps/api/dist/database/migrations/
 
 FROM node:22-alpine AS production-deps
 

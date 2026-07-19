@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,10 +15,12 @@ function resolveMigrationsDir(): string {
   const sourceDir = path.resolve(process.cwd(), 'src/database/migrations');
   const distDir = path.resolve(process.cwd(), 'dist/database/migrations');
 
-  return sourceDir;
+  if (existsSync(sourceDir)) return sourceDir;
+  if (existsSync(distDir)) return distDir;
+  throw new Error('POSTGRES_MIGRATIONS_DIRECTORY_NOT_FOUND');
 }
 
-async function readMigrations(): Promise<MigrationFile[]> {
+export async function readPostgresMigrations(): Promise<MigrationFile[]> {
   const migrationsDir = resolveMigrationsDir();
   const entries = await fs.readdir(migrationsDir);
 
@@ -51,7 +54,7 @@ export async function runPostgresMigrations(): Promise<void> {
       'SELECT id FROM schema_migrations',
     );
     const applied = new Set(appliedResult.rows.map((row) => row.id));
-    const migrations = await readMigrations();
+    const migrations = await readPostgresMigrations();
 
     for (const migration of migrations) {
       if (applied.has(migration.id)) {
@@ -77,6 +80,41 @@ export async function runPostgresMigrations(): Promise<void> {
     if (migrations.length === 0) {
       console.log('No migrations found.');
     }
+  } finally {
+    await client.end();
+  }
+}
+
+export async function getPostgresMigrationStatus(): Promise<{
+  applied: number;
+  available: number;
+  pending: string[];
+}> {
+  const migrations = await readPostgresMigrations();
+  const client = createPostgresClient();
+  await client.connect();
+  try {
+    const table = await client.query<{ exists: boolean }>(
+      `SELECT to_regclass('public.schema_migrations') IS NOT NULL AS exists`,
+    );
+    if (!table.rows[0]?.exists) {
+      return {
+        applied: 0,
+        available: migrations.length,
+        pending: migrations.map((migration) => migration.id),
+      };
+    }
+    const appliedResult = await client.query<{ id: string }>(
+      'SELECT id FROM schema_migrations',
+    );
+    const applied = new Set(appliedResult.rows.map((row) => row.id));
+    return {
+      applied: applied.size,
+      available: migrations.length,
+      pending: migrations
+        .filter((migration) => !applied.has(migration.id))
+        .map((migration) => migration.id),
+    };
   } finally {
     await client.end();
   }

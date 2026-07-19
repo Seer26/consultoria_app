@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     container_name: consultoria-postgres
     environment:
-      POSTGRES_DB: consultoria
-      POSTGRES_USER: consultoria
-      POSTGRES_PASSWORD: consultoria_local_password
+      POSTGRES_DB: ${POSTGRES_DB:-consultoria_local}
+      POSTGRES_USER: ${POSTGRES_USER:-consultoria_local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - consultoria_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U consultoria -d consultoria"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-consultoria_local} -d ${POSTGRES_DB:-consultoria_local}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,12 +26,16 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      APP_ENV: local-postgres
       PORT: 3000
-      DATABASE_URL: postgres://consultoria:consultoria_local_password@postgres:5432/consultoria
+      DATABASE_URL: postgres://${POSTGRES_USER:-consultoria_local}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-consultoria_local}
+      RUN_MIGRATIONS_ON_STARTUP: "true"
       JWT_SECRET: replace-with-a-strong-local-secret-for-docker
       JWT_EXPIRES_IN: 7d
       CORS_ORIGINS: http://127.0.0.1:3000,http://localhost:3000,http://localhost:8080
       ENABLE_DEMO_SEED: "false"
+      EMAIL_PROVIDER: console
+      EMAIL_ALLOW_TEST_PROVIDER: "true"
       OPENAI_API_KEY: ""
     ports:
       - "3000:3000"
