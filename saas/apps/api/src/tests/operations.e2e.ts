@@ -56,10 +56,25 @@ async function main(): Promise<void> {
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   try {
-    const health = await call<{ status: string; environment: string }>(baseUrl, 'GET', '/health');
+    const health = await call<{
+      status: string;
+      environment: string;
+      database: {
+        status: string;
+        provider: string;
+        connectivity: string;
+        schema: string;
+        migrations: { status: string; pendingCount: number };
+      };
+    }>(baseUrl, 'GET', '/health');
     assert.equal(health.status, 200);
     assert.equal(health.body.status, 'ok');
-    assert.equal('database' in health.body, false);
+    assert.equal(health.body.database.status, 'ready');
+    assert.equal(health.body.database.provider, 'sqlite');
+    assert.equal(health.body.database.connectivity, 'connected');
+    assert.equal(health.body.database.schema, 'ready');
+    assert.equal(health.body.database.migrations.status, 'embedded');
+    assert.equal(health.body.database.migrations.pendingCount, 0);
 
     const ready = await call<{ status: string; checks: Record<string, unknown> }>(baseUrl, 'GET', '/ready');
     assert.equal(ready.status, 200);

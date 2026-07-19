@@ -55,6 +55,71 @@ jobs:
           JWT_SECRET: consultoria-ci-load-secret-with-32-chars
           CORS_ORIGINS: http://127.0.0.1:3000
 
+  postgres:
+    name: PostgreSQL migrations and E2E
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: consultoria_ci
+          POSTGRES_USER: consultoria_ci
+          POSTGRES_PASSWORD: consultoria_ci_local_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U consultoria_ci -d consultoria_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: saas
+
+    env:
+      DATABASE_URL: postgres://consultoria_ci:consultoria_ci_local_only@127.0.0.1:5432/consultoria_ci
+      NODE_ENV: test
+      ENABLE_DEMO_SEED: "false"
+      JWT_SECRET: consultoria-ci-postgres-secret-with-32-chars
+      CORS_ORIGINS: http://127.0.0.1:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm --workspace @consultoria/api run build
+
+      - name: Apply migrations to an empty database
+        run: npm --workspace @consultoria/api run db:migrate
+
+      - name: Reapply migrations idempotently
+        run: npm --workspace @consultoria/api run db:migrate
+
+      - name: Validate PostgreSQL schema
+        run: npm --workspace @consultoria/api run db:validate
+
+      - name: Run PostgreSQL E2E
+        run: npm --workspace @consultoria/api run test:e2e:postgres
+
+      - name: Run PostgreSQL smoke
+        run: npm --workspace @consultoria/api run test:smoke:postgres
+
+      - name: Validate readiness with PostgreSQL unavailable
+        run: npm --workspace @consultoria/api run test:postgres:unavailable
+
   flutter:
     name: Flutter analyze and tests
     runs-on: ubuntu-latest

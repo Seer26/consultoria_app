@@ -28,9 +28,20 @@ const baseUrl = `http://127.0.0.1:${address.port}`;
 try {
   const health = await fetch(`${baseUrl}/health`);
   assert.equal(health.status, 200);
-  const healthBody = await health.json() as Record<string, unknown>;
+  const healthBody = await health.json() as {
+    status: string;
+    database: {
+      status: string;
+      provider: string;
+      connectivity: string;
+      schema: string;
+    };
+  };
   assert.equal(healthBody.status, 'ok');
-  assert.equal('database' in healthBody, false);
+  assert.equal(healthBody.database.status, 'ready');
+  assert.equal(healthBody.database.provider, 'sqlite');
+  assert.equal(healthBody.database.connectivity, 'connected');
+  assert.equal(healthBody.database.schema, 'ready');
 
   const ready = await fetch(`${baseUrl}/ready`);
   assert.equal(ready.status, 503);
@@ -43,6 +54,9 @@ try {
   const serialized = JSON.stringify(readyBody);
   assert.equal(serialized.includes(path.resolve(databasePath)), false);
   assert.equal(serialized.toLowerCase().includes('secret'), false);
+  const serializedHealth = JSON.stringify(healthBody);
+  assert.equal(serializedHealth.includes(path.resolve(databasePath)), false);
+  assert.equal(serializedHealth.toLowerCase().includes('secret'), false);
 
   console.log(JSON.stringify({
     ok: true,
