@@ -37,12 +37,23 @@ documentação.
 ```powershell
 git clone https://github.com/Seer26/consultoria_app.git
 Set-Location consultoria_app
-git switch codex/release-baseline
+git switch codex/dependency-hardening
 git status --short --branch
 ```
 
-O clone deve mostrar a branch `codex/release-baseline` acompanhando
-`origin/codex/release-baseline`.
+O clone deve mostrar a branch `codex/dependency-hardening` acompanhando
+`origin/codex/dependency-hardening`.
+
+No Windows, mantenha o `.gitattributes` do projeto como regra autoritativa:
+
+```powershell
+git config core.autocrlf false
+git config core.eol lf
+git ls-files --eol
+```
+
+Fontes portáveis permanecem em LF; `.ps1`, `.bat` e `.cmd` permanecem em CRLF.
+Não altere globalmente essas regras sem avaliar outros repositórios.
 
 ## 4. Preparar o Flutter
 
@@ -64,12 +75,15 @@ flutter run --dart-define=APP_ENV=local --dart-define=API_BASE_URL=http://127.0.
 
 ```powershell
 Set-Location saas
-npm.cmd install
+npm.cmd ci
+npm.cmd audit
 npm.cmd run build
 ```
 
 O `package-lock.json` deve ser preservado. Nunca copie `node_modules` de outro
-dispositivo.
+dispositivo. A baseline de hardening possui audit npm com zero
+vulnerabilidades. Se `npm.cmd audit` reportar um resultado diferente, não use
+`npm audit fix --force`; registre o resultado e revise o lockfile.
 
 ## 6. Criar a configuração local
 
@@ -156,6 +170,22 @@ npm.cmd run build
 
 Os testes usam bancos temporários. Nunca configure testes para o SQLite
 operacional.
+
+Ao terminar a preparação, confirme que os geradores e instaladores não
+alteraram arquivos rastreados:
+
+```powershell
+Set-Location ..
+flutter pub get
+git status --short
+Set-Location saas
+npm.cmd install
+Set-Location ..
+git status --short
+```
+
+O status deve permanecer limpo. Os registradores de plugins de Windows, Linux
+e macOS são gerados pelo Flutter, mas continuam versionados com LF estável.
 
 ## 11. Atualizar a branch
 

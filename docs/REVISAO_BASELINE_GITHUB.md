@@ -7,27 +7,27 @@ Data de preparação: 19/07/2026.
 Branch de revisão:
 
 ```text
-codex/release-baseline
+codex/dependency-hardening
 ```
 
 Base:
 
 ```text
-main
+codex/release-baseline
 ```
 
-Commits principais antes da documentação da Sprint 3.9:
+Commits principais do hardening antes da documentação da Sprint 3.10:
 
 ```text
-327fce5 feat: establish validated consultoria saas baseline
-0c0e032 docs: record baseline release evidence
-4590150 docs: prepare private GitHub baseline publication
+23feb6e chore: normalize repository line endings
+fc29f7b chore: remediate dependency vulnerabilities
 ```
 
 Não fazer merge, excluir a branch ou publicar a tag sem revisão humana.
 
-A branch foi publicada no repositório privado e rastreia
-`origin/codex/release-baseline`. Nenhum pull request foi aberto.
+A baseline permanece publicada no repositório privado. A branch
+`codex/dependency-hardening` contém somente padronização Git, atualização
+compatível do lockfile e documentação. Nenhum pull request foi aberto.
 
 ## Arquivos proibidos verificados
 
@@ -61,14 +61,19 @@ npm.cmd run build
 - smoke da API: aprovado;
 - build raiz: aprovado.
 
-Os testes de API utilizaram bancos temporários. Os resultados e hashes de
-preservação do banco operacional ficam registrados em
-`RELATORIO_SPRINT_3_9_GITHUB_PRIVADO.md`.
+Os testes de API utilizaram bancos temporários. Os resultados, a classificação
+das dependências e os hashes de preservação do banco operacional ficam
+registrados em `RELATORIO_SPRINT_3_10_HARDENING_REPOSITORIO.md`.
 
-Uma clonagem temporária do commit `4590150` também aprovou `flutter analyze`,
-instalação npm, build raiz e build isolado da API após o domínio. A instalação
-npm reportou 6 vulnerabilidades (2 baixas, 3 moderadas e 1 alta), ainda
-pendentes de análise.
+O audit inicial encontrou 6 vulnerabilidades: 2 baixas, 3 moderadas e 1 alta.
+Atualizações compatíveis no lockfile corrigiram todas elas sem `--force`,
+mudança de major ou alteração dos manifests. O audit final registrou zero
+vulnerabilidades.
+
+A política de `.gitattributes` agora mantém fontes portáveis em LF, scripts
+Windows em CRLF e binários fora da normalização. Os sete registradores desktop
+gerados pelo Flutter continuam versionados e `flutter pub get` não modifica
+mais o status por diferença de quebra de linha.
 
 ## Comparar com main
 
@@ -76,14 +81,15 @@ No dispositivo local:
 
 ```powershell
 git fetch origin
-git diff origin/main...origin/codex/release-baseline --stat
-git diff origin/main...origin/codex/release-baseline --name-status
-git log --oneline --decorate --graph origin/main..origin/codex/release-baseline
+git diff origin/codex/release-baseline...origin/codex/dependency-hardening --stat
+git diff origin/codex/release-baseline...origin/codex/dependency-hardening --name-status
+git log --oneline --decorate --graph origin/codex/release-baseline..origin/codex/dependency-hardening
 ```
 
-No GitHub, use a comparação entre `main` e `codex/release-baseline`. Revise
-especialmente autenticação, isolamento multiempresa, migrations, operações de
-banco, configuração, CI e remoções de artefatos.
+No GitHub, use a comparação entre `codex/release-baseline` e
+`codex/dependency-hardening`. Revise especialmente o lockfile,
+`.gitattributes`, o resultado do audit e a documentação. Não há alteração
+funcional, migration ou banco nesta branch.
 
 ## Checklist de revisão
 
@@ -95,8 +101,9 @@ banco, configuração, CI e remoções de artefatos.
 - [ ] verificar migrations e scripts operacionais;
 - [ ] revisar contratos `.env.example` sem inserir valores reais;
 - [ ] conferir resultados de Flutter, API e clone limpo;
-- [ ] avaliar as 6 vulnerabilidades reportadas pelo npm, especialmente a alta;
-- [ ] decidir a política LF/CRLF para registradores Flutter gerados no Windows;
+- [x] confirmar que as 6 vulnerabilidades reportadas pelo npm foram corrigidas;
+- [x] confirmar audit final com zero vulnerabilidades;
+- [x] confirmar a política LF/CRLF e os registradores Flutter no Windows;
 - [ ] confirmar que `main` não foi alterada;
 - [ ] aprovar ou solicitar correções;
 - [ ] decidir separadamente se um pull request deve ser aberto.
