@@ -253,10 +253,28 @@ O banco operacional permaneceu com:
 
 ## 15. Clonagem limpa
 
-A clonagem local temporária da branch será registrada nesta seção após o
-commit documental. O roteiro inclui `flutter pub get`, status, analyze,
-instalação npm, audit, build raiz, busca de arquivos proibidos e remoção
-explícita da cópia.
+A branch foi clonada localmente, sem reaproveitar objetos do worktree, em:
+
+```text
+C:\tmp\consultoria-sprint-3-10-clean-clone-20260719
+```
+
+Estado e resultados:
+
+- commit: `c7d86068b741bb872a6da8537549249684b416b0`;
+- 457 arquivos rastreados;
+- zero arquivos proibidos rastreados;
+- zero arquivos com formato de chave privada ou token conhecido;
+- sete registradores Flutter em `i/lf`, `w/lf`, `eol=lf`;
+- `flutter pub get`: aprovado e sem mudança no status;
+- `flutter analyze`: aprovado, sem issues;
+- `npm install`: 257 pacotes instalados, zero vulnerabilidades;
+- `npm audit`: zero vulnerabilidades;
+- build raiz: domínio, API e web aprovados com Vite 6.4.3;
+- status final: limpo.
+
+O diretório temporário foi removido explicitamente após conferência do caminho
+absoluto. A remoção foi confirmada.
 
 ## 16. Branch e commits
 
@@ -271,10 +289,12 @@ Commits temáticos já criados:
 ```text
 23feb6e chore: normalize repository line endings
 fc29f7b chore: remediate dependency vulnerabilities
+c7d8606 docs: record dependency hardening evidence
 ```
 
-O commit documental será criado somente com os documentos consolidados e a
-remoção explícita do relatório anterior.
+O commit documental contém somente os documentos consolidados e a remoção
+explícita do relatório anterior. A evidência da clonagem limpa será registrada
+em commit documental adicional, sem alteração funcional.
 
 ## 17. Publicação da branch
 
@@ -349,7 +369,7 @@ Estado esperado ao encerrar:
 - [x] banco operacional preservado;
 - [x] nenhum secret ou artefato proibido incluído;
 - [x] commits temáticos locais;
-- [ ] clone limpo final;
+- [x] clone limpo final;
 - [ ] branch publicada sem force push;
 - [x] `main` não alterada;
 - [x] tag não publicada;
