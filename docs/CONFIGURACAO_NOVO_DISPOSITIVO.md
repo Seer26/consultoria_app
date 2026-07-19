@@ -11,8 +11,9 @@ Instale:
 - um navegador ou dispositivo compatível com Flutter;
 - acesso autorizado ao repositório privado `Seer26/consultoria_app`.
 
-Docker é opcional. O perfil local desta baseline usa SQLite e não exige
-PostgreSQL.
+Docker é opcional para SQLite. Para validar o runtime PostgreSQL, instale
+Docker Desktop com Compose ou PostgreSQL 16 com `psql`, `pg_dump` e
+`pg_restore`.
 
 Confirme as instalações:
 
@@ -128,6 +129,18 @@ Não copie o SQLite operacional pelo GitHub. Não copie apenas o arquivo
 principal enquanto a API estiver escrevendo ou houver WAL pendente. Valide a
 integridade de qualquer backup antes do uso.
 
+Para PostgreSQL local, siga `docs/POSTGRESQL_LOCAL_SETUP.md`. Em resumo:
+
+```powershell
+Set-Location saas
+docker compose -f docker-compose.postgres.yml up --build
+npm.cmd --workspace @consultoria/api run db:migrate
+npm.cmd --workspace @consultoria/api run db:validate
+npm.cmd --workspace @consultoria/api run test:e2e:postgres
+```
+
+`DATABASE_URL` seleciona PostgreSQL. Sem ela, a API permanece em SQLite.
+
 ## 8. Iniciar a API
 
 No diretório `saas`:
@@ -169,7 +182,18 @@ API, no diretório `saas`:
 npm.cmd --workspace @consultoria/api run build
 npm.cmd --workspace @consultoria/api run test
 npm.cmd --workspace @consultoria/api run test:smoke
+npm.cmd --workspace @consultoria/api run test:e2e:sqlite
+npm.cmd --workspace @consultoria/api run test:smoke:sqlite
 npm.cmd run build
+```
+
+Com PostgreSQL isolado disponível:
+
+```powershell
+npm.cmd --workspace @consultoria/api run db:migrate
+npm.cmd --workspace @consultoria/api run db:validate
+npm.cmd --workspace @consultoria/api run test:e2e:postgres
+npm.cmd --workspace @consultoria/api run test:smoke:postgres
 ```
 
 Os testes usam bancos temporários. Nunca configure testes para o SQLite

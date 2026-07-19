@@ -1,5 +1,8 @@
 # Backup e restore Postgres
 
+> Procedimento executável e situação de validação da Sprint 3.12:
+> `docs/POSTGRESQL_BACKUP_RESTORE.md`.
+
 ## Objetivo
 
 Definir o processo mínimo para recuperar o SaaS em caso de erro operacional, perda de dados ou troca de ambiente.

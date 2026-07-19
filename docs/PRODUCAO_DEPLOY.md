@@ -6,7 +6,9 @@ Este documento define o caminho operacional da Fase 3 sem trocar a arquitetura d
 
 - SQLite continua disponivel para desenvolvimento local e E2E atuais.
 - Postgres foi preparado por `DATABASE_URL`, migrations versionadas, validacao de schema, Docker Compose local e healthcheck.
-- Os repositórios da API ainda usam `better-sqlite3` de forma síncrona. A virada completa do runtime para Postgres deve ser feita em uma sprint controlada de refatoração async dos repositórios para preservar o MVP.
+- Os repositórios usam um adapter assíncrono centralizado que seleciona
+  SQLite ou PostgreSQL por configuração. A execução PostgreSQL local ainda
+  precisa completar a matriz da Sprint 3.12 em uma máquina com PostgreSQL.
 
 ## Variaveis obrigatorias
 
@@ -87,7 +89,10 @@ Healthcheck:
 Invoke-WebRequest -Uri http://127.0.0.1:3000/health -UseBasicParsing
 ```
 
-Observacao: o Docker Compose sobe API + Postgres e valida conectividade no `/health`. A persistencia funcional completa da API em Postgres depende da sprint de refatoracao dos repositórios síncronos para acesso async.
+Observacao: o Docker Compose sobe API + Postgres, aplica migrations no startup
+do perfil local e valida conectividade no `/health`. A implementacao existe,
+mas não deve ser declarada aprovada até E2E, smoke, migrador, backup e restore
+PostgreSQL passarem.
 
 ## Deploy sem prender a provedor
 
@@ -123,9 +128,10 @@ O endpoint não expõe secrets.
 
 ## Atualização operacional da Sprint 3.2
 
-`GET /health` é apenas liveness e não consulta dependências. `GET /ready` verifica banco SQLite/runtime, schema mínimo, provider de e-mail, URL pública HTTPS em ambientes restritos e configuração de IA quando exigida. Readiness retorna `ready`, `degraded` ou `not_ready`, sem chamada paga à OpenAI e sem revelar caminhos ou segredos. Para staging, seguir `docs/STAGING.md`.
-
-O runtime funcional permanece SQLite de instância única. A infraestrutura/migrations PostgreSQL existente não significa que os repositórios síncronos já operem em Postgres.
+`GET /health` consulta a conectividade do banco e retorna 503 quando ela falha.
+`GET /ready` também valida schema/migrations, provider de e-mail, URL pública
+HTTPS em ambientes restritos e IA quando exigida. As respostas mostram apenas
+provider e estados sanitizados, sem caminho, host ou credenciais.
 
 ## Logs
 

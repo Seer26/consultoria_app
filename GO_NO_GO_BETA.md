@@ -2,8 +2,9 @@
 
 Data: 19/07/2026. Decisão: **NO-GO**.
 
-Estado após a Sprint 3.11: **BASELINE ENDURECIDA, INTEGRADA E SINCRONIZADA NO
-GITHUB PRIVADO**. A higiene do Git está **APROVADA**: banco e artefatos
+Estado durante a Sprint 3.12: **MIGRAÇÃO POSTGRESQL IMPLEMENTADA, MAS
+VALIDAÇÃO OPERACIONAL PARCIAL**. A higiene da baseline anterior permanece
+**APROVADA**: banco e artefatos
 gerados estão fora do versionamento, o backup foi validado, a suíte pré e
 pós-merge passou, o audit npm está zerado e a tag
 `baseline-hardened-pre-postgres-2026-07-19` foi publicada. A integração usou
@@ -14,7 +15,8 @@ permaneceu inalterada. Isso não comprova staging ou beta externo.
 |---|---|---|
 | Higiene do Git | APROVADO | hardening integrado à baseline privada; dependências, builds, banco e secrets fora do versionamento; clone limpo validado |
 | Infraestrutura | REPROVADO | nenhum provedor escolhido, autorizado ou configurado |
-| Docker | NÃO VALIDADO | Docker e Compose indisponíveis; somente validação estática |
+| Docker | NÃO VALIDADO | Docker e Compose indisponíveis nesta máquina; Compose preparado e somente validação estática |
+| PostgreSQL | NÃO VALIDADO | adapter, migrations, migrador, testes e CI preparados; E2E/smoke/migração local não executados por falta do servidor |
 | HTTPS | NÃO VALIDADO | frontend/API não publicados e certificado inexistente |
 | DNS | NÃO VALIDADO | domínio, zona e autorização não informados |
 | Banco SQLite | APROVADO COM RESTRIÇÃO | operação local e guardas aprovadas; staging externo ausente |
@@ -34,6 +36,20 @@ permaneceu inalterada. Isso não comprova staging ou beta externo.
 | Smoke | NÃO VALIDADO | não há URL HTTPS autorizada |
 | Carga | NÃO VALIDADO | carga externa depende de smoke aprovado |
 | Rollback | APROVADO COM RESTRIÇÃO | procedimento documentado; não existe ambiente para ensaio |
+
+## Decisão PostgreSQL da Sprint 3.12
+
+**POSTGRESQL REPROVADO para promoção nesta máquina**, no sentido de que não
+foi possível produzir evidência de execução. O código pode ser revisado na
+branch `codex/postgres-migration`, mas não deve ser integrado à baseline nem
+receber a tag `postgres-ready-pre-staging-2026-07-19` antes de:
+
+- migrations passarem duas vezes em banco vazio;
+- E2E e smoke PostgreSQL passarem;
+- migrador e comparação passarem com dados sintéticos;
+- backup e restore em banco separado passarem;
+- readiness indisponível/disponível passar;
+- clone limpo com PostgreSQL passar.
 
 ## Condições mínimas para mudar para GO
 
