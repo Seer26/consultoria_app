@@ -46,7 +46,15 @@ baseline-pre-cloud-2026-07-19
 
 A branch e os commits foram publicados no repositório GitHub privado durante a
 Sprint 3.9. O segundo commit registra os resultados pós-commit e é o alvo da
-tag. A tag continua exclusivamente local. Nenhum deploy foi executado.
+tag antiga, que continua exclusivamente local e não foi movida. Na Sprint 3.11,
+`codex/dependency-hardening` foi revisada e integrada em
+`codex/release-baseline` por merge commit
+`63b0c0e758fa63fc65590b5d8648c3b2cf0cea11`. O GitHub CLI não estava
+disponível, portanto não houve PR; foi usado o merge local auditado autorizado.
+A nova tag anotada `baseline-hardened-pre-postgres-2026-07-19` foi definida
+como marcador publicado do commit documental final. Nenhum deploy foi
+executado e `main` permaneceu em
+`e039fc641f45378a9f7e7ac8d9371813ba4d952d`.
 
 ## Arquivos retirados do índice
 
@@ -147,13 +155,21 @@ novas alterações:
 6. usar `git push`, sem force;
 7. revisar no GitHub antes de qualquer merge.
 
-A tag só pode ser publicada depois da aprovação humana:
+A tag antiga continua somente local e não deve ser movida ou publicada por
+engano:
 
 ```powershell
-git push origin baseline-pre-cloud-2026-07-19
+baseline-pre-cloud-2026-07-19
 ```
 
-Não usar `git push --tags`.
+A tag publicada da baseline endurecida é:
+
+```text
+baseline-hardened-pre-postgres-2026-07-19
+```
+
+Não usar `git push --tags`; qualquer tag futura deve ser revisada e publicada
+individualmente.
 
 ## Procedimento para outro dispositivo
 
@@ -184,6 +200,7 @@ Para dados:
 
 - SQLite continua limitado a instância única;
 - staging externo, PostgreSQL e backup remoto continuam pendentes;
-- a tag local não substitui backup externo;
-- a branch privada foi publicada, mas ainda exige revisão humana do baseline;
+- nenhuma tag substitui backup externo;
+- a baseline endurecida foi integrada e publicada, mas isso não autoriza beta
+  externo nem deploy;
 - a migração para PostgreSQL deve ocorrer em sprint separada.

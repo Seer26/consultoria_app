@@ -32,17 +32,21 @@ uma conta que tenha acesso ao repositório privado.
 Não salve token em URL, arquivo do projeto, histórico do terminal ou
 documentação.
 
-## 3. Clonar a branch publicada
+## 3. Clonar a baseline endurecida publicada
 
 ```powershell
 git clone https://github.com/Seer26/consultoria_app.git
 Set-Location consultoria_app
-git switch codex/dependency-hardening
+git switch codex/release-baseline
+git pull --ff-only origin codex/release-baseline
 git status --short --branch
 ```
 
-O clone deve mostrar a branch `codex/dependency-hardening` acompanhando
-`origin/codex/dependency-hardening`.
+O clone deve mostrar a branch `codex/release-baseline` acompanhando
+`origin/codex/release-baseline`. O hardening foi integrado por merge commit
+`63b0c0e758fa63fc65590b5d8648c3b2cf0cea11`. A tag anotada
+`baseline-hardened-pre-postgres-2026-07-19` identifica o commit documental
+publicado que encerra essa integração.
 
 No Windows, mantenha o `.gitattributes` do projeto como regra autoritativa:
 
@@ -81,7 +85,7 @@ npm.cmd run build
 ```
 
 O `package-lock.json` deve ser preservado. Nunca copie `node_modules` de outro
-dispositivo. A baseline de hardening possui audit npm com zero
+dispositivo. A baseline integrada possui audit npm com zero
 vulnerabilidades. Se `npm.cmd audit` reportar um resultado diferente, não use
 `npm audit fix --force`; registre o resultado e revise o lockfile.
 
@@ -219,6 +223,9 @@ git push
 
 Nunca use `git add .` sem uma revisão imediatamente anterior. Nunca faça force
 push na baseline compartilhada.
+
+O branch `main` não é a baseline de trabalho deste ciclo e permanece no commit
+inicial. Não publique alterações nele sem uma decisão separada.
 
 ## 13. Tratar conflitos
 

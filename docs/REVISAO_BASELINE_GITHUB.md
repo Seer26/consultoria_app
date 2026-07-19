@@ -1,10 +1,10 @@
-# Revisão da baseline no GitHub
+# Revisão e integração da baseline no GitHub
 
 Data de preparação: 19/07/2026.
 
 ## Escopo
 
-Branch de revisão:
+Branch revisada:
 
 ```text
 codex/dependency-hardening
@@ -16,20 +16,22 @@ Base:
 codex/release-baseline
 ```
 
-Commits principais do hardening antes da documentação da Sprint 3.10:
+Commits principais do hardening:
 
 ```text
 23feb6e chore: normalize repository line endings
 fc29f7b chore: remediate dependency vulnerabilities
+55a997f docs: prepare baseline integration evidence
 ```
 
-Não fazer merge, excluir a branch ou publicar a tag sem revisão humana.
-
-A baseline permanece publicada no repositório privado. A branch
-`codex/dependency-hardening` também foi publicada e rastreia
-`origin/codex/dependency-hardening`. Ela contém somente padronização Git,
-atualização compatível do lockfile e documentação. Nenhum pull request foi
-aberto.
+A baseline e a hardening permanecem publicadas no repositório privado. A
+revisão confirmou escopo somente de padronização Git, atualização compatível
+do lockfile e documentação. O GitHub CLI não estava disponível e não foi
+instalado; nenhum pull request foi simulado ou declarado. Foi usada a
+integração local auditada expressamente permitida, com base
+`codex/release-baseline`, head `codex/dependency-hardening`, estratégia de
+merge commit e resultado
+`63b0c0e758fa63fc65590b5d8648c3b2cf0cea11`.
 
 ## Arquivos proibidos verificados
 
@@ -41,15 +43,18 @@ aberto.
 - [x] nenhum log ou PDF rastreado;
 - [x] `.env.example` contém somente contrato e placeholders.
 
-## Testes
+## Testes pré e pós-merge
 
-Validação aprovada em 19/07/2026:
+Validação aprovada duas vezes em 19/07/2026, antes e depois do merge:
 
 ```powershell
 flutter pub get
 flutter analyze
 flutter test --reporter expanded
 npm.cmd --workspace @consultoria/api run build
+npm.cmd --workspace @consultoria/api run test:unit
+npm.cmd --workspace @consultoria/api run test:operations
+npm.cmd --workspace @consultoria/api run test:e2e
 npm.cmd --workspace @consultoria/api run test
 npm.cmd --workspace @consultoria/api run test:smoke
 npm.cmd run build
@@ -58,7 +63,10 @@ npm.cmd run build
 - `flutter pub get`: aprovado;
 - `flutter analyze`: aprovado, sem issues;
 - `flutter test --reporter expanded`: 19/19 aprovados;
+- `npm.cmd ci`: aprovado e lockfile inalterado;
+- `npm.cmd audit --json`: zero em todas as severidades;
 - build da API: aprovado;
+- unitários, operações e E2E: aprovados separadamente;
 - suíte agregada da API: aprovada;
 - smoke da API: aprovado;
 - build raiz: aprovado.
@@ -77,54 +85,55 @@ Windows em CRLF e binários fora da normalização. Os sete registradores deskto
 gerados pelo Flutter continuam versionados e `flutter pub get` não modifica
 mais o status por diferença de quebra de linha.
 
-## Comparar com main
+## Comparação e integração
 
 No dispositivo local:
 
 ```powershell
 git fetch origin
-git diff origin/codex/release-baseline...origin/codex/dependency-hardening --stat
-git diff origin/codex/release-baseline...origin/codex/dependency-hardening --name-status
-git log --oneline --decorate --graph origin/codex/release-baseline..origin/codex/dependency-hardening
+git show --stat 63b0c0e758fa63fc65590b5d8648c3b2cf0cea11
+git show --no-patch --format="%H %P %s" 63b0c0e758fa63fc65590b5d8648c3b2cf0cea11
 ```
 
-No GitHub, use a comparação entre `codex/release-baseline` e
-`codex/dependency-hardening`. Revise especialmente o lockfile,
-`.gitattributes`, o resultado do audit e a documentação. Não há alteração
-funcional, migration ou banco nesta branch.
+O diff revisado antes da integração continha seis caminhos: `.gitattributes`,
+`saas/package-lock.json`, dois documentos, o relatório consolidado e a remoção
+do relatório anterior. Não houve alteração funcional, migration, banco,
+secret ou artefato compilado. O merge tem como pais a baseline anterior
+`668ac3c0c512a1e804b3d72d565660558cbf67f1` e a hardening publicada
+`55a997f7055c86bbd6da69d089896f896c5ddd7e`.
 
 ## Checklist de revisão
 
-- [ ] confirmar que o repositório continua privado;
-- [ ] confirmar que a branch publicada corresponde ao commit local;
-- [ ] revisar todos os caminhos adicionados ou modificados;
-- [ ] confirmar que exclusões de `node_modules`, `dist` e SQLite são
+- [x] confirmar que o repositório continua privado;
+- [x] confirmar que a branch publicada corresponde ao commit local;
+- [x] revisar todos os caminhos adicionados ou modificados;
+- [x] confirmar que exclusões de `node_modules`, `dist` e SQLite são
       intencionais;
-- [ ] verificar migrations e scripts operacionais;
-- [ ] revisar contratos `.env.example` sem inserir valores reais;
-- [ ] conferir resultados de Flutter, API e clone limpo;
+- [x] confirmar que migrations e scripts operacionais não mudaram;
+- [x] revisar contratos `.env.example` sem inserir valores reais;
+- [x] conferir resultados de Flutter, API e clone limpo;
 - [x] confirmar que as 6 vulnerabilidades reportadas pelo npm foram corrigidas;
 - [x] confirmar audit final com zero vulnerabilidades;
 - [x] confirmar a política LF/CRLF e os registradores Flutter no Windows;
-- [ ] confirmar que `main` não foi alterada;
-- [ ] aprovar ou solicitar correções;
-- [ ] decidir separadamente se um pull request deve ser aberto.
+- [x] confirmar que `main` não foi alterada;
+- [x] aprovar a integração auditada;
+- [x] registrar que o PR não foi aberto por indisponibilidade da ferramenta.
 
-## Procedimento de aprovação
+## Resultado da aprovação
 
-1. dois revisores, quando disponíveis, conferem o diff e este checklist;
-2. o responsável confirma que não há dados empresariais ou secrets;
-3. o responsável valida a decisão GO/NO-GO vigente;
-4. somente depois decide-se sobre PR e merge;
-5. tag e deploy continuam decisões separadas.
+1. branches local e remota foram atualizadas e comparadas;
+2. diff, lockfile, `.gitattributes`, documentação e relatório foram revisados;
+3. arquivos proibidos e formatos conhecidos de secrets retornaram zero;
+4. testes pré-integração foram aprovados;
+5. a hardening documental foi publicada;
+6. o merge commit auditado foi criado somente na baseline;
+7. a matriz pós-merge foi aprovada antes do push;
+8. documentação final e tag específica foram preparadas para publicação;
+9. deploy e mudança do beta para GO não foram autorizados.
 
 ## Rollback
 
-Antes de merge, rollback significa manter `main` intacta e interromper a
-revisão. Correções devem entrar em novos commits na branch, sem reescrever
-histórico compartilhado.
-
-Depois de qualquer merge futuro:
+Depois do merge publicado:
 
 1. não usar reset destrutivo ou force push;
 2. preferir `git revert` dos commits aprovados;
@@ -132,7 +141,7 @@ Depois de qualquer merge futuro:
 4. executar toda a suíte;
 5. tratar restore de dados como procedimento separado e autorizado.
 
-## Publicação futura da tag
+## Tags
 
 A tag local:
 
@@ -140,12 +149,27 @@ A tag local:
 baseline-pre-cloud-2026-07-19
 ```
 
-permanece somente no dispositivo de origem. Após aprovação humana, confirme
-que ela aponta para o commit pretendido e publique somente essa tag:
+permanece somente no dispositivo de origem e não foi movida nem publicada.
 
-```powershell
-git push origin baseline-pre-cloud-2026-07-19
+A tag nova e específica:
+
+```text
+baseline-hardened-pre-postgres-2026-07-19
 ```
 
-Nunca use `git push --tags` nesta baseline. A publicação da tag não autoriza
-deploy.
+foi criada anotada no commit documental final e publicada individualmente. A
+publicação da tag não autoriza deploy.
+
+## Sincronização final
+
+- hardening local/remota:
+  `55a997f7055c86bbd6da69d089896f896c5ddd7e`;
+- merge de integração:
+  `63b0c0e758fa63fc65590b5d8648c3b2cf0cea11`;
+- baseline local/remota: commit documental final que contém este registro,
+  confirmado igual após o push;
+- `main` local/remota:
+  `e039fc641f45378a9f7e7ac8d9371813ba4d952d`;
+- nova tag: publicada no mesmo commit documental final;
+- worktree: limpo após a sincronização;
+- beta externo: `NO-GO`.

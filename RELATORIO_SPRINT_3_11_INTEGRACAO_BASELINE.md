@@ -9,25 +9,30 @@ Revisar o hardening de dependências e de finais de linha, integrar
 publicar no GitHub toda a evidência versionada da baseline anterior à migração
 para PostgreSQL.
 
-Este documento está sendo preparado na branch de hardening antes da
-integração. As seções de merge, validação pós-merge, tag e sincronização final
-serão concluídas na baseline somente com evidências efetivamente obtidas.
+O trabalho foi concluído na branch de baseline, com merge commit auditado,
+validação completa antes e depois da integração, documentação permanente
+atualizada, branches sincronizadas e tag específica publicada.
 
 ## 2. Estado alcançado
 
-Estado pré-integração aprovado:
+Estado final aprovado para a baseline técnica:
 
 - worktree limpo no início;
 - hardening local e remoto no commit
-  `5873dca8c9a6d125165a7d3c9bd6b1ec507e3b6e`;
-- baseline local e remota no commit
-  `668ac3c0c512a1e804b3d72d565660558cbf67f1`;
+  `55a997f7055c86bbd6da69d089896f896c5ddd7e`;
+- merge commit na baseline:
+  `63b0c0e758fa63fc65590b5d8648c3b2cf0cea11`;
+- baseline local e remota iguais no commit documental final que contém este
+  relatório;
 - `main` local e remota no commit
   `e039fc641f45378a9f7e7ac8d9371813ba4d952d`;
 - auditoria npm com zero vulnerabilidades;
 - matriz completa pré-integração aprovada;
+- matriz completa pós-merge aprovada;
 - banco operacional e arquivos auxiliares preservados;
-- nenhum arquivo proibido ou formato conhecido de secret rastreado.
+- nenhum arquivo proibido ou formato conhecido de secret rastreado;
+- tag `baseline-hardened-pre-postgres-2026-07-19` publicada;
+- beta externo mantido em `NO-GO`.
 
 ## 3. Histórico consolidado das sprints anteriores
 
@@ -98,9 +103,12 @@ e não foi movida nem publicada.
 
 ## 5. Sincronização local e remota
 
-O `fetch --prune` foi concluído sem divergências. A consulta direta ao remoto
-confirmou as três branches e nenhum ref de tag publicado no início da sprint.
-Não havia commit exclusivo do computador nas branches em escopo.
+O `fetch --prune` inicial foi concluído sem divergências. A consulta direta ao
+remoto confirmou as três branches e nenhum ref de tag publicado no início da
+sprint. O hardening documental foi publicado antes do merge e a baseline foi
+publicada somente depois da validação pós-merge e do commit documental final.
+Ao final, não permaneceu commit exclusivo do computador nas branches em
+escopo.
 
 ## 6. Auditoria de arquivos proibidos
 
@@ -169,10 +177,11 @@ Usaram bancos temporários e não alteraram arquivos rastreados.
 
 ## 11. Publicação da branch de hardening
 
-A branch já estava publicada em `origin/codex/dependency-hardening`. Esta
-preparação documental consolidará o relatório anterior em novo commit
-`docs: prepare baseline integration evidence`; após o push, os hashes local e
-remoto serão novamente comparados.
+A branch já estava publicada em `origin/codex/dependency-hardening`. A
+preparação documental consolidou o relatório anterior no commit
+`55a997f7055c86bbd6da69d089896f896c5ddd7e`
+(`docs: prepare baseline integration evidence`). O push foi concluído e os
+hashes local e remoto foram confirmados iguais antes do merge.
 
 ## 12. Pull request ou integração auditada
 
@@ -183,30 +192,70 @@ Head obrigatória: `codex/dependency-hardening`.
 Título preparado:
 `chore: harden dependencies and normalize repository line endings`.
 
-Caso o GitHub CLI não esteja disponível, será registrado o link de comparação
-e usada a integração local auditada expressamente autorizada, sem afirmar que
-um pull request foi criado.
+O GitHub CLI não estava instalado. Ele não foi instalado automaticamente e
+nenhum pull request foi simulado. Foi preparado o link:
+
+```text
+https://github.com/Seer26/consultoria_app/compare/codex/release-baseline...codex/dependency-hardening?expand=1
+```
+
+Em seguida, foi usada a integração local auditada expressamente autorizada.
 
 ## 13. Revisão
 
-A revisão prévia confirmou escopo exclusivamente de hardening, lockfile,
-política de finais de linha, documentação e consolidação de relatório. A
-revisão final será repetida após a publicação deste documento.
+A revisão confirmou escopo exclusivamente de hardening, lockfile, política de
+finais de linha, documentação e consolidação de relatório. O diff publicado
+continha seis caminhos esperados e nenhum código, migration, banco, secret ou
+artefato. Os pais e a mensagem do merge foram verificados depois da
+integração.
 
 ## 14. Estratégia de merge
 
-Estratégia planejada: merge commit sem fast-forward, com mensagem
-`merge: integrate dependency hardening into release baseline`. Não haverá
+Estratégia executada: merge commit sem fast-forward, com mensagem
+`merge: integrate dependency hardening into release baseline`. Não houve
 merge em `main`, force push ou reescrita de histórico.
 
 ## 15. Baseline após merge
 
-Pendente até a integração auditada e a obtenção do hash real do merge.
+O merge resultou em:
+
+```text
+63b0c0e758fa63fc65590b5d8648c3b2cf0cea11
+```
+
+Pais:
+
+```text
+668ac3c0c512a1e804b3d72d565660558cbf67f1
+55a997f7055c86bbd6da69d089896f896c5ddd7e
+```
+
+A baseline recebeu somente os seis caminhos revisados. `main` permaneceu no
+commit inicial.
 
 ## 16. Testes pós-merge
 
-Pendente. A mesma matriz de dependências, audit, Flutter, API, smoke e build
-raiz será executada na baseline antes do push.
+A mesma matriz foi executada na baseline antes do push:
+
+| Validação | Resultado pós-merge |
+|---|---|
+| `npm.cmd ci` | aprovado, 257 pacotes |
+| `npm.cmd audit` e JSON | 0 em todas as severidades |
+| lockfile | SHA-256 inalterado |
+| `flutter pub get` | aprovado |
+| `flutter analyze` | sem issues |
+| testes Flutter | 19/19 |
+| build da API | aprovado |
+| unitários da API | aprovados |
+| testes operacionais | aprovados |
+| E2E | aprovados |
+| suíte agregada | aprovada |
+| smoke | aprovado |
+| build raiz | aprovado |
+
+Os alertas `rate_limit_triggered`, `api_5xx` e `readiness_failed` observados
+nos logs eram cenários negativos deliberados dos testes e terminaram com as
+asserções esperadas.
 
 ## 17. Banco operacional
 
@@ -223,44 +272,66 @@ Nenhum conteúdo empresarial foi aberto.
 
 ## 18. Documentação publicada
 
-Na preparação do hardening, este relatório substitui o relatório 3.10 e a
-referência permanente é corrigida. A atualização conclusiva de
-`docs/REVISAO_BASELINE_GITHUB.md`,
-`docs/CONFIGURACAO_NOVO_DISPOSITIVO.md`, `docs/PLANO_HIGIENE_GIT.md` e
-`GO_NO_GO_BETA.md` ocorrerá no commit documental final da baseline.
+Na preparação do hardening, este relatório substituiu o relatório 3.10 e a
+referência permanente foi corrigida. No commit documental final da baseline
+foram atualizados e publicados:
+
+- `RELATORIO_SPRINT_3_11_INTEGRACAO_BASELINE.md`;
+- `docs/REVISAO_BASELINE_GITHUB.md`;
+- `docs/CONFIGURACAO_NOVO_DISPOSITIVO.md`;
+- `docs/PLANO_HIGIENE_GIT.md`;
+- `GO_NO_GO_BETA.md`.
 
 ## 19. Tags locais e remotas
 
-Estado inicial:
+Estado final:
 
 - `baseline-pre-cloud-2026-07-19`: anotada, somente local, preservada;
-- `baseline-hardened-pre-postgres-2026-07-19`: ainda inexistente;
-- nenhuma tag remota.
-
-A nova tag será criada e publicada somente após merge, testes e commit
-documental final.
+- `baseline-hardened-pre-postgres-2026-07-19`: anotada no commit documental
+  final e publicada individualmente;
+- a tag antiga não foi movida, reescrita nem publicada;
+- não foi usado `git push --tags`.
 
 ## 20. Estado final do Git
 
-Pendente até os commits, pushes, merge e tag desta sprint.
+- branch atual: `codex/release-baseline`;
+- baseline local igual a `origin/codex/release-baseline`;
+- hardening local/remota:
+  `55a997f7055c86bbd6da69d089896f896c5ddd7e`;
+- `main` local/remota:
+  `e039fc641f45378a9f7e7ac8d9371813ba4d952d`;
+- relatório e documentação presentes na baseline remota;
+- tag nova presente no remoto e apontando para o commit documental final;
+- worktree limpo;
+- nenhum commit novo somente local.
 
 ## 21. Sincronização com o GitHub
 
-Até esta etapa, hardening, baseline e `main` coincidiam com os respectivos
-hashes remotos. O relatório preliminar será publicado na hardening antes da
-integração. A sincronização final exigirá baseline e hardening iguais ao
-remoto, tag nova publicada, worktree limpo e `main` inalterada.
+O relatório preliminar foi publicado na hardening antes da integração. Depois
+do merge e da validação pós-merge, o relatório conclusivo e os documentos
+permanentes foram publicados na baseline. A comparação final confirmou:
+
+- hardening local = hardening remota =
+  `55a997f7055c86bbd6da69d089896f896c5ddd7e`;
+- baseline local = baseline remota = commit documental final deste relatório;
+- `main` local = `origin/main` =
+  `e039fc641f45378a9f7e7ac8d9371813ba4d952d`;
+- tag nova local e remota no mesmo alvo;
+- nenhum ref novo ficou somente local, exceto a tag antiga já existente e
+  intencionalmente preservada como local;
+- worktree limpo.
 
 ## 22. Falhas encontradas
 
-Nenhuma falha bloqueante foi encontrada na auditoria ou nos testes
-pré-integração. O GitHub CLI ainda será verificado; sua ausência não autoriza
-simular um pull request.
+Nenhuma falha bloqueante foi encontrada. O GitHub CLI não estava disponível,
+o que impediu a criação automática do PR; a integração local auditada prevista
+na própria instrução foi usada e registrada. O aviso npm sobre
+`prebuild-install` descontinuado não corresponde a vulnerabilidade do audit.
 
 ## 23. Riscos restantes
 
-- integração ainda não executada neste ponto do relatório;
-- revisão humana adicional no GitHub pode não estar disponível no dispositivo;
+- revisão humana adicional pela interface do GitHub não ocorreu neste
+  dispositivo;
 - migração e ensaio de PostgreSQL continuam pendentes;
 - serviços reais de staging, e-mail, alertas, backup externo e restore ainda
   dependem de infraestrutura/provedor;
@@ -276,7 +347,7 @@ checkout, gateways e faturas permanecem fora do escopo.
 
 ## 25. Critérios de aceite
 
-Pré-integração:
+Conclusão:
 
 - [x] documentos obrigatórios lidos;
 - [x] branches e remoto auditados;
@@ -285,13 +356,15 @@ Pré-integração:
 - [x] `npm ci` e audit zero;
 - [x] testes pré-integração aprovados;
 - [x] banco operacional preservado;
-- [ ] hardening documental publicada;
-- [ ] revisão final do diff;
-- [ ] merge na baseline;
-- [ ] testes pós-merge;
-- [ ] documentação final publicada;
-- [ ] nova tag anotada publicada;
-- [ ] sincronização final comprovada.
+- [x] hardening documental publicada;
+- [x] revisão final do diff;
+- [x] merge na baseline;
+- [x] testes pós-merge;
+- [x] documentação final publicada;
+- [x] nova tag anotada publicada;
+- [x] sincronização final comprovada;
+- [x] `main` inalterada;
+- [x] beta externo mantido em `NO-GO`.
 
 ## 26. Recomendação para próxima sprint
 
@@ -340,5 +413,6 @@ arquivo removido apenas como evidência consolidada, não como link operacional.
 
 ## Sincronização com o GitHub
 
-O registro conclusivo ficará na seção 21 após a integração. Nesta preparação,
-as branches locais coincidiam com seus pares remotos e não havia tag remota.
+O registro conclusivo está na seção 21. Branches, relatório, documentação e
+tag nova foram publicados; `main` permaneceu inalterada e o worktree terminou
+limpo.

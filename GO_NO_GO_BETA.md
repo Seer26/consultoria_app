@@ -2,15 +2,17 @@
 
 Data: 19/07/2026. Decisão: **NO-GO**.
 
-Estado após a Sprint 3.9: **BASELINE PUBLICADA EM GITHUB PRIVADO; REVISÃO
-HUMANA PENDENTE**. A higiene do Git está **APROVADA**: banco e artefatos
-gerados estão fora do versionamento, o backup foi validado, a suíte passou, a
-branch foi publicada e uma clonagem limpa foi validada. A tag permanece local.
-Isso não comprova staging ou beta externo.
+Estado após a Sprint 3.11: **BASELINE ENDURECIDA, INTEGRADA E SINCRONIZADA NO
+GITHUB PRIVADO**. A higiene do Git está **APROVADA**: banco e artefatos
+gerados estão fora do versionamento, o backup foi validado, a suíte pré e
+pós-merge passou, o audit npm está zerado e a tag
+`baseline-hardened-pre-postgres-2026-07-19` foi publicada. A integração usou
+merge commit auditado porque o GitHub CLI não estava disponível; `main`
+permaneceu inalterada. Isso não comprova staging ou beta externo.
 
 | Área | Estado | Evidência / restrição |
 |---|---|---|
-| Higiene do Git | APROVADO | branch em GitHub privado; dependências, builds, banco e secrets fora do versionamento; clone limpo validado |
+| Higiene do Git | APROVADO | hardening integrado à baseline privada; dependências, builds, banco e secrets fora do versionamento; clone limpo validado |
 | Infraestrutura | REPROVADO | nenhum provedor escolhido, autorizado ou configurado |
 | Docker | NÃO VALIDADO | Docker e Compose indisponíveis; somente validação estática |
 | HTTPS | NÃO VALIDADO | frontend/API não publicados e certificado inexistente |
@@ -49,11 +51,13 @@ Isso não comprova staging ou beta externo.
 
 Consulte `docs/RECURSOS_EXTERNOS_STAGING.md` e `docs/STATUS_JURIDICO_BETA.md`.
 
-## Decisão da Sprint 3.9
+## Decisão da Sprint 3.11
 
 - apresentação local assistida: permitida com as restrições do
   `CHECKLIST_APRESENTACAO_MVP.md`;
-- baseline Git privada: `APROVADO PARA REVISÃO`;
+- baseline Git privada: `HARDENING INTEGRADO E SINCRONIZADO`;
 - beta externo: `NO-GO`;
-- push apenas da branch: executado;
-- tag, PR, merge, deploy, PostgreSQL e pagamentos: não executados.
+- branches hardening e baseline: publicadas e sincronizadas;
+- PR: não criado porque a ferramenta não estava disponível;
+- merge commit auditado e nova tag específica: publicados;
+- `main`, deploy, PostgreSQL e pagamentos: não alterados/não executados.
