@@ -1,29 +1,50 @@
 # Configuração em um novo dispositivo
 
-## Pré-requisitos
+## 1. Pré-requisitos
 
-- Git;
+Instale:
+
+- Git para Windows;
 - Flutter estável compatível com `pubspec.yaml`;
-- Node.js 22;
-- npm;
+- Node.js 22 e npm;
 - ferramentas de compilação exigidas pelo `better-sqlite3`;
-- acesso autorizado ao repositório.
+- um navegador ou dispositivo compatível com Flutter;
+- acesso autorizado ao repositório privado `Seer26/consultoria_app`.
 
-Opcionalmente, Docker pode ser usado para os cenários documentados, mas não é
-necessário para o perfil local SQLite.
+Docker é opcional. O perfil local desta baseline usa SQLite e não exige
+PostgreSQL.
 
-## Clonar o repositório
+Confirme as instalações:
+
+```powershell
+git --version
+flutter --version
+node --version
+npm.cmd --version
+```
+
+## 2. Autenticação no GitHub
+
+Autentique o Git Credential Manager pelo fluxo oficial do GitHub ao primeiro
+clone ou push. Quando o GitHub solicitar autorização no navegador, use somente
+uma conta que tenha acesso ao repositório privado.
+
+Não salve token em URL, arquivo do projeto, histórico do terminal ou
+documentação.
+
+## 3. Clonar a branch publicada
 
 ```powershell
 git clone https://github.com/Seer26/consultoria_app.git
 Set-Location consultoria_app
 git switch codex/release-baseline
+git status --short --branch
 ```
 
-Se a branch ainda não tiver sido publicada, ela só estará disponível no
-dispositivo onde foi criada.
+O clone deve mostrar a branch `codex/release-baseline` acompanhando
+`origin/codex/release-baseline`.
 
-## Flutter
+## 4. Preparar o Flutter
 
 Na raiz:
 
@@ -39,60 +60,57 @@ Para iniciar apontando à API local:
 flutter run --dart-define=APP_ENV=local --dart-define=API_BASE_URL=http://127.0.0.1:3000 --dart-define=SHOW_DEMO_CREDENTIALS=false
 ```
 
-## Node.js
-
-No diretório `saas`:
+## 5. Preparar Node.js
 
 ```powershell
-npm.cmd ci
+Set-Location saas
+npm.cmd install
 npm.cmd run build
 ```
 
-O lockfile deve ser preservado. Não copie `node_modules` de outro dispositivo.
+O `package-lock.json` deve ser preservado. Nunca copie `node_modules` de outro
+dispositivo.
 
-## Variáveis locais
+## 6. Criar a configuração local
 
-Copie `saas/apps/api/.env.example` para
-`saas/apps/api/.env.local` e preencha localmente. O arquivo `.env.local` nunca
-deve ser enviado ao Git.
+Copie:
 
-Para o perfil operacional local:
+```text
+saas/apps/api/.env.example
+```
+
+para:
+
+```text
+saas/apps/api/.env.local
+```
+
+Preencha o arquivo somente no novo dispositivo. Ele é ignorado pelo Git.
+
+Para o perfil local:
 
 - `APP_ENV=local`;
 - `NODE_ENV=development`;
 - `ENABLE_DEMO_SEED=false`;
 - `DATABASE_URL` vazio;
-- `DATABASE_PATH` absoluto e apontando a um SQLite não demonstrativo;
+- `DATABASE_PATH` absoluto para um SQLite local próprio;
 - `SHOW_DEMO_CREDENTIALS=false` no Flutter;
-- secrets reais somente no arquivo local ou no gerenciador do ambiente.
+- secrets somente em `.env.local` ou em gerenciador seguro.
 
-Não reutilize secrets de staging ou produção.
+Nunca reutilize secrets de staging ou produção.
 
-## Banco local
+## 7. Banco local
 
-O Git não distribui o banco operacional. Escolha uma das opções:
+O GitHub não transfere o banco operacional. Escolha:
 
-1. criar um banco novo pelo startup/migrations do aplicativo; ou
-2. receber um backup autorizado por canal seguro e executar o procedimento
-   oficial de restore.
+1. criar um banco local vazio pelo startup/migrations; ou
+2. receber um backup autorizado por canal seguro e usar o restore oficial.
 
-Nunca copie apenas o arquivo principal enquanto houver escrita ativa ou WAL sem
-incorporação. Antes de usar um banco recebido, execute a validação de
-integridade documentada.
+Não copie o SQLite operacional pelo GitHub. Não copie apenas o arquivo
+principal enquanto a API estiver escrevendo ou houver WAL pendente. Valide a
+integridade de qualquer backup antes do uso.
 
-## Testes
-
-Os testes usam bancos temporários. Nunca configure uma suíte para
-`saas/apps/api/data/consultoria.sqlite`.
-
-```powershell
-Set-Location saas
-npm.cmd --workspace @consultoria/api run test
-npm.cmd --workspace @consultoria/api run test:smoke
-npm.cmd --workspace @consultoria/api run test:load:lite
-```
-
-## Como iniciar a API
+## 8. Iniciar a API
 
 No diretório `saas`:
 
@@ -107,35 +125,94 @@ http://127.0.0.1:3000/health
 http://127.0.0.1:3000/ready
 ```
 
-O runtime local suportado usa `tsx`. O build TypeScript valida a compilação,
-mas `node dist/server.js` não é o comando operacional desta baseline.
+O runtime local suportado usa `tsx`. O build valida TypeScript, mas
+`node dist/server.js` não é o comando operacional desta baseline.
 
-## Como iniciar o Flutter
+## 9. Iniciar o Flutter
 
-Com a API online, execute na raiz:
+Com a API online, volte à raiz e execute:
 
 ```powershell
 flutter run --dart-define=APP_ENV=local --dart-define=API_BASE_URL=http://127.0.0.1:3000 --dart-define=SHOW_DEMO_CREDENTIALS=false
 ```
 
-## Como sincronizar alterações
+## 10. Executar os testes
 
-Antes de atualizar:
+Flutter, na raiz:
 
-1. confirme que não existem mudanças locais sem commit;
-2. faça backup consistente do banco;
-3. busque a branch autorizada;
-4. execute `npm.cmd ci` e `flutter pub get`;
-5. execute build e testes;
-6. nunca resolva conflitos apagando o worktree.
+```powershell
+flutter analyze
+flutter test --reporter expanded
+```
 
-## Arquivos que nunca devem ser enviados
+API, no diretório `saas`:
 
-- `.env`, `.env.local` ou outro `.env.*` com valores reais;
+```powershell
+npm.cmd --workspace @consultoria/api run build
+npm.cmd --workspace @consultoria/api run test
+npm.cmd --workspace @consultoria/api run test:smoke
+npm.cmd run build
+```
+
+Os testes usam bancos temporários. Nunca configure testes para o SQLite
+operacional.
+
+## 11. Atualizar a branch
+
+Antes de um pull:
+
+```powershell
+git status --short --branch
+git fetch origin
+git pull --ff-only
+```
+
+Não execute pull com mudanças locais não revisadas. Faça backup consistente do
+banco antes de atualizar código que possa alterar migrations.
+
+## 12. Criar commit e publicar alterações
+
+Revise antes de adicionar:
+
+```powershell
+git status --short
+git diff
+git diff --cached
+```
+
+Adicione somente os arquivos intencionais, execute os testes e então:
+
+```powershell
+git commit -m "descrição objetiva da alteração"
+git push
+```
+
+Nunca use `git add .` sem uma revisão imediatamente anterior. Nunca faça force
+push na baseline compartilhada.
+
+## 13. Tratar conflitos
+
+Se `git pull --ff-only` recusar a atualização:
+
+1. não use `git reset --hard`;
+2. confirme branch, status e commits locais;
+3. faça backup dos dados locais;
+4. busque o remoto com `git fetch origin`;
+5. compare os commits;
+6. resolva cada arquivo de código conscientemente;
+7. execute novamente toda a validação;
+8. solicite revisão antes de publicar.
+
+Dados e `.env.local` não devem participar de conflitos porque não são
+versionados.
+
+## 14. Arquivos que nunca devem ser enviados
+
+- `.env`, `.env.local` ou `.env.*` com valores reais;
 - `.secrets*`;
 - `*.sqlite`, `*.sqlite3`, `*.db`, WAL ou SHM;
 - backups e dumps;
 - `node_modules/`;
 - `dist/`, `build/`, `.dart_tool/`, `coverage/`;
-- tokens, chaves privadas ou URLs com credenciais reais;
-- PDFs, logs e exportações contendo dados empresariais.
+- tokens, chaves privadas ou URLs com credenciais;
+- PDFs, logs e exportações com dados empresariais.
