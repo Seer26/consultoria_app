@@ -116,13 +116,13 @@ class FormsPage extends ConsumerWidget {
 
                 return ListView.separated(
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
                   itemBuilder: (_, index) => _FormCard(form: filtered[index]),
                 );
               },
-              loading: () => const AppLoadingState(
-                message: 'Carregando formularios',
-              ),
+              loading: () =>
+                  const AppLoadingState(message: 'Carregando formularios'),
               error: (error, _) => AppErrorState(
                 title: 'Nao foi possivel carregar os formularios',
                 message: error.toString(),
@@ -170,10 +170,9 @@ class FormsPage extends ConsumerWidget {
       return;
     }
 
-    await ref.read(formsControllerProvider.notifier).create(
-          input,
-          clientId: ref.read(selectedFormClientIdProvider),
-        );
+    await ref
+        .read(formsControllerProvider.notifier)
+        .create(input, clientId: ref.read(selectedFormClientIdProvider));
 
     if (!context.mounted) {
       return;
@@ -206,7 +205,7 @@ class _CompanyFilter extends StatelessWidget {
       data: (companies) => SizedBox(
         width: 320,
         child: DropdownButtonFormField<String?>(
-          value: selectedCompanyId,
+          initialValue: selectedCompanyId,
           decoration: const InputDecoration(
             labelText: 'Empresa',
             prefixIcon: Icon(Icons.apartment_outlined),
@@ -226,11 +225,9 @@ class _CompanyFilter extends StatelessWidget {
           onChanged: onChanged,
         ),
       ),
-      loading: () => const SizedBox(
-        width: 320,
-        child: LinearProgressIndicator(),
-      ),
-      error: (_, __) => const Text('Erro ao carregar empresas.'),
+      loading: () =>
+          const SizedBox(width: 320, child: LinearProgressIndicator()),
+      error: (error, stackTrace) => const Text('Erro ao carregar empresas.'),
     );
   }
 }
@@ -257,9 +254,8 @@ class _FormCard extends ConsumerWidget {
                     children: [
                       Text(
                         form.title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 6),
                       Text(form.description),
@@ -270,8 +266,14 @@ class _FormCard extends ConsumerWidget {
                   onSelected: (value) => _handleMenu(value, context, ref),
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'edit', child: Text('Editar')),
-                    PopupMenuItem(value: 'draft', child: Text('Salvar como rascunho')),
-                    PopupMenuItem(value: 'sent', child: Text('Marcar como enviado')),
+                    PopupMenuItem(
+                      value: 'draft',
+                      child: Text('Salvar como rascunho'),
+                    ),
+                    PopupMenuItem(
+                      value: 'sent',
+                      child: Text('Marcar como enviado'),
+                    ),
                     PopupMenuItem(value: 'duplicate', child: Text('Duplicar')),
                     PopupMenuItem(value: 'archive', child: Text('Arquivar')),
                     PopupMenuItem(value: 'delete', child: Text('Excluir')),
@@ -307,12 +309,15 @@ class _FormCard extends ConsumerWidget {
                       : () => _respond(context, ref),
                   icon: const Icon(Icons.send_outlined),
                   label: Text(
-                    form.status == FormStatus.sent ? 'Ver respostas' : 'Simular envio',
+                    form.status == FormStatus.sent
+                        ? 'Ver respostas'
+                        : 'Simular envio',
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () =>
-                      ref.read(formsControllerProvider.notifier).duplicate(form),
+                  onPressed: () => ref
+                      .read(formsControllerProvider.notifier)
+                      .duplicate(form),
                   icon: const Icon(Icons.copy_outlined),
                   label: const Text('Duplicar'),
                 ),
@@ -348,7 +353,9 @@ class _FormCard extends ConsumerWidget {
           ),
         );
         if (edited != null) {
-          ref.read(formsControllerProvider.notifier).updateTemplate(
+          ref
+              .read(formsControllerProvider.notifier)
+              .updateTemplate(
                 form.copyWith(
                   clientId: edited.clientId,
                   clientName: edited.clientName,
@@ -395,12 +402,12 @@ class _FormCard extends ConsumerWidget {
       return;
     }
 
-    await ref.read(formsControllerProvider.notifier).submit(
-          formId: form.id,
-          clientId: form.clientId,
-          answers: answers,
-        );
-    ref.read(formsControllerProvider.notifier).updateStatus(form.id, FormStatus.sent);
+    await ref
+        .read(formsControllerProvider.notifier)
+        .submit(formId: form.id, clientId: form.clientId, answers: answers);
+    ref
+        .read(formsControllerProvider.notifier)
+        .updateStatus(form.id, FormStatus.sent);
     try {
       await ref.read(diagnosisControllerProvider.notifier).submit({
         'source': 'form_demo',
@@ -410,7 +417,9 @@ class _FormCard extends ConsumerWidget {
         'answers': answers,
       });
     } catch (_) {}
-    ref.read(actionPlanControllerProvider.notifier).addGeneratedFromForm(
+    ref
+        .read(actionPlanControllerProvider.notifier)
+        .addGeneratedFromForm(
           clientName: form.clientName,
           formTitle: form.title,
           answers: answers,
@@ -459,7 +468,8 @@ class _CreateOrEditFormDialog extends StatefulWidget {
   final FormTemplate? form;
 
   @override
-  State<_CreateOrEditFormDialog> createState() => _CreateOrEditFormDialogState();
+  State<_CreateOrEditFormDialog> createState() =>
+      _CreateOrEditFormDialogState();
 }
 
 class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
@@ -488,8 +498,9 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
     _audience = form?.audience ?? FormAudience.manager;
     _status = form?.status ?? FormStatus.draft;
     _titleController = TextEditingController(text: form?.title ?? '');
-    _descriptionController =
-        TextEditingController(text: form?.description ?? '');
+    _descriptionController = TextEditingController(
+      text: form?.description ?? '',
+    );
     _labelController = TextEditingController();
     _optionsController = TextEditingController();
     _fields = List<FormFieldItem>.from(form?.fields ?? const []);
@@ -506,12 +517,15 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final needsOptions = _selectedType == FormFieldType.multipleChoice ||
+    final needsOptions =
+        _selectedType == FormFieldType.multipleChoice ||
         _selectedType == FormFieldType.checkbox ||
         _selectedType == FormFieldType.dropdown;
 
     return AlertDialog(
-      title: Text(widget.form == null ? 'Novo formulario' : 'Editar formulario'),
+      title: Text(
+        widget.form == null ? 'Novo formulario' : 'Editar formulario',
+      ),
       content: SizedBox(
         width: 640,
         child: SingleChildScrollView(
@@ -519,7 +533,7 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedCompany.id,
+                initialValue: _selectedCompany.id,
                 decoration: const InputDecoration(labelText: 'Empresa'),
                 items: widget.companies
                     .map(
@@ -542,7 +556,7 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<FormAudience>(
-                value: _audience,
+                initialValue: _audience,
                 decoration: const InputDecoration(labelText: 'Publico-alvo'),
                 items: const [
                   DropdownMenuItem(
@@ -570,7 +584,7 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<FormStatus>(
-                value: _status,
+                initialValue: _status,
                 decoration: const InputDecoration(labelText: 'Status inicial'),
                 items: const [
                   DropdownMenuItem(
@@ -592,8 +606,10 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<FormFieldType>(
-                value: _selectedType,
-                decoration: const InputDecoration(labelText: 'Tipo de pergunta'),
+                initialValue: _selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de pergunta',
+                ),
                 items: FormFieldType.values
                     .map(
                       (type) => DropdownMenuItem(
@@ -641,7 +657,8 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
                         .map(
                           (field) => Chip(
                             label: Text(field.label),
-                            onDeleted: () => setState(() => _fields.remove(field)),
+                            onDeleted: () =>
+                                setState(() => _fields.remove(field)),
                           ),
                         )
                         .toList(),
@@ -679,11 +696,12 @@ class _CreateOrEditFormDialogState extends State<_CreateOrEditFormDialog> {
       FormFieldType.scale => const ['1', '2', '3', '4', '5'],
       FormFieldType.multipleChoice ||
       FormFieldType.checkbox ||
-      FormFieldType.dropdown => _optionsController.text
-          .split(',')
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .toList(),
+      FormFieldType.dropdown =>
+        _optionsController.text
+            .split(',')
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(),
       FormFieldType.shortText ||
       FormFieldType.longText ||
       FormFieldType.date => const <String>[],
@@ -814,10 +832,8 @@ class _RespondFormDialogState extends State<_RespondFormDialog> {
             decoration: InputDecoration(labelText: field.label),
             items: field.options
                 .map(
-                  (option) => DropdownMenuItem(
-                    value: option,
-                    child: Text(option),
-                  ),
+                  (option) =>
+                      DropdownMenuItem(value: option, child: Text(option)),
                 )
                 .toList(),
             onChanged: (value) => _answers[field.id] = value,

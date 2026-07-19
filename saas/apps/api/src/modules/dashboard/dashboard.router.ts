@@ -2,29 +2,31 @@ import { Router } from 'express';
 
 import { authenticate, authorize } from '../auth/auth.middleware';
 import { DashboardController } from './dashboard.controller';
+import { DashboardRepository } from './dashboard.repository';
 import { DashboardService } from './dashboard.service';
 
-const service = new DashboardService();
+const repository = new DashboardRepository();
+const service = new DashboardService(repository);
 const controller = new DashboardController(service);
 
 export const dashboardRouter = Router();
 
 dashboardRouter.get(
-  '/admin/overview',
+  '/dashboard/admin',
   authenticate,
   authorize('ADMIN'),
-  controller.getAdminOverview,
+  controller.getAdminDashboard,
 );
 
 dashboardRouter.get(
-  '/company/dashboard',
+  '/dashboard/company',
   authenticate,
   authorize('OWNER'),
   controller.getCompanyDashboard,
 );
 
 dashboardRouter.get(
-  '/employee/dashboard',
+  '/dashboard/employee',
   authenticate,
   authorize('EMPLOYEE'),
   controller.getEmployeeDashboard,

@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master", "codex/**"]
+  pull_request:
+
+jobs:
+  api:
+    name: API build and E2E
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: saas
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm run build
+
+      - name: Run API tests
+        run: npm --workspace @consultoria/api run test
+        env:
+          NODE_ENV: test
+          ENABLE_DEMO_SEED: "false"
+          JWT_SECRET: consultoria-ci-api-test-secret-with-32-chars
+          CORS_ORIGINS: http://127.0.0.1:3000
+
+      - name: Run API E2E
+        run: npm --workspace @consultoria/api run test:e2e
+        env:
+          NODE_ENV: test
+          ENABLE_DEMO_SEED: "false"
+          JWT_SECRET: consultoria-ci-e2e-secret-with-32-chars
+          CORS_ORIGINS: http://127.0.0.1:3000
+
+      - name: Run controlled light load test
+        run: npm --workspace @consultoria/api run test:load:lite
+        env:
+          NODE_ENV: test
+          ENABLE_DEMO_SEED: "false"
+          JWT_SECRET: consultoria-ci-load-secret-with-32-chars
+          CORS_ORIGINS: http://127.0.0.1:3000
+
+  flutter:
+    name: Flutter analyze and tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter
+        run: flutter analyze
+
+      - name: Test Flutter
+        run: flutter test --reporter expanded
+
+      - name: Build Flutter Web staging artifact
+        run: >-
+          flutter build web --release
+          --dart-define=APP_ENV=staging
+          --dart-define=API_BASE_URL=https://api-staging.example.invalid
+          --dart-define=SHOW_DEMO_CREDENTIALS=false

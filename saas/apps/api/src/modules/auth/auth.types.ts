@@ -10,6 +10,7 @@ export interface AuthUserRecord {
   status: 'ACTIVE' | 'INACTIVE';
   createdAt: string;
   updatedAt: string;
+  authVersion: number;
 }
 
 export interface CompanyRecord {
@@ -40,6 +41,19 @@ export interface AuthTokenPayload {
   userId: string;
   role: UserRole;
   companyId: string | null;
+  authVersion: number;
+}
+
+export interface PasswordResetTokenRecord {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  requestedIpHash: string | null;
+  requestId: string | null;
+  status: 'PENDING' | 'USED' | 'REVOKED';
 }
 
 export interface AuthResponse {

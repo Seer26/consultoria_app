@@ -17,11 +17,15 @@ final getClientsProvider = Provider<GetClients>((ref) {
 
 final clientsControllerProvider =
     StateNotifierProvider<ClientsController, AsyncValue<List<Client>>>((ref) {
-  return ClientsController(ref.read(getClientsProvider));
-});
+      return ClientsController(ref.read(getClientsProvider));
+    });
 
-final selectedClientProvider = Provider.family<Client?, String>((ref, clientId) {
-  final clients = ref.watch(clientsControllerProvider).valueOrNull ?? const <Client>[];
+final selectedClientProvider = Provider.family<Client?, String>((
+  ref,
+  clientId,
+) {
+  final clients =
+      ref.watch(clientsControllerProvider).valueOrNull ?? const <Client>[];
   for (final client in clients) {
     if (client.id == clientId) {
       return client;

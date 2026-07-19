@@ -35,10 +35,7 @@ class KpiCard extends StatelessWidget {
                     color: (color ?? AppColors.primary).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
-                    icon,
-                    color: color ?? AppColors.primary,
-                  ),
+                  child: Icon(icon, color: color ?? AppColors.primary),
                 ),
                 const Spacer(),
                 if (trend != null)
@@ -65,18 +62,17 @@ class KpiCard extends StatelessWidget {
             const Spacer(flex: 2),
             Text(
               value,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

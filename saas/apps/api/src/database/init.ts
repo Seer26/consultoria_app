@@ -1,9 +1,4 @@
-import bcrypt from 'bcrypt';
-
 import { database } from '../db/database';
-
-const TEST_PASSWORD = '123456';
-const TEST_COMPANY_ID = 'company-demo';
 
 function slugify(value: string): string {
   return value
@@ -30,12 +25,102 @@ function ensureColumn(tableName: string, columnName: string, definition: string)
   }
 }
 
+function getCurrentPeriodRange(now = new Date()): { start: string; end: string } {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
+function seedPlansAndSubscriptions(): void {
+  const now = new Date().toISOString();
+  const period = getCurrentPeriodRange();
+
+  database.prepare(`
+    INSERT INTO plans (
+      id, slug, name, description, status,
+      max_users, max_research_submissions_monthly, max_report_pdfs_monthly,
+      max_active_action_tasks, max_ai_questions_monthly,
+      created_at, updated_at
+    ) VALUES (
+      'plan-starter', 'starter', 'Starter',
+      'Plano inicial para operacao controlada do SaaS.',
+      'ACTIVE', 5, 20, 30, 100, 100, @now, @now
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      slug = excluded.slug,
+      name = excluded.name,
+      description = excluded.description,
+      status = excluded.status,
+      max_users = excluded.max_users,
+      max_research_submissions_monthly = excluded.max_research_submissions_monthly,
+      max_report_pdfs_monthly = excluded.max_report_pdfs_monthly,
+      max_active_action_tasks = excluded.max_active_action_tasks,
+      max_ai_questions_monthly = excluded.max_ai_questions_monthly,
+      updated_at = excluded.updated_at
+  `).run({ now });
+
+  database.prepare(`
+    INSERT INTO plans (
+      id, slug, name, description, status,
+      max_users, max_research_submissions_monthly, max_report_pdfs_monthly,
+      max_active_action_tasks, max_ai_questions_monthly,
+      created_at, updated_at
+    ) VALUES (
+      'plan-growth', 'growth', 'Growth',
+      'Plano intermediario preparado para beta e expansao.',
+      'ACTIVE', 20, 100, 150, 500, 500, @now, @now
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      slug = excluded.slug,
+      name = excluded.name,
+      description = excluded.description,
+      status = excluded.status,
+      max_users = excluded.max_users,
+      max_research_submissions_monthly = excluded.max_research_submissions_monthly,
+      max_report_pdfs_monthly = excluded.max_report_pdfs_monthly,
+      max_active_action_tasks = excluded.max_active_action_tasks,
+      max_ai_questions_monthly = excluded.max_ai_questions_monthly,
+      updated_at = excluded.updated_at
+  `).run({ now });
+
+  database.prepare(`
+    INSERT OR IGNORE INTO company_subscriptions (
+      id, company_id, plan_id, status,
+      current_period_start, current_period_end,
+      created_at, updated_at
+    )
+    SELECT
+      'subscription-' || c.id,
+      c.id,
+      'plan-starter',
+      'ACTIVE',
+      @periodStart,
+      @periodEnd,
+      @now,
+      @now
+    FROM companies c
+  `).run({
+    periodStart: period.start,
+    periodEnd: period.end,
+    now,
+  });
+}
+
 function runMigrations(): void {
   ensureColumn('companies', 'slug', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('companies', 'status', `TEXT NOT NULL DEFAULT 'ACTIVE'`);
+  ensureColumn('companies', 'sector', `TEXT`);
+  ensureColumn('companies', 'size', `TEXT`);
+  ensureColumn('companies', 'phone', `TEXT`);
+  ensureColumn('companies', 'responsible_name', `TEXT`);
+  ensureColumn('companies', 'notes', `TEXT`);
   ensureColumn('companies', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('users', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('users', 'status', `TEXT NOT NULL DEFAULT 'ACTIVE'`);
+  ensureColumn('users', 'auth_version', `INTEGER NOT NULL DEFAULT 0`);
   ensureColumn('diagnosis_submissions', 'user_id', `TEXT`);
   ensureColumn('diagnosis_submissions', 'submission_type', `TEXT NOT NULL DEFAULT 'DIAGNOSIS'`);
   ensureColumn('diagnosis_submissions', 'respondent_role', `TEXT`);
@@ -67,6 +152,7 @@ function runMigrations(): void {
   ensureColumn('action_plan_tasks', 'created_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('action_plan_tasks', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('action_plan_tasks', 'completed_at', `TEXT`);
+  ensureColumn('plans', 'description', `TEXT`);
 
   database.exec(`
     UPDATE companies
@@ -271,82 +357,43 @@ function runMigrations(): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_slug_unique
     ON companies(slug)
   `);
-}
 
-const seedUsers = [
-  {
-    id: 'user-admin-teste',
-    name: 'Admin Teste',
-    email: 'admin@teste.com',
-    role: 'ADMIN',
-    companyId: null,
-  },
-  {
-    id: 'user-owner-teste',
-    name: 'Dono Teste',
-    email: 'owner@teste.com',
-    role: 'OWNER',
-    companyId: TEST_COMPANY_ID,
-  },
-  {
-    id: 'user-employee-teste',
-    name: 'Funcionario Teste',
-    email: 'employee@teste.com',
-    role: 'EMPLOYEE',
-    companyId: TEST_COMPANY_ID,
-  },
-] as const;
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_usage_counters_company_feature_period
+    ON usage_counters(company_id, feature, period)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_company_subscriptions_company_id
+    ON company_subscriptions(company_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_company_subscription_events_company_id
+    ON company_subscription_events(company_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_status
+    ON password_reset_tokens(user_id, status)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at
+    ON password_reset_tokens(expires_at)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_legal_acceptances_user_document
+    ON legal_acceptances(user_id, document_type, document_version)
+  `);
+
+  seedPlansAndSubscriptions();
+}
 
 export async function initDatabase(): Promise<void> {
   runMigrations();
-
-  const now = new Date().toISOString();
-  database
-    .prepare(
-      `
-      INSERT INTO companies (id, name, slug, status, sector, size, created_at, updated_at)
-      VALUES (@id, @name, @slug, @status, @sector, @size, @createdAt, @updatedAt)
-      ON CONFLICT(id) DO NOTHING
-      `,
-    )
-    .run({
-      id: TEST_COMPANY_ID,
-      name: 'Empresa Demo',
-      slug: 'empresa-demo',
-      status: 'ACTIVE',
-      sector: 'Consultoria',
-      size: 'SMB',
-      createdAt: now,
-      updatedAt: now,
-    });
-
-  const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
-  const upsertUser = database.prepare(`
-    INSERT INTO users (id, name, email, password_hash, role, company_id, created_at, updated_at, status)
-    VALUES (@id, @name, @email, @passwordHash, @role, @companyId, @createdAt, @updatedAt, @status)
-    ON CONFLICT(email) DO UPDATE SET
-      id = excluded.id,
-      name = excluded.name,
-      password_hash = excluded.password_hash,
-      role = excluded.role,
-      company_id = excluded.company_id,
-      updated_at = excluded.updated_at,
-      status = excluded.status
-  `);
-
-  for (const user of seedUsers) {
-    upsertUser.run({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      passwordHash,
-      role: user.role,
-      companyId: user.companyId,
-      createdAt: now,
-      updatedAt: now,
-      status: 'ACTIVE',
-    });
-  }
-
-  console.log('Banco pronto e usuarios de teste padronizados');
+  console.log(
+    'Banco pronto sem seed automatico. Use o comando demo:seed somente em base demo isolada.',
+  );
 }

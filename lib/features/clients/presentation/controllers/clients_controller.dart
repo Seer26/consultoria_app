@@ -48,6 +48,8 @@ class ClientsController extends StateNotifier<AsyncValue<List<Client>>> {
 
   void remove(String id) {
     final current = state.valueOrNull ?? const <Client>[];
-    state = AsyncValue.data(current.where((client) => client.id != id).toList());
+    state = AsyncValue.data(
+      current.where((client) => client.id != id).toList(),
+    );
   }
 }

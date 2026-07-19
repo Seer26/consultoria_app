@@ -1,10 +1,22 @@
 import { database } from '../../db/database';
 import type {
+  ActionPlanAssignee,
   ActionPlanCompanyRecord,
   ActionPlanTaskDetails,
   ActionPlanTaskRecord,
   AuthenticatedActionPlanUser,
 } from './action-plan.types';
+
+interface AssigneeRow {
+  id: string;
+  name: string;
+  email: string;
+  role: 'ADMIN' | 'OWNER' | 'EMPLOYEE';
+  company_id: string;
+  job_role: string | null;
+  department: string | null;
+  company_sector: string | null;
+}
 
 interface UserRow {
   id: string;
@@ -96,10 +108,68 @@ function mapTaskDetails(row: ActionPlanTaskDetailsRow): ActionPlanTaskDetails {
     companyName: row.company_name,
     responsibleUserName: row.responsible_user_name,
     responsibleUserEmail: row.responsible_user_email,
+    isOverdue: false,
+    daysOverdue: 0,
+    isDueSoon: false,
   };
 }
 
 export class ActionPlanRepository {
+  listActiveAssignees(companyId: string): ActionPlanAssignee[] {
+    const rows = database
+      .prepare(
+        `
+        SELECT
+          u.id,
+          u.name,
+          u.email,
+          u.role,
+          u.company_id,
+          (
+            SELECT ds.respondent_role
+            FROM diagnosis_submissions ds
+            WHERE ds.user_id = u.id
+              AND ds.company_id = u.company_id
+              AND ds.respondent_role IS NOT NULL
+              AND TRIM(ds.respondent_role) <> ''
+            ORDER BY ds.created_at DESC
+            LIMIT 1
+          ) AS job_role,
+          (
+            SELECT ds.department
+            FROM diagnosis_submissions ds
+            WHERE ds.user_id = u.id
+              AND ds.company_id = u.company_id
+              AND ds.department IS NOT NULL
+              AND TRIM(ds.department) <> ''
+            ORDER BY ds.created_at DESC
+            LIMIT 1
+          ) AS department,
+          c.sector AS company_sector
+        FROM users u
+        INNER JOIN companies c ON c.id = u.company_id
+        WHERE u.company_id = ?
+          AND u.status = 'ACTIVE'
+        ORDER BY
+          CASE u.role WHEN 'OWNER' THEN 1 ELSE 2 END,
+          u.name ASC
+        `,
+      )
+      .all(companyId) as AssigneeRow[];
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      jobRole:
+        row.job_role?.trim() ||
+        (row.role === 'OWNER' ? 'Responsável pela empresa' : 'Colaborador'),
+      department: row.department?.trim() || row.company_sector?.trim() || 'Não informado',
+      companyId: row.company_id,
+    }));
+  }
+
   findUserById(id: string): AuthenticatedActionPlanUser | null {
     const row = database
       .prepare(

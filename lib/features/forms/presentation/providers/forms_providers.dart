@@ -31,12 +31,14 @@ final submitFormResponseProvider = Provider<SubmitFormResponse>((ref) {
 });
 
 final formsControllerProvider =
-    StateNotifierProvider<FormsController, AsyncValue<List<FormTemplate>>>((ref) {
-  return FormsController(
-    ref.read(getFormsProvider),
-    ref.read(createFormProvider),
-    ref.read(submitFormResponseProvider),
-  );
-});
+    StateNotifierProvider<FormsController, AsyncValue<List<FormTemplate>>>((
+      ref,
+    ) {
+      return FormsController(
+        ref.read(getFormsProvider),
+        ref.read(createFormProvider),
+        ref.read(submitFormResponseProvider),
+      );
+    });
 
 final selectedFormClientIdProvider = StateProvider<String?>((ref) => null);

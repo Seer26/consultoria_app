@@ -8,62 +8,64 @@ enum SidebarItem {
   empresas,
   relatorios,
   usuarios,
-  equipe,
   tarefas,
+  plano,
+  configuracoesEmpresa,
 }
 
-enum SidebarGroup {
-  workspace,
-  management,
-}
+enum SidebarGroup { workspace, management }
 
 extension SidebarItemX on SidebarItem {
   String get label => switch (this) {
-        SidebarItem.dashboard => 'Dashboard',
-        SidebarItem.diagnostico => 'Pesquisa',
-        SidebarItem.empresas => 'Empresas',
-        SidebarItem.relatorios => 'Relatorios',
-        SidebarItem.usuarios => 'Usuarios',
-        SidebarItem.equipe => 'Equipe',
-        SidebarItem.tarefas => 'Tarefas',
-      };
+    SidebarItem.dashboard => 'Dashboard',
+    SidebarItem.diagnostico => 'Pesquisa Empresarial',
+    SidebarItem.empresas => 'Empresas',
+    SidebarItem.relatorios => 'Relatório Executivo',
+    SidebarItem.usuarios => 'Usuários',
+    SidebarItem.tarefas => 'Plano de Ação',
+    SidebarItem.plano => 'Plano atual',
+    SidebarItem.configuracoesEmpresa => 'Configurações',
+  };
 
   String get helper => switch (this) {
-        SidebarItem.dashboard => 'Visao geral da operacao',
-        SidebarItem.diagnostico => 'Perguntas guiadas pela IA',
-        SidebarItem.empresas => 'Gestao das empresas',
-        SidebarItem.relatorios => 'Resultados e analises',
-        SidebarItem.usuarios => 'Acesso e perfis',
-        SidebarItem.equipe => 'Colaboradores da empresa',
-        SidebarItem.tarefas => 'Execucao individual',
-      };
+    SidebarItem.dashboard => 'Visao geral da operacao',
+    SidebarItem.diagnostico => 'Perguntas guiadas pela IA',
+    SidebarItem.empresas => 'Gestao das empresas',
+    SidebarItem.relatorios => 'Resultados e analises',
+    SidebarItem.usuarios => 'Acesso e perfis',
+    SidebarItem.tarefas => 'Tarefas e acompanhamento',
+    SidebarItem.plano => 'Limites e uso do SaaS',
+    SidebarItem.configuracoesEmpresa => 'Dados da empresa',
+  };
 
   IconData get icon => switch (this) {
-        SidebarItem.dashboard => Icons.space_dashboard_outlined,
-        SidebarItem.diagnostico => Icons.analytics_outlined,
-        SidebarItem.empresas => Icons.apartment_outlined,
-        SidebarItem.relatorios => Icons.assessment_outlined,
-        SidebarItem.usuarios => Icons.manage_accounts_outlined,
-        SidebarItem.equipe => Icons.groups_2_outlined,
-        SidebarItem.tarefas => Icons.task_alt_outlined,
-      };
+    SidebarItem.dashboard => Icons.space_dashboard_outlined,
+    SidebarItem.diagnostico => Icons.analytics_outlined,
+    SidebarItem.empresas => Icons.apartment_outlined,
+    SidebarItem.relatorios => Icons.assessment_outlined,
+    SidebarItem.usuarios => Icons.manage_accounts_outlined,
+    SidebarItem.tarefas => Icons.task_alt_outlined,
+    SidebarItem.plano => Icons.workspace_premium_outlined,
+    SidebarItem.configuracoesEmpresa => Icons.settings_outlined,
+  };
 
   SidebarGroup get group => switch (this) {
-        SidebarItem.dashboard || SidebarItem.diagnostico || SidebarItem.tarefas =>
-          SidebarGroup.workspace,
-        SidebarItem.empresas ||
-        SidebarItem.relatorios ||
-        SidebarItem.usuarios ||
-        SidebarItem.equipe =>
-          SidebarGroup.management,
-      };
+    SidebarItem.dashboard ||
+    SidebarItem.diagnostico ||
+    SidebarItem.tarefas => SidebarGroup.workspace,
+    SidebarItem.empresas ||
+    SidebarItem.relatorios ||
+    SidebarItem.usuarios ||
+    SidebarItem.plano ||
+    SidebarItem.configuracoesEmpresa => SidebarGroup.management,
+  };
 }
 
 extension SidebarGroupX on SidebarGroup {
   String get label => switch (this) {
-        SidebarGroup.workspace => 'Workspace',
-        SidebarGroup.management => 'Gestao',
-      };
+    SidebarGroup.workspace => 'Workspace',
+    SidebarGroup.management => 'Gestao',
+  };
 }
 
 class Sidebar extends StatelessWidget {
@@ -95,12 +97,14 @@ class Sidebar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (workspaceItems.isNotEmpty) ...[
-          if (extended) _SidebarSectionLabel(label: SidebarGroup.workspace.label),
+          if (extended)
+            _SidebarSectionLabel(label: SidebarGroup.workspace.label),
           ...workspaceItems.map(_buildTile),
         ],
         if (managementItems.isNotEmpty) ...[
           const SizedBox(height: 12),
-          if (extended) _SidebarSectionLabel(label: SidebarGroup.management.label),
+          if (extended)
+            _SidebarSectionLabel(label: SidebarGroup.management.label),
           ...managementItems.map(_buildTile),
         ],
       ],
@@ -118,15 +122,14 @@ class Sidebar extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(
-                  colors: [
-                    Color(0xFFF3F7FF),
-                    Color(0xFFE8F0FF),
-                  ],
+                  colors: [Color(0xFFF3F7FF), Color(0xFFE8F0FF)],
                 )
               : null,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isSelected ? AppColors.primary.withValues(alpha: 0.22) : AppColors.border,
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.22)
+                : AppColors.border,
           ),
           boxShadow: isSelected
               ? [
@@ -164,7 +167,9 @@ class Sidebar extends StatelessWidget {
               ? Text(
                   item.label,
                   style: TextStyle(
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
                   ),
                 )
@@ -180,10 +185,7 @@ class Sidebar extends StatelessWidget {
                 )
               : null,
           trailing: badge != null
-              ? _SidebarBadge(
-                  label: badge,
-                  highlighted: isSelected,
-                )
+              ? _SidebarBadge(label: badge, highlighted: isSelected)
               : null,
           onTap: () => onSelect(item),
         ),
@@ -215,10 +217,7 @@ class _SidebarSectionLabel extends StatelessWidget {
 }
 
 class _SidebarBadge extends StatelessWidget {
-  const _SidebarBadge({
-    required this.label,
-    required this.highlighted,
-  });
+  const _SidebarBadge({required this.label, required this.highlighted});
 
   final String label;
   final bool highlighted;

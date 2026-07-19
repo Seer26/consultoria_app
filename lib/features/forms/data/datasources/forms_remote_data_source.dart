@@ -207,7 +207,8 @@ class FormsRemoteDataSource {
       description: json['description']?.toString() ?? '',
       audience: _parseAudience(json['audience']?.toString()),
       status: _parseStatus(json['status']?.toString()),
-      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       fields: rawFields.map(_fieldFromApi).toList(growable: false),
       responsesCount: json['responsesCount'] is int

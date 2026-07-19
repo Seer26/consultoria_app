@@ -23,4 +23,3 @@ class ValidationException extends AppException {
 class ServerException extends AppException {
   ServerException(super.message, [super.statusCode]);
 }
-

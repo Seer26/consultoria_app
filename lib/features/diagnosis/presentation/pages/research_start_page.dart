@@ -4,10 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
 
 class ResearchCompanyOption {
-  const ResearchCompanyOption({
-    required this.id,
-    required this.name,
-  });
+  const ResearchCompanyOption({required this.id, required this.name});
 
   final String id;
   final String name;
@@ -18,6 +15,7 @@ class ResearchStartPage extends StatefulWidget {
     super.key,
     required this.onStart,
     this.isStarting = false,
+    this.allowStart = true,
     this.historySection,
     this.requireCompanySelection = false,
     this.companyOptions = const [],
@@ -27,8 +25,10 @@ class ResearchStartPage extends StatefulWidget {
     required String role,
     required String sector,
     String? companyId,
-  }) onStart;
+  })
+  onStart;
   final bool isStarting;
+  final bool allowStart;
   final Widget? historySection;
   final bool requireCompanySelection;
   final List<ResearchCompanyOption> companyOptions;
@@ -68,7 +68,9 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
 
     if (role == null || role.isEmpty || sector == null || sector.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione funcao e setor para continuar.')),
+        const SnackBar(
+          content: Text('Selecione funcao e setor para continuar.'),
+        ),
       );
       return;
     }
@@ -76,109 +78,122 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
     if (widget.requireCompanySelection &&
         (companyId == null || companyId.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione a empresa para iniciar a pesquisa.')),
+        const SnackBar(
+          content: Text('Selecione a empresa para iniciar a pesquisa.'),
+        ),
       );
       return;
     }
 
-    await widget.onStart(
-      role: role,
-      sector: sector,
-      companyId: companyId,
-    );
+    await widget.onStart(role: role, sector: sector, companyId: companyId);
   }
 
   @override
   Widget build(BuildContext context) {
     return AppPageScaffold(
-      title: 'Pesquisa',
-      subtitle: 'Antes de comecar, informe sua funcao e o setor em que atua.',
+      title: 'Pesquisa Empresarial',
+      subtitle: widget.allowStart
+          ? 'Antes de comecar, informe sua funcao e o setor em que atua.'
+          : 'Acompanhe as pesquisas das empresas. O perfil ADMIN possui acesso somente para consulta.',
       child: ListView(
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Informacoes iniciais',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 16),
-                  if (widget.requireCompanySelection) ...[
-                    const _FieldLabel(text: 'Empresa'),
+          if (widget.allowStart)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Informacoes iniciais',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (widget.requireCompanySelection) ...[
+                      const _FieldLabel(text: 'Empresa'),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedCompanyId,
+                        items: widget.companyOptions
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: item.id,
+                                child: Text(item.name),
+                              ),
+                            )
+                            .toList(),
+                        decoration: _inputDecoration(
+                          hintText: 'Selecione a empresa',
+                        ),
+                        onChanged: (value) =>
+                            setState(() => _selectedCompanyId = value),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    _FieldLabel(text: 'Funcao (cargo)'),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      initialValue: _selectedCompanyId,
-                      items: widget.companyOptions
+                      initialValue: _selectedRole,
+                      items: _roles
                           .map(
                             (item) => DropdownMenuItem(
-                              value: item.id,
-                              child: Text(item.name),
+                              value: item,
+                              child: Text(item),
                             ),
                           )
                           .toList(),
                       decoration: _inputDecoration(
-                        hintText: 'Selecione a empresa',
+                        hintText: 'Selecione sua funcao',
                       ),
-                      onChanged: (value) => setState(() => _selectedCompanyId = value),
+                      onChanged: (value) =>
+                          setState(() => _selectedRole = value),
                     ),
                     const SizedBox(height: 16),
-                  ],
-                  _FieldLabel(text: 'Funcao (cargo)'),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedRole,
-                    items: _roles
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item,
-                            child: Text(item),
-                          ),
-                        )
-                        .toList(),
-                    decoration: _inputDecoration(hintText: 'Selecione sua funcao'),
-                    onChanged: (value) => setState(() => _selectedRole = value),
-                  ),
-                  const SizedBox(height: 16),
-                  _FieldLabel(text: 'Setor'),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedSector,
-                    items: _sectors
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item,
-                            child: Text(item),
-                          ),
-                        )
-                        .toList(),
-                    decoration: _inputDecoration(hintText: 'Selecione seu setor'),
-                    onChanged: (value) => setState(() => _selectedSector = value),
-                  ),
-                  const SizedBox(height: 24),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      onPressed: widget.isStarting ? null : _handleStart,
-                      icon: widget.isStarting
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.play_arrow_rounded),
-                      label: Text(widget.isStarting ? 'Iniciando...' : 'Iniciar Pesquisa'),
+                    _FieldLabel(text: 'Setor'),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedSector,
+                      items: _sectors
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item,
+                              child: Text(item),
+                            ),
+                          )
+                          .toList(),
+                      decoration: _inputDecoration(
+                        hintText: 'Selecione seu setor',
+                      ),
+                      onChanged: (value) =>
+                          setState(() => _selectedSector = value),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.icon(
+                        onPressed: widget.isStarting ? null : _handleStart,
+                        icon: widget.isStarting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.play_arrow_rounded),
+                        label: Text(
+                          widget.isStarting
+                              ? 'Iniciando...'
+                              : 'Iniciar Pesquisa Empresarial',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           if (widget.historySection != null) ...[
             const SizedBox(height: 16),
             widget.historySection!,

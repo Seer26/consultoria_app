@@ -4,8 +4,10 @@ import '../../domain/entities/diagnosis_question.dart';
 import '../../domain/usecases/get_questions.dart';
 import '../../domain/usecases/submit_diagnosis.dart';
 
-class DiagnosisController extends StateNotifier<AsyncValue<List<DiagnosisQuestion>>> {
-  DiagnosisController(this._getQuestions, this._submit) : super(const AsyncValue.loading()) {
+class DiagnosisController
+    extends StateNotifier<AsyncValue<List<DiagnosisQuestion>>> {
+  DiagnosisController(this._getQuestions, this._submit)
+    : super(const AsyncValue.loading()) {
     load();
   }
 

@@ -4,8 +4,8 @@ import '../widgets/sidebar.dart';
 /// RBAC do app de consultoria (alinhado ao backend: ADMIN, OWNER, EMPLOYEE).
 ///
 /// Regras resumidas:
-/// - ADMIN: dashboard global, empresas, usuarios, relatorios e pesquisa.
-/// - OWNER: dashboard da empresa, equipe, relatorios completos e pesquisa.
+/// - ADMIN: dashboard global, empresas, usuarios, relatorios e consulta de pesquisas.
+/// - OWNER: dashboard da empresa, relatorios, pesquisa e plano de acao.
 /// - EMPLOYEE: pesquisa operacional e tarefas.
 class RoleGuard {
   static const String admin = 'ADMIN';
@@ -21,7 +21,6 @@ class RoleGuard {
       case admin:
         return const [
           SidebarItem.dashboard,
-          SidebarItem.diagnostico,
           SidebarItem.empresas,
           SidebarItem.relatorios,
           SidebarItem.usuarios,
@@ -30,11 +29,14 @@ class RoleGuard {
         return const [
           SidebarItem.dashboard,
           SidebarItem.diagnostico,
+          SidebarItem.tarefas,
           SidebarItem.relatorios,
-          SidebarItem.equipe,
+          SidebarItem.plano,
+          SidebarItem.configuracoesEmpresa,
         ];
       case employee:
         return const [
+          SidebarItem.dashboard,
           SidebarItem.diagnostico,
           SidebarItem.tarefas,
         ];
@@ -48,6 +50,10 @@ class RoleGuard {
   }
 
   static bool canAccessRoute(String? role, String location) {
+    if (_isSafeUtilityRoute(location)) {
+      return true;
+    }
+
     final item = _itemFromLocation(location);
 
     if (item == null) {
@@ -81,17 +87,24 @@ class RoleGuard {
   }
 
   static SidebarItem? _itemFromLocation(String location) {
+    if (location.startsWith('/reports/')) {
+      return SidebarItem.relatorios;
+    }
+    if (location.startsWith('/research/')) {
+      return SidebarItem.diagnostico;
+    }
+
     switch (location) {
       case '/dashboard':
         return SidebarItem.dashboard;
       case '/admin':
       case '/owner':
+      case '/employee':
         return SidebarItem.dashboard;
       case '/diagnosis':
         return SidebarItem.diagnostico;
       case '/research':
       case '/research/chat':
-      case '/employee':
         return SidebarItem.diagnostico;
       case '/companies':
         return SidebarItem.empresas;
@@ -99,12 +112,26 @@ class RoleGuard {
         return SidebarItem.relatorios;
       case '/users':
         return SidebarItem.usuarios;
-      case '/team':
-        return SidebarItem.equipe;
       case '/tasks':
         return SidebarItem.tarefas;
+      case '/plan':
+        return SidebarItem.plano;
+      case '/company-settings':
+        return SidebarItem.configuracoesEmpresa;
       default:
         return null;
     }
+  }
+
+  static bool _isSafeUtilityRoute(String location) {
+    return location == '/unavailable' ||
+        location == '/clients' ||
+        location.startsWith('/clients/') ||
+        location == '/forms' ||
+        location.startsWith('/forms/') ||
+        location == '/chat' ||
+        location == '/ai-diagnosis' ||
+        location == '/diagnosis/legacy' ||
+        location == '/diagnosis-workspace';
   }
 }

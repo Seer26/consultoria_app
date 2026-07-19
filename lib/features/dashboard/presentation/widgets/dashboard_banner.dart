@@ -39,9 +39,9 @@ class DashboardBanner extends StatelessWidget {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -59,7 +59,9 @@ class DashboardBanner extends StatelessWidget {
             spacing: 12,
             runSpacing: 12,
             children: stats
-                .map((stat) => _BannerStat(label: stat.label, value: stat.value))
+                .map(
+                  (stat) => _BannerStat(label: stat.label, value: stat.value),
+                )
                 .toList(),
           ),
         ],
@@ -69,20 +71,14 @@ class DashboardBanner extends StatelessWidget {
 }
 
 class DashboardBannerStat {
-  const DashboardBannerStat({
-    required this.label,
-    required this.value,
-  });
+  const DashboardBannerStat({required this.label, required this.value});
 
   final String label;
   final String value;
 }
 
 class _BannerStat extends StatelessWidget {
-  const _BannerStat({
-    required this.label,
-    required this.value,
-  });
+  const _BannerStat({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -111,9 +107,9 @@ class _BannerStat extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),

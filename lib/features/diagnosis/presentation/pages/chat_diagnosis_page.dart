@@ -7,13 +7,11 @@ import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
 import '../../data/services/ai_question_service.dart';
 import '../../data/services/research_service.dart';
+import '../../domain/entities/research_submission.dart';
 import '../providers/research_service_provider.dart';
 
 class Message {
-  const Message({
-    required this.text,
-    required this.isUser,
-  });
+  const Message({required this.text, required this.isUser});
 
   final String text;
   final bool isUser;
@@ -47,14 +45,21 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
   late final List<Message> messages;
 
   bool isLoading = false;
+  bool isRestoring = true;
   bool isFinishing = false;
   bool isCompleted = false;
+  bool isGeneratingActionPlan = false;
   String? _lastAssistantQuestion;
 
   @override
   void initState() {
     super.initState();
-    messages = [
+    messages = _initialMessages();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreConversation());
+  }
+
+  List<Message> _initialMessages() {
+    return [
       Message(
         text:
             'Pesquisa iniciada. Funcao: ${widget.jobRole}. Setor: ${widget.sector}.',
@@ -63,7 +68,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
       if (!widget.allowRespond)
         const Message(
           text:
-              'Modo visualizacao: voce pode acompanhar o fluxo da pesquisa; apenas colaboradores respondem as perguntas.',
+              'Modo de visualizacao: o ADMIN acompanha o fluxo; somente OWNER e EMPLOYEE respondem.',
           isUser: false,
         ),
       const Message(
@@ -71,7 +76,73 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
         isUser: false,
       ),
     ];
-    _lastAssistantQuestion = 'Como voce descreveria o principal desafio atual da empresa?';
+  }
+
+  Future<void> _restoreConversation() async {
+    try {
+      final details = await ref
+          .read(researchServiceProvider)
+          .getSubmissionById(widget.submissionId);
+      if (!mounted) return;
+
+      final restoredMessages = <Message>[
+        Message(
+          text:
+              'Pesquisa iniciada. Funcao: ${widget.jobRole}. Setor: ${widget.sector}.',
+          isUser: false,
+        ),
+        if (!widget.allowRespond)
+          const Message(
+            text:
+                'Modo de visualizacao: o ADMIN acompanha o fluxo; somente OWNER e EMPLOYEE respondem.',
+            isUser: false,
+          ),
+      ];
+
+      for (final answer in details.answers) {
+        restoredMessages
+          ..add(Message(text: answer.question, isUser: false))
+          ..add(Message(text: answer.answer, isUser: true));
+      }
+
+      if (details.status == ResearchSubmissionStatus.completed) {
+        restoredMessages.add(
+          const Message(
+            text: 'Esta pesquisa já foi finalizada.',
+            isUser: false,
+          ),
+        );
+        setState(() {
+          messages
+            ..clear()
+            ..addAll(restoredMessages);
+          isCompleted = true;
+          isRestoring = false;
+          _lastAssistantQuestion = null;
+        });
+        return;
+      }
+
+      final nextQuestion = details.answers.isEmpty
+          ? 'Como voce descreveria o principal desafio atual da empresa?'
+          : 'Considerando as respostas anteriores, qual outro ponto importante deve ser registrado nesta pesquisa?';
+      restoredMessages.add(Message(text: nextQuestion, isUser: false));
+      setState(() {
+        messages
+          ..clear()
+          ..addAll(restoredMessages);
+        isRestoring = false;
+        _lastAssistantQuestion = nextQuestion;
+      });
+      _scrollToBottom();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => isRestoring = false);
+      _showMessage(
+        'Não foi possível recuperar as respostas anteriores. Atualize a página antes de continuar.',
+        isError: true,
+      );
+    }
   }
 
   @override
@@ -88,13 +159,16 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
 
     final answer = inputController.text.trim();
 
-    if (answer.isEmpty || isLoading || isFinishing) {
+    if (answer.isEmpty || isLoading || isRestoring || isFinishing) {
       return;
     }
 
     final question = _lastAssistantQuestion;
     if (question == null || question.trim().isEmpty) {
-      _showMessage('Pergunta atual invalida. Reinicie a pesquisa.', isError: true);
+      _showMessage(
+        'Pergunta atual invalida. Reinicie a pesquisa.',
+        isError: true,
+      );
       return;
     }
 
@@ -106,23 +180,37 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
     _scrollToBottom();
 
     try {
-      await ref.read(researchServiceProvider).saveAnswer(
+      await ref
+          .read(researchServiceProvider)
+          .saveAnswer(
             submissionId: widget.submissionId,
             question: question,
             answer: answer,
             pillar: widget.sector,
           );
 
-      final nextQuestion = await _aiQuestionService.getNextQuestion(answer);
+      try {
+        final nextQuestion = await _aiQuestionService.getNextQuestion(answer);
 
-      if (!mounted) {
-        return;
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          messages.add(Message(text: nextQuestion, isUser: false));
+          _lastAssistantQuestion = nextQuestion;
+        });
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        final message = error.toString().replaceFirst('Exception: ', '');
+        setState(() {
+          messages.add(Message(text: message, isUser: false));
+        });
+        _showMessage(message, isError: true);
       }
-
-      setState(() {
-        messages.add(Message(text: nextQuestion, isUser: false));
-        _lastAssistantQuestion = nextQuestion;
-      });
     } catch (error) {
       if (!mounted) {
         return;
@@ -131,7 +219,8 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
       setState(() {
         messages.add(
           Message(
-            text: 'Nao foi possivel salvar a resposta ou gerar a proxima pergunta agora.',
+            text:
+                'Nao foi possivel salvar a resposta. Tente novamente antes de finalizar.',
             isUser: false,
           ),
         );
@@ -152,15 +241,20 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
   }
 
   Future<void> _completeResearch() async {
-    if (!widget.allowRespond || isLoading || isFinishing || isCompleted) {
+    if (!widget.allowRespond ||
+        isLoading ||
+        isRestoring ||
+        isFinishing ||
+        isCompleted) {
       return;
     }
 
     setState(() => isFinishing = true);
 
     try {
-      final result =
-          await ref.read(researchServiceProvider).completeSubmission(widget.submissionId);
+      final result = await ref
+          .read(researchServiceProvider)
+          .completeSubmission(widget.submissionId);
 
       if (!mounted) {
         return;
@@ -238,8 +332,8 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                   Text(
                     'Resultado Inicial',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -265,7 +359,9 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                         label: 'Concluida em',
                         value: submission.completedAt == null
                             ? '-'
-                            : DateFormatter.formatDateTime(submission.completedAt!),
+                            : DateFormatter.formatDateTime(
+                                submission.completedAt!,
+                              ),
                       ),
                     ],
                   ),
@@ -307,8 +403,8 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                     Text(
                       'Scores por Pilar',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     for (final pillar in submission.pillarScores)
@@ -326,12 +422,16 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                               Expanded(
                                 child: Text(
                                   pillar.pillar,
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                               Text(
                                 '${pillar.score.toStringAsFixed(1)} | ${pillar.maturity}',
-                                style: const TextStyle(color: AppColors.textSecondary),
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                             ],
                           ),
@@ -339,12 +439,81 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                       ),
                   ],
                   const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Fechar'),
-                    ),
+                  StatefulBuilder(
+                    builder: (context, setSheetState) {
+                      Future<void> handleGenerateActionPlan() async {
+                        final sheetNavigator = Navigator.of(context);
+                        setSheetState(() => isGeneratingActionPlan = true);
+                        try {
+                          final generated = await ref
+                              .read(researchServiceProvider)
+                              .generateActionPlan(submission.id);
+
+                          if (!mounted) {
+                            return;
+                          }
+
+                          _showMessage(
+                            generated.alreadyGenerated
+                                ? 'O plano desta pesquisa ja havia sido gerado. ${generated.tasks.length} tarefas carregadas.'
+                                : 'Plano de acao gerado com sucesso. ${generated.createdCount} tarefas criadas.',
+                          );
+
+                          if (sheetNavigator.mounted) {
+                            sheetNavigator.pop();
+                          }
+
+                          if (mounted) {
+                            this.context.go('/tasks');
+                          }
+                        } catch (error) {
+                          if (!mounted) {
+                            return;
+                          }
+                          _showMessage(
+                            error.toString().replaceFirst('Exception: ', ''),
+                            isError: true,
+                          );
+                        } finally {
+                          if (context.mounted) {
+                            setSheetState(() => isGeneratingActionPlan = false);
+                          }
+                        }
+                      }
+
+                      return Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: isGeneratingActionPlan
+                                ? null
+                                : handleGenerateActionPlan,
+                            icon: isGeneratingActionPlan
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.playlist_add_check_circle_outlined,
+                                  ),
+                            label: Text(
+                              isGeneratingActionPlan
+                                  ? 'Gerando plano...'
+                                  : 'Gerar plano de acao',
+                            ),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Fechar'),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -358,14 +527,17 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
   @override
   Widget build(BuildContext context) {
     return AppPageScaffold(
-      title: 'Pesquisa (Chat)',
+      title: 'Pesquisa Empresarial',
       subtitle: widget.allowRespond
           ? 'Responda em formato de conversa. Cada resposta e salva no backend.'
-          : 'Visualizacao e gestao do fluxo; envio de respostas restrito a colaboradores.',
+          : 'Visualização do fluxo; envio de respostas restrito aos perfis OWNER e EMPLOYEE.',
       actions: widget.allowRespond
           ? [
               FilledButton.icon(
-                onPressed: isLoading || isFinishing || isCompleted ? null : _completeResearch,
+                onPressed:
+                    isLoading || isRestoring || isFinishing || isCompleted
+                    ? null
+                    : _completeResearch,
                 icon: isFinishing
                     ? const SizedBox(
                         width: 16,
@@ -384,9 +556,9 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.all(20),
-                itemCount: messages.length + (isLoading ? 1 : 0),
+                itemCount: messages.length + (isLoading || isRestoring ? 1 : 0),
                 itemBuilder: (context, index) {
-                  if (isLoading && index == messages.length) {
+                  if ((isLoading || isRestoring) && index == messages.length) {
                     return const _TypingBubble();
                   }
 
@@ -422,7 +594,10 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                   ),
                   const SizedBox(width: 12),
                   FilledButton.icon(
-                    onPressed: isLoading || isFinishing || isCompleted ? null : _sendMessage,
+                    onPressed:
+                        isLoading || isRestoring || isFinishing || isCompleted
+                        ? null
+                        : _sendMessage,
                     icon: const Icon(Icons.send),
                     label: const Text('Enviar'),
                   ),
@@ -454,10 +629,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
 }
 
 class _ResultSection extends StatelessWidget {
-  const _ResultSection({
-    required this.title,
-    required this.items,
-  });
+  const _ResultSection({required this.title, required this.items});
 
   final String title;
   final List<String> items;
@@ -471,9 +643,9 @@ class _ResultSection extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           ...items.map(
@@ -495,10 +667,7 @@ class _ResultSection extends StatelessWidget {
 }
 
 class _ResultChip extends StatelessWidget {
-  const _ResultChip({
-    required this.label,
-    required this.value,
-  });
+  const _ResultChip({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -516,14 +685,11 @@ class _ResultChip extends StatelessWidget {
         children: [
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
-          Text(
-            label,
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
+          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
         ],
       ),
     );
@@ -537,9 +703,12 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final alignment = message.isUser ? Alignment.centerRight : Alignment.centerLeft;
-    final backgroundColor =
-        message.isUser ? AppColors.primary : AppColors.primarySoft;
+    final alignment = message.isUser
+        ? Alignment.centerRight
+        : Alignment.centerLeft;
+    final backgroundColor = message.isUser
+        ? AppColors.primary
+        : AppColors.primarySoft;
     final textColor = message.isUser ? Colors.white : AppColors.textPrimary;
 
     return Align(

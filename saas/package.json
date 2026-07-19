@@ -9,6 +9,8 @@
     "dev:web": "npm --workspace @consultoria/web run dev",
     "dev:api": "npm --workspace @consultoria/api run dev",
     "dev:all": "npm run dev:api && npm run dev:web",
+    "staging:seed": "npm --workspace @consultoria/api run staging:seed",
+    "staging:cleanup": "npm --workspace @consultoria/api run staging:cleanup",
     "build": "npm run build --workspace @consultoria/domain && npm run build --workspace @consultoria/api && npm run build --workspace @consultoria/web"
   }
 }

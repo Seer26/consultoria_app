@@ -21,5 +21,7 @@ diagnosisRouter.post(
   '/submissions',
   authenticate,
   authorize('ADMIN', 'OWNER', 'EMPLOYEE'),
-  controller.submit,
+  (_request, response) => {
+    response.status(410).json({ error: 'LEGACY_DIAGNOSIS_DISABLED' });
+  },
 );

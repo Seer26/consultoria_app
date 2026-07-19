@@ -68,7 +68,11 @@ class AppPageScaffold extends StatelessWidget {
                             ),
                           ),
                           if (actions.isNotEmpty)
-                            Wrap(spacing: 12, runSpacing: 12, children: actions),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: actions,
+                            ),
                         ],
                       ),
                       const SizedBox(height: 24),

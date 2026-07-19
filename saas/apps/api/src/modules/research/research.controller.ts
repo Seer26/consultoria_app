@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 
+import { writePlanLimitResponse } from '../entitlements/entitlements.middleware';
 import { ResearchService } from './research.service';
 
 export class ResearchController {
@@ -79,6 +80,10 @@ export class ResearchController {
   };
 
   private handleError(error: unknown, response: Response): void {
+    if (writePlanLimitResponse(error, response)) {
+      return;
+    }
+
     const code = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
 
     const statusCode = (() => {
@@ -92,6 +97,7 @@ export class ResearchController {
         case 'ACTION_PLAN_SUBMISSION_NOT_COMPLETED':
           return 400;
         case 'FORBIDDEN':
+        case 'ADMIN_RESEARCH_READ_ONLY':
           return 403;
         case 'USER_NOT_FOUND':
         case 'COMPANY_NOT_FOUND':

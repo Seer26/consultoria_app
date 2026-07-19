@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
 import type { AuthTokenPayload } from '../auth/auth.types';
+import { EntitlementsRepository } from '../entitlements/entitlements.repository';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 import { ActionPlanRepository } from './action-plan.repository';
 import type {
   ActionPlanAccessContext,
+  ActionPlanAssignee,
   ActionPlanGenerationResult,
   ActionPlanListFilters,
   ActionPlanTaskDetails,
@@ -21,24 +24,40 @@ const VALID_STATUSES: ActionPlanTaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE', '
 const VALID_SOURCES: ActionPlanTaskSource[] = ['RESEARCH_RECOMMENDATION', 'MANUAL', 'AI'];
 
 export class ActionPlanService {
-  constructor(private readonly repository: ActionPlanRepository) {}
+  constructor(
+    private readonly repository: ActionPlanRepository,
+    private readonly entitlementsService = new EntitlementsService(
+      new EntitlementsRepository(),
+    ),
+  ) {}
 
   listTasks(auth: AuthTokenPayload, filters: ActionPlanListFilters): ActionPlanTaskDetails[] {
     const context = this.getAccessContext(auth);
     this.ensureActiveUser(context);
 
     if (context.actor.role === 'ADMIN') {
-      return this.repository.listTasks({
+      return this.applyListFilters(auth, filters, this.repository.listTasks({
         companyId: filters.companyId?.trim() || undefined,
         submissionId: filters.submissionId?.trim() || undefined,
-      });
+      }));
     }
 
     const companyId = this.ensureActorCompany(context);
-    return this.repository.listTasks({
+    if (filters.companyId?.trim() && filters.companyId.trim() !== companyId) {
+      throw new Error('FORBIDDEN');
+    }
+
+    return this.applyListFilters(auth, filters, this.repository.listTasks({
       companyId,
       submissionId: filters.submissionId?.trim() || undefined,
-    });
+    }));
+  }
+
+  listAssignees(auth: AuthTokenPayload, requestedCompanyId?: string): ActionPlanAssignee[] {
+    const context = this.getAccessContext(auth);
+    this.ensureActiveUser(context);
+    const companyId = this.resolveCompanyId(context, requestedCompanyId);
+    return this.repository.listActiveAssignees(companyId);
   }
 
   getTaskById(auth: AuthTokenPayload, taskId: string): ActionPlanTaskDetails {
@@ -51,7 +70,7 @@ export class ActionPlanService {
     }
 
     this.ensureTaskAccess(context, task.companyId);
-    return task;
+    return this.decorateTask(task);
   }
 
   createTask(auth: AuthTokenPayload, input: CreateActionPlanTaskInput): ActionPlanTaskDetails {
@@ -72,6 +91,10 @@ export class ActionPlanService {
     const submissionId = this.validateSubmission(companyId, input.submissionId ?? null);
     const now = new Date().toISOString();
 
+    if (this.isActiveTaskStatus(status)) {
+      this.entitlementsService.assertCanUseFeature(companyId, 'ACTION_TASKS_ACTIVE');
+    }
+
     const created = this.repository.createTask({
       id: randomUUID(),
       companyId,
@@ -89,7 +112,7 @@ export class ActionPlanService {
       completedAt: status === 'DONE' ? now : null,
     });
 
-    return this.repository.findTaskById(created.id)!;
+    return this.decorateTask(this.repository.findTaskById(created.id)!);
   }
 
   updateTask(
@@ -110,6 +133,13 @@ export class ActionPlanService {
     const nextStatus = this.validateStatus(input.status ?? existing.status);
     const updatedAt = new Date().toISOString();
 
+    if (!this.isActiveTaskStatus(existing.status) && this.isActiveTaskStatus(nextStatus)) {
+      this.entitlementsService.assertCanUseFeature(
+        existing.companyId,
+        'ACTION_TASKS_ACTIVE',
+      );
+    }
+
     this.repository.updateTask({
       ...existing,
       title: nextTitle,
@@ -126,7 +156,7 @@ export class ActionPlanService {
       completedAt: this.resolveCompletedAt(existing.completedAt, nextStatus, updatedAt),
     });
 
-    return this.repository.findTaskById(taskId)!;
+    return this.decorateTask(this.repository.findTaskById(taskId)!);
   }
 
   updateTaskStatus(
@@ -142,6 +172,13 @@ export class ActionPlanService {
     const status = this.validateStatus(input.status);
     const updatedAt = new Date().toISOString();
 
+    if (!this.isActiveTaskStatus(existing.status) && this.isActiveTaskStatus(status)) {
+      this.entitlementsService.assertCanUseFeature(
+        existing.companyId,
+        'ACTION_TASKS_ACTIVE',
+      );
+    }
+
     this.repository.updateTask({
       ...existing,
       status,
@@ -149,7 +186,7 @@ export class ActionPlanService {
       completedAt: this.resolveCompletedAt(existing.completedAt, status, updatedAt),
     });
 
-    return this.repository.findTaskById(taskId)!;
+    return this.decorateTask(this.repository.findTaskById(taskId)!);
   }
 
   generateFromResearch(
@@ -180,11 +217,19 @@ export class ActionPlanService {
         companyId: input.companyId,
         alreadyGenerated: true,
         createdCount: 0,
-        tasks: existing,
+        tasks: existing.map((task) => this.decorateTask(task)),
       };
     }
 
     const generated = this.buildTasksFromResearch(input);
+    if (generated.length > 0) {
+      this.entitlementsService.assertCanUseFeature(
+        input.companyId,
+        'ACTION_TASKS_ACTIVE',
+        generated.length,
+      );
+    }
+
     this.repository.createTasks(generated);
 
     return {
@@ -192,7 +237,9 @@ export class ActionPlanService {
       companyId: input.companyId,
       alreadyGenerated: false,
       createdCount: generated.length,
-      tasks: this.repository.listTasks({ submissionId: input.submissionId }),
+      tasks: this.repository
+        .listTasks({ submissionId: input.submissionId })
+        .map((task) => this.decorateTask(task)),
     };
   }
 
@@ -347,6 +394,10 @@ export class ActionPlanService {
     throw new Error('INVALID_ACTION_PLAN_STATUS');
   }
 
+  private isActiveTaskStatus(status: ActionPlanTaskStatus): boolean {
+    return status !== 'DONE' && status !== 'CANCELED';
+  }
+
   private validateSource(value: string): ActionPlanTaskSource {
     if (VALID_SOURCES.includes(value as ActionPlanTaskSource)) {
       return value as ActionPlanTaskSource;
@@ -383,7 +434,85 @@ export class ActionPlanService {
       throw new Error('RESPONSIBLE_USER_COMPANY_MISMATCH');
     }
 
+    if (user.status !== 'ACTIVE') {
+      throw new Error('RESPONSIBLE_USER_INACTIVE');
+    }
+
     return normalized;
+  }
+
+  private applyListFilters(
+    auth: AuthTokenPayload,
+    filters: ActionPlanListFilters,
+    tasks: ActionPlanTaskDetails[],
+  ): ActionPlanTaskDetails[] {
+    const scope = filters.scope ?? 'all';
+    const search = filters.search?.trim().toLocaleLowerCase('pt-BR') ?? '';
+    const decorated = tasks.map((task) => this.decorateTask(task));
+
+    return decorated.filter((task) => {
+      if (
+        search &&
+        ![
+          task.title,
+          task.description,
+          task.pillar,
+          task.responsibleUserName,
+          task.responsibleUserEmail,
+        ].some((value) => value?.toLocaleLowerCase('pt-BR').includes(search))
+      ) {
+        return false;
+      }
+
+      switch (scope) {
+        case 'mine':
+          return task.responsibleUserId === auth.userId;
+        case 'overdue':
+          return task.isOverdue;
+        case 'dueSoon':
+          return task.isDueSoon;
+        case 'critical':
+          return task.priority === 'CRITICAL' && this.isActiveTaskStatus(task.status);
+        case 'completed':
+          return task.status === 'DONE';
+        case 'all':
+        default:
+          return true;
+      }
+    });
+  }
+
+  private decorateTask(task: ActionPlanTaskDetails, now = new Date()): ActionPlanTaskDetails {
+    if (!task.dueDate || !this.isActiveTaskStatus(task.status)) {
+      return {
+        ...task,
+        isOverdue: false,
+        daysOverdue: 0,
+        isDueSoon: false,
+      };
+    }
+
+    const due = new Date(task.dueDate);
+    if (Number.isNaN(due.getTime())) {
+      return {
+        ...task,
+        isOverdue: false,
+        daysOverdue: 0,
+        isDueSoon: false,
+      };
+    }
+
+    const oneDay = 86_400_000;
+    const todayDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const dueDay = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+    const daysDifference = Math.round((dueDay - todayDay) / oneDay);
+
+    return {
+      ...task,
+      isOverdue: daysDifference < 0,
+      daysOverdue: daysDifference < 0 ? Math.abs(daysDifference) : 0,
+      isDueSoon: daysDifference >= 0 && daysDifference <= 7,
+    };
   }
 
   private validateSubmission(companyId: string, submissionId: string | null): string | null {

@@ -20,10 +20,11 @@ final loginUseCaseProvider = Provider<Login>((ref) {
   return Login(ref.read(authRepositoryProvider));
 });
 
-final authControllerProvider =
-    StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController(
-    ref.read(loginUseCaseProvider),
-    ref.read(authRepositoryProvider),
-  );
-});
+final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
+  (ref) {
+    return AuthController(
+      ref.read(loginUseCaseProvider),
+      ref.read(authRepositoryProvider),
+    );
+  },
+);

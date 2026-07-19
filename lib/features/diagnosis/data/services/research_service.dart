@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/http/plan_limit_error_mapper.dart';
+import '../../../action_plan/domain/entities/action_plan_task.dart';
 import '../../domain/entities/research_submission.dart';
 
 class ResearchSubmissionSession {
@@ -64,7 +66,8 @@ class ResearchService {
       final response = await _dio.post<Map<String, dynamic>>(
         '/research/submissions',
         data: {
-          if (companyId != null && companyId.trim().isNotEmpty) 'companyId': companyId,
+          if (companyId != null && companyId.trim().isNotEmpty)
+            'companyId': companyId,
           'respondentRole': respondentRole,
           'department': department,
         },
@@ -72,7 +75,9 @@ class ResearchService {
 
       return _sessionFromMap(response.data ?? const {});
     } on DioException catch (error) {
-      throw Exception(_extractError(error, fallback: 'Falha ao iniciar a pesquisa.'));
+      throw Exception(
+        _extractError(error, fallback: 'Falha ao iniciar a pesquisa.'),
+      );
     }
   }
 
@@ -94,11 +99,15 @@ class ResearchService {
         },
       );
     } on DioException catch (error) {
-      throw Exception(_extractError(error, fallback: 'Falha ao salvar a resposta.'));
+      throw Exception(
+        _extractError(error, fallback: 'Falha ao salvar a resposta.'),
+      );
     }
   }
 
-  Future<ResearchCompletionResult> completeSubmission(String submissionId) async {
+  Future<ResearchCompletionResult> completeSubmission(
+    String submissionId,
+  ) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/research/submissions/$submissionId/complete',
@@ -114,7 +123,58 @@ class ResearchService {
         answersCount: answers.length,
       );
     } on DioException catch (error) {
-      throw Exception(_extractError(error, fallback: 'Falha ao finalizar a pesquisa.'));
+      throw Exception(
+        _extractError(error, fallback: 'Falha ao finalizar a pesquisa.'),
+      );
+    }
+  }
+
+  Future<ActionPlanGenerationResult> generateActionPlan(
+    String submissionId,
+  ) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/research/submissions/$submissionId/generate-action-plan',
+      );
+
+      final data = response.data ?? const {};
+      return ActionPlanGenerationResult(
+        submissionId: data['submissionId']?.toString() ?? submissionId,
+        companyId: data['companyId']?.toString() ?? '',
+        alreadyGenerated: data['alreadyGenerated'] == true,
+        createdCount: (data['createdCount'] as num?)?.toInt() ?? 0,
+        tasks: ((data['tasks'] as List?) ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) => ActionPlanTask(
+                id: item['id']?.toString() ?? '',
+                companyId: item['companyId']?.toString() ?? '',
+                companyName: item['companyName']?.toString(),
+                submissionId: item['submissionId']?.toString(),
+                title: item['title']?.toString() ?? '',
+                description: item['description']?.toString() ?? '',
+                pillar: item['pillar']?.toString(),
+                priority: _taskPriorityFromApi(item['priority']?.toString()),
+                status: _taskStatusFromApi(item['status']?.toString()),
+                dueDate: _parseDate(item['dueDate']),
+                responsibleUserId: item['responsibleUserId']?.toString(),
+                responsibleUserName: item['responsibleUserName']?.toString(),
+                responsibleUserEmail: item['responsibleUserEmail']?.toString(),
+                source: _taskSourceFromApi(item['source']?.toString()),
+                createdAt: _parseDate(item['createdAt']) ?? DateTime.now(),
+                updatedAt: _parseDate(item['updatedAt']) ?? DateTime.now(),
+                completedAt: _parseDate(item['completedAt']),
+              ),
+            )
+            .toList(),
+      );
+    } on DioException catch (error) {
+      throw Exception(
+        _extractError(
+          error,
+          fallback: 'Falha ao gerar o plano de acao da pesquisa.',
+        ),
+      );
     }
   }
 
@@ -123,7 +183,8 @@ class ResearchService {
       final response = await _dio.get<List<dynamic>>(
         '/research/submissions',
         queryParameters: {
-          if (companyId != null && companyId.trim().isNotEmpty) 'companyId': companyId,
+          if (companyId != null && companyId.trim().isNotEmpty)
+            'companyId': companyId,
         },
       );
 
@@ -133,24 +194,107 @@ class ResearchService {
           .map((item) => _historyFromMap(Map<String, dynamic>.from(item)))
           .toList();
     } on DioException catch (error) {
-      throw Exception(_extractError(error, fallback: 'Falha ao carregar o historico.'));
+      throw Exception(
+        _extractError(error, fallback: 'Falha ao carregar o historico.'),
+      );
     }
+  }
+
+  Future<ResearchSubmissionDetails> getSubmissionById(
+    String submissionId,
+  ) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/research/submissions/$submissionId',
+      );
+      return _detailsFromMap(response.data ?? const {});
+    } on DioException catch (error) {
+      throw Exception(
+        _extractError(
+          error,
+          fallback: 'Falha ao carregar o resultado da pesquisa.',
+        ),
+      );
+    }
+  }
+
+  ResearchSubmissionDetails _detailsFromMap(Map<String, dynamic> map) {
+    final company = map['company'] is Map
+        ? Map<String, dynamic>.from(map['company'] as Map)
+        : const <String, dynamic>{};
+    final user = map['user'] is Map
+        ? Map<String, dynamic>.from(map['user'] as Map)
+        : const <String, dynamic>{};
+    final answers = map['answers'] is List ? map['answers'] as List : const [];
+
+    return ResearchSubmissionDetails(
+      id: map['id']?.toString() ?? '',
+      companyId: company['id']?.toString() ?? '',
+      companyName: company['name']?.toString() ?? '',
+      userId: user['id']?.toString() ?? '',
+      userName: user['name']?.toString() ?? '',
+      userEmail: user['email']?.toString() ?? '',
+      respondentRole: map['respondentRole']?.toString() ?? '',
+      department: map['department']?.toString() ?? '',
+      status: map['status']?.toString() == 'COMPLETED'
+          ? ResearchSubmissionStatus.completed
+          : ResearchSubmissionStatus.inProgress,
+      overallScore: (map['overallScore'] as num?)?.toDouble(),
+      summary: map['summary']?.toString(),
+      createdAt:
+          DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
+      completedAt: _parseDate(map['completedAt']),
+      criticalPoints: _readStringList(map['criticalPoints']),
+      opportunities: _readStringList(map['opportunities']),
+      recommendations: _readStringList(map['recommendations']),
+      nextSteps: _readStringList(map['nextSteps']),
+      pillarScores: _readPillarScores(map['pillarScores']),
+      answers: answers
+          .whereType<Map>()
+          .map(
+            (item) => ResearchAnswer(
+              id: item['id']?.toString() ?? '',
+              question: item['question']?.toString() ?? '',
+              answer: item['answer']?.toString() ?? '',
+              pillar: item['pillar']?.toString(),
+              score: (item['score'] as num?)?.toDouble(),
+              createdAt:
+                  DateTime.tryParse(item['createdAt']?.toString() ?? '') ??
+                  DateTime.now(),
+            ),
+          )
+          .toList(),
+    );
   }
 
   ResearchSubmissionSession _sessionFromMap(Map<String, dynamic> map) {
     return ResearchSubmissionSession(
       id: map['id']?.toString() ?? '',
-      companyId: map['companyId']?.toString() ??
-          (map['company'] is Map ? (map['company'] as Map)['id']?.toString() ?? '' : ''),
-      userId: map['userId']?.toString() ??
-          (map['user'] is Map ? (map['user'] as Map)['id']?.toString() ?? '' : ''),
+      companyId:
+          map['companyId']?.toString() ??
+          (map['company'] is Map
+              ? (map['company'] as Map)['id']?.toString() ?? ''
+              : ''),
+      userId:
+          map['userId']?.toString() ??
+          (map['user'] is Map
+              ? (map['user'] as Map)['id']?.toString() ?? ''
+              : ''),
       respondentRole: map['respondentRole']?.toString() ?? '',
       department: map['department']?.toString() ?? '',
       status: map['status']?.toString() ?? 'IN_PROGRESS',
       overallScore: (map['overallScore'] as num?)?.toDouble(),
       summary: map['summary']?.toString(),
-      createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
       completedAt: map['completedAt'] == null
           ? null
           : DateTime.tryParse(map['completedAt']?.toString() ?? ''),
@@ -177,8 +321,12 @@ class ResearchService {
       answersCount: (map['answersCount'] as num?)?.toInt() ?? 0,
       overallScore: (map['overallScore'] as num?)?.toDouble(),
       summary: map['summary']?.toString(),
-      createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
       completedAt: map['completedAt'] == null
           ? null
           : DateTime.tryParse(map['completedAt']?.toString() ?? ''),
@@ -216,8 +364,62 @@ class ResearchService {
         .toList();
   }
 
+  DateTime? _parseDate(dynamic value) {
+    final raw = value?.toString();
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(raw);
+  }
+
+  ActionPlanTaskPriority _taskPriorityFromApi(String? value) {
+    switch (value) {
+      case 'LOW':
+        return ActionPlanTaskPriority.low;
+      case 'HIGH':
+        return ActionPlanTaskPriority.high;
+      case 'CRITICAL':
+        return ActionPlanTaskPriority.critical;
+      case 'MEDIUM':
+      default:
+        return ActionPlanTaskPriority.medium;
+    }
+  }
+
+  ActionPlanTaskStatus _taskStatusFromApi(String? value) {
+    switch (value) {
+      case 'IN_PROGRESS':
+        return ActionPlanTaskStatus.inProgress;
+      case 'DONE':
+        return ActionPlanTaskStatus.done;
+      case 'CANCELED':
+        return ActionPlanTaskStatus.canceled;
+      case 'TODO':
+      default:
+        return ActionPlanTaskStatus.todo;
+    }
+  }
+
+  ActionPlanTaskSource _taskSourceFromApi(String? value) {
+    switch (value) {
+      case 'RESEARCH_RECOMMENDATION':
+        return ActionPlanTaskSource.researchRecommendation;
+      case 'AI':
+        return ActionPlanTaskSource.ai;
+      case 'MANUAL':
+      default:
+        return ActionPlanTaskSource.manual;
+    }
+  }
+
   String _extractError(DioException error, {required String fallback}) {
     final data = error.response?.data;
+    final planLimitMessage = planLimitMessageFromResponseData(data);
+    if (planLimitMessage != null) {
+      return planLimitMessage;
+    }
+
     if (data is Map && data['error'] != null) {
       final code = data['error'].toString();
       switch (code) {
@@ -233,6 +435,10 @@ class ResearchService {
           return 'Seu usuario esta inativo.';
         case 'FORBIDDEN':
           return 'Voce nao tem permissao para acessar esta pesquisa.';
+        case 'ADMIN_RESEARCH_READ_ONLY':
+          return 'O perfil ADMIN pode acompanhar resultados, mas nao responder pesquisas.';
+        case 'ACTION_PLAN_SUBMISSION_NOT_COMPLETED':
+          return 'Finalize a pesquisa antes de gerar o plano de acao.';
       }
     }
 

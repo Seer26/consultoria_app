@@ -19,8 +19,9 @@ class AppShell extends ConsumerWidget {
     SidebarItem.empresas: 2,
     SidebarItem.relatorios: 3,
     SidebarItem.usuarios: 4,
-    SidebarItem.equipe: 5,
-    SidebarItem.tarefas: 6,
+    SidebarItem.tarefas: 5,
+    SidebarItem.plano: 6,
+    SidebarItem.configuracoesEmpresa: 7,
   };
 
   static const Map<int, SidebarItem> _itemByBranchIndex = {
@@ -29,8 +30,9 @@ class AppShell extends ConsumerWidget {
     2: SidebarItem.empresas,
     3: SidebarItem.relatorios,
     4: SidebarItem.usuarios,
-    5: SidebarItem.equipe,
-    6: SidebarItem.tarefas,
+    5: SidebarItem.tarefas,
+    6: SidebarItem.plano,
+    7: SidebarItem.configuracoesEmpresa,
   };
 
   void _goBranch(int index) {
@@ -100,7 +102,9 @@ class AppShell extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(18),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.primary.withValues(alpha: 0.2),
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.2,
+                                    ),
                                     blurRadius: 24,
                                     offset: const Offset(0, 12),
                                   ),
@@ -122,9 +126,13 @@ class AppShell extends ConsumerWidget {
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.w800),
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                     ),
-                                    Text('Acesso ${RoleGuard.normalizeRole(role)}'),
+                                    Text(
+                                      'Acesso ${RoleGuard.normalizeRole(role)}',
+                                    ),
                                   ],
                                 ),
                               ),
@@ -175,16 +183,21 @@ class AppShell extends ConsumerWidget {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Controle de acesso',
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .titleSmall
-                                                  ?.copyWith(fontWeight: FontWeight.w700),
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
                                             ),
-                                            Text('Permissoes aplicadas por role no app'),
+                                            Text(
+                                              'Permissoes aplicadas por role no app',
+                                            ),
                                           ],
                                         ),
                                       ),

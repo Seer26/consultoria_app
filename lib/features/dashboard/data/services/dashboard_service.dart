@@ -6,15 +6,15 @@ class DashboardService {
   final Dio _dio;
 
   Future<Map<String, dynamic>> getAdminDashboard() async {
-    return _get('/admin/overview');
+    return _get('/dashboard/admin');
   }
 
   Future<Map<String, dynamic>> getOwnerDashboard() async {
-    return _get('/company/dashboard');
+    return _get('/dashboard/company');
   }
 
   Future<Map<String, dynamic>> getEmployeeDashboard() async {
-    return _get('/employee/dashboard');
+    return _get('/dashboard/employee');
   }
 
   Future<Map<String, dynamic>> _get(String path) async {
@@ -28,7 +28,10 @@ class DashboardService {
 
       return data;
     } on DioException catch (error) {
-      final message = error.response?.data?.toString() ?? error.message ?? 'Falha desconhecida';
+      final message =
+          error.response?.data?.toString() ??
+          error.message ??
+          'Falha desconhecida';
       throw Exception('Falha ao carregar dashboard: $message');
     } catch (error) {
       throw Exception('Falha ao carregar dashboard: $error');

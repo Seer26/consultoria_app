@@ -16,18 +16,39 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> login({required String email, required String password}) async {
     try {
-      final dto = await remoteDataSource.login(email: email, password: password);
+      final dto = await remoteDataSource.login(
+        email: email,
+        password: password,
+      );
       await tokenStorage.saveToken(dto.accessToken);
       await tokenStorage.saveSessionUser(dto.user);
       return dto.user;
+    } on AuthFailure {
+      rethrow;
     } catch (e) {
-      throw AuthFailure('Falha ao autenticar: $e');
+      throw AuthFailure(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
   @override
   Future<void> logout() async {
     await tokenStorage.clear();
+  }
+
+  @override
+  Future<void> requestPasswordReset({required String email}) {
+    return remoteDataSource.requestPasswordReset(email: email);
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) {
+    return remoteDataSource.resetPassword(
+      token: token,
+      newPassword: newPassword,
+    );
   }
 
   @override

@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 
+import { writePlanLimitResponse } from '../entitlements/entitlements.middleware';
 import { ActionPlanService } from './action-plan.service';
 
 export class ActionPlanController {
@@ -18,11 +19,37 @@ export class ActionPlanController {
       const submissionId = Array.isArray(request.query.submissionId)
         ? request.query.submissionId[0]
         : request.query.submissionId;
+      const scope = Array.isArray(request.query.scope)
+        ? request.query.scope[0]
+        : request.query.scope;
+      const search = Array.isArray(request.query.search)
+        ? request.query.search[0]
+        : request.query.search;
 
       const result = this.service.listTasks(request.auth!, {
         companyId: typeof companyId === 'string' ? companyId : undefined,
         submissionId: typeof submissionId === 'string' ? submissionId : undefined,
+        scope:
+          typeof scope === 'string'
+            ? (scope as 'all' | 'mine' | 'overdue' | 'dueSoon' | 'critical' | 'completed')
+            : undefined,
+        search: typeof search === 'string' ? search : undefined,
       });
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
+  listAssignees = (request: Request, response: Response): void => {
+    try {
+      const companyId = Array.isArray(request.query.companyId)
+        ? request.query.companyId[0]
+        : request.query.companyId;
+      const result = this.service.listAssignees(
+        request.auth!,
+        typeof companyId === 'string' ? companyId : undefined,
+      );
       response.status(200).json(result);
     } catch (error) {
       this.handleError(error, response);
@@ -74,6 +101,10 @@ export class ActionPlanController {
   };
 
   private handleError(error: unknown, response: Response): void {
+    if (writePlanLimitResponse(error, response)) {
+      return;
+    }
+
     const code = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
 
     const statusCode = (() => {
@@ -96,6 +127,7 @@ export class ActionPlanController {
         case 'RESEARCH_SUBMISSION_NOT_FOUND':
           return 404;
         case 'INACTIVE_USER':
+        case 'RESPONSIBLE_USER_INACTIVE':
           return 409;
         default:
           return 500;

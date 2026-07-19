@@ -2,19 +2,27 @@ import { randomUUID } from 'node:crypto';
 
 import bcrypt from 'bcrypt';
 
+import type { AuthTokenPayload } from '../auth/auth.types';
+import { audit } from '../../shared/audit';
 import { CompaniesRepository } from './companies.repository';
 import type {
+  CompanySettingsRecord,
   CompanyRecord,
   CreateCompanyInput,
+  CreateCompanyWithOwnerInput,
   CreateCompanyUserInput,
   EntityStatus,
   ManagedUserRecord,
   ManagedUserRole,
   UpdateCompanyInput,
+  UpdateCompanySettingsInput,
   UpdateCompanyStatusInput,
   UpdateUserInput,
   UpdateUserStatusInput,
 } from './companies.types';
+import { EntitlementsRepository } from '../entitlements/entitlements.repository';
+import { EntitlementsService } from '../entitlements/entitlements.service';
+import { assertPasswordPolicy } from '../auth/password-policy';
 
 function slugify(value: string): string {
   return value
@@ -32,9 +40,29 @@ function sanitizeCompany(company: CompanyRecord & { userCount?: number }) {
     name: company.name,
     slug: company.slug,
     status: company.status,
+    sector: company.sector,
+    size: company.size,
+    phone: company.phone,
+    responsibleName: company.responsibleName,
+    notes: company.notes,
     createdAt: company.createdAt,
     updatedAt: company.updatedAt,
     userCount: company.userCount ?? 0,
+  };
+}
+
+function sanitizeCompanySettings(company: CompanyRecord): CompanySettingsRecord {
+  return {
+    id: company.id,
+    name: company.name,
+    slug: company.slug,
+    status: company.status,
+    sector: company.sector,
+    size: company.size,
+    phone: company.phone,
+    responsibleName: company.responsibleName,
+    notes: company.notes,
+    updatedAt: company.updatedAt,
   };
 }
 
@@ -52,7 +80,12 @@ function sanitizeUser(user: ManagedUserRecord) {
 }
 
 export class CompaniesService {
-  constructor(private readonly repository: CompaniesRepository) {}
+  constructor(
+    private readonly repository: CompaniesRepository,
+    private readonly entitlementsService = new EntitlementsService(
+      new EntitlementsRepository(),
+    ),
+  ) {}
 
   listCompanies() {
     return this.repository.listCompanies().map(sanitizeCompany);
@@ -80,14 +113,90 @@ export class CompaniesService {
       name,
       slug,
       status: 'ACTIVE',
+      sector: null,
+      size: null,
+      phone: null,
+      responsibleName: null,
+      notes: null,
       createdAt: now,
       updatedAt: now,
+    });
+
+    audit('company_created', {
+      companyId: company.id,
+      slug: company.slug,
     });
 
     return sanitizeCompany({
       ...company,
       userCount: 0,
     });
+  }
+
+  async createCompanyWithOwner(input: CreateCompanyWithOwnerInput) {
+    const companyInput = input?.company;
+    const ownerInput = input?.owner;
+    const companyName = companyInput?.name?.trim();
+
+    if (!companyName) {
+      throw new Error('INVALID_COMPANY_NAME');
+    }
+
+    this.validateOwnerPayload(ownerInput);
+
+    const normalizedEmail = ownerInput.email.trim().toLowerCase();
+    assertPasswordPolicy(ownerInput.password, normalizedEmail);
+    const existingUser = this.repository.findUserByEmail(normalizedEmail);
+    if (existingUser) {
+      throw new Error('EMAIL_ALREADY_IN_USE');
+    }
+
+    const now = new Date().toISOString();
+    const company: CompanyRecord = {
+      id: randomUUID(),
+      name: companyName,
+      slug: this.buildUniqueCompanySlug(companyInput.slug?.trim() || companyName),
+      status: 'ACTIVE',
+      sector: null,
+      size: null,
+      phone: null,
+      responsibleName: null,
+      notes: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const owner: ManagedUserRecord = {
+      id: randomUUID(),
+      name: ownerInput.name.trim(),
+      email: normalizedEmail,
+      passwordHash: await bcrypt.hash(ownerInput.password, 10),
+      role: 'OWNER',
+      companyId: company.id,
+      status: 'ACTIVE',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const created = this.repository.createCompanyWithOwner({ company, owner });
+
+    audit('company_created', {
+      companyId: created.company.id,
+      slug: created.company.slug,
+      withOwner: true,
+    });
+    audit('user_created', {
+      userId: created.owner.id,
+      companyId: created.company.id,
+      role: created.owner.role,
+    });
+
+    return {
+      company: sanitizeCompany({
+        ...created.company,
+        userCount: 1,
+      }),
+      owner: sanitizeUser(created.owner),
+    };
   }
 
   updateCompany(companyId: string, input: UpdateCompanyInput) {
@@ -111,6 +220,11 @@ export class CompaniesService {
       name,
       slug,
       status: existing.status,
+      sector: existing.sector,
+      size: existing.size,
+      phone: existing.phone,
+      responsibleName: existing.responsibleName,
+      notes: existing.notes,
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
     });
@@ -148,6 +262,7 @@ export class CompaniesService {
     this.validateUserPayload(input, true);
 
     const normalizedEmail = input.email.trim().toLowerCase();
+    assertPasswordPolicy(input.password, normalizedEmail);
     const existingUser = this.repository.findUserByEmail(normalizedEmail);
     if (existingUser) {
       throw new Error('EMAIL_ALREADY_IN_USE');
@@ -156,6 +271,8 @@ export class CompaniesService {
     if (input.role === 'ADMIN') {
       throw new Error('INVALID_COMPANY_USER_ROLE');
     }
+
+    this.entitlementsService.assertCanUseFeature(companyId, 'USER_SEATS');
 
     const now = new Date().toISOString();
     const user = await this.repository.createUser({
@@ -168,6 +285,12 @@ export class CompaniesService {
       status: 'ACTIVE',
       createdAt: now,
       updatedAt: now,
+    });
+
+    audit('user_created', {
+      userId: user.id,
+      companyId,
+      role: user.role,
     });
 
     return sanitizeUser(user);
@@ -194,9 +317,11 @@ export class CompaniesService {
       throw new Error('COMPANY_ID_REQUIRED');
     }
 
-    const passwordHash = input.password?.trim()
-      ? await bcrypt.hash(input.password, 10)
-      : existing.passwordHash;
+    let passwordHash = existing.passwordHash;
+    if (input.password?.trim()) {
+      assertPasswordPolicy(input.password, normalizedEmail);
+      passwordHash = await bcrypt.hash(input.password, 10);
+    }
 
     const updated = this.repository.updateUser({
       ...existing,
@@ -226,6 +351,62 @@ export class CompaniesService {
       status: input.status,
       updatedAt,
     });
+  }
+
+  getOwnCompanySettings(auth: AuthTokenPayload): CompanySettingsRecord {
+    if (auth.role !== 'OWNER') {
+      throw new Error('FORBIDDEN');
+    }
+
+    if (!auth.companyId) {
+      throw new Error('COMPANY_ID_REQUIRED');
+    }
+
+    const company = this.repository.findCompanyById(auth.companyId);
+    if (!company) {
+      throw new Error('COMPANY_NOT_FOUND');
+    }
+
+    return sanitizeCompanySettings(company);
+  }
+
+  updateOwnCompanySettings(
+    auth: AuthTokenPayload,
+    input: UpdateCompanySettingsInput,
+  ): CompanySettingsRecord {
+    if (auth.role !== 'OWNER') {
+      throw new Error('FORBIDDEN');
+    }
+
+    if (!auth.companyId) {
+      throw new Error('COMPANY_ID_REQUIRED');
+    }
+
+    const existing = this.repository.findCompanyById(auth.companyId);
+    if (!existing) {
+      throw new Error('COMPANY_NOT_FOUND');
+    }
+
+    const name = input.name === undefined ? existing.name : input.name.trim();
+    if (!name) {
+      throw new Error('INVALID_COMPANY_NAME');
+    }
+
+    const updated = this.repository.updateCompanySettings({
+      ...existing,
+      name,
+      sector: this.cleanOptionalText(input.sector, existing.sector),
+      size: this.cleanOptionalText(input.size, existing.size),
+      phone: this.cleanOptionalText(input.phone, existing.phone),
+      responsibleName: this.cleanOptionalText(
+        input.responsibleName,
+        existing.responsibleName,
+      ),
+      notes: this.cleanOptionalText(input.notes, existing.notes),
+      updatedAt: new Date().toISOString(),
+    });
+
+    return sanitizeCompanySettings(updated);
   }
 
   private ensureCompanyExists(companyId: string): void {
@@ -275,9 +456,17 @@ export class CompaniesService {
       throw new Error('PASSWORD_REQUIRED');
     }
 
-    if ('password' in input && input.password && input.password.trim().length < 6) {
-      throw new Error('PASSWORD_TOO_SHORT');
+  }
+
+  private validateOwnerPayload(input?: CreateCompanyWithOwnerInput['owner']): void {
+    if (!input?.name?.trim() || !input.email?.trim() || !input.password?.trim()) {
+      throw new Error('INVALID_OWNER_PAYLOAD');
     }
+
+    if (!this.isValidEmail(input.email)) {
+      throw new Error('INVALID_EMAIL');
+    }
+
   }
 
   private assertValidStatus(status: string): asserts status is EntityStatus {
@@ -292,5 +481,14 @@ export class CompaniesService {
 
   private isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  }
+
+  private cleanOptionalText(value: string | null | undefined, fallback: string | null): string | null {
+    if (value === undefined) {
+      return fallback;
+    }
+
+    const normalized = value?.trim() ?? '';
+    return normalized.length > 0 ? normalized : null;
   }
 }

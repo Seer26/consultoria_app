@@ -28,16 +28,16 @@ class ClientDto {
   final String notes;
 
   Client toDomain() => Client(
-        id: id,
-        name: name,
-        segment: segment,
-        progress: progress,
-        status: status,
-        nextStep: nextStep,
-        score: score,
-        lastUpdatedAt: lastUpdatedAt,
-        owner: owner,
-        contactEmail: contactEmail,
-        notes: notes,
-      );
+    id: id,
+    name: name,
+    segment: segment,
+    progress: progress,
+    status: status,
+    nextStep: nextStep,
+    score: score,
+    lastUpdatedAt: lastUpdatedAt,
+    owner: owner,
+    contactEmail: contactEmail,
+    notes: notes,
+  );
 }

@@ -38,8 +38,8 @@ class User {
       company: map['company'] is Map<String, dynamic>
           ? map['company'] as Map<String, dynamic>
           : map['company'] is Map
-              ? Map<String, dynamic>.from(map['company'] as Map)
-              : null,
+          ? Map<String, dynamic>.from(map['company'] as Map)
+          : null,
     );
   }
 

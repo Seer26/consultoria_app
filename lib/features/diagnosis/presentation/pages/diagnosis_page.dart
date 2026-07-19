@@ -48,10 +48,12 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
 
     try {
       final normalizedRole = RoleGuard.normalizeRole(user.role);
-      final companyId = normalizedRole == RoleGuard.admin ? null : user.companyId;
-      final history = await ref.read(researchServiceProvider).listSubmissions(
-            companyId: companyId,
-          );
+      final companyId = normalizedRole == RoleGuard.admin
+          ? null
+          : user.companyId;
+      final history = await ref
+          .read(researchServiceProvider)
+          .listSubmissions(companyId: companyId);
 
       if (!mounted) {
         return;
@@ -87,18 +89,19 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
     }
 
     final normalizedRole = RoleGuard.normalizeRole(user.role);
-    final respondEnabled = normalizedRole != RoleGuard.owner;
+    final respondEnabled =
+        normalizedRole == RoleGuard.owner ||
+        normalizedRole == RoleGuard.employee;
 
     if (!respondEnabled) {
       _showMessage(
-        'Somente ADMIN e EMPLOYEE podem responder a pesquisa neste momento.',
+        'O perfil ADMIN acompanha os resultados, mas nao responde pesquisas. Entre como OWNER ou EMPLOYEE para iniciar.',
         isError: true,
       );
       return;
     }
 
-    final effectiveCompanyId =
-        normalizedRole == RoleGuard.admin ? companyId : user.companyId;
+    final effectiveCompanyId = user.companyId;
 
     if (effectiveCompanyId == null || effectiveCompanyId.trim().isEmpty) {
       _showMessage(
@@ -111,7 +114,9 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
     setState(() => _isStarting = true);
 
     try {
-      final submission = await ref.read(researchServiceProvider).createSubmission(
+      final submission = await ref
+          .read(researchServiceProvider)
+          .createSubmission(
             companyId: effectiveCompanyId,
             respondentRole: role,
             department: sector,
@@ -171,18 +176,16 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
     final companyOptions = adminCompaniesState == null
         ? const <ResearchCompanyOption>[]
         : adminCompaniesState.companies
-            .map(
-              (item) => ResearchCompanyOption(
-                id: item.id,
-                name: item.name,
-              ),
-            )
-            .toList();
+              .map(
+                (item) => ResearchCompanyOption(id: item.id, name: item.name),
+              )
+              .toList();
 
     return ResearchStartPage(
       onStart: _handleStart,
       isStarting: _isStarting,
-      requireCompanySelection: normalizedRole == RoleGuard.admin,
+      allowStart: normalizedRole != RoleGuard.admin,
+      requireCompanySelection: false,
       companyOptions: companyOptions,
       historySection: _HistorySection(
         isLoading: _isLoadingHistory,
@@ -226,16 +229,15 @@ class _HistorySection extends StatelessWidget {
                     children: [
                       Text(
                         'Historico da pesquisa',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Lista basica das pesquisas respondidas, com setor, funcao, status e score.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -273,6 +275,8 @@ class _HistorySection extends StatelessWidget {
                     _HistoryCard(
                       submission: submissions[index],
                       showCompany: isAdmin,
+                      onTap: () =>
+                          context.go('/research/${submissions[index].id}'),
                     ),
                   ],
                 ],
@@ -288,98 +292,120 @@ class _HistoryCard extends StatelessWidget {
   const _HistoryCard({
     required this.submission,
     required this.showCompany,
+    required this.onTap,
   });
 
   final ResearchSubmission submission;
   final bool showCompany;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isCompleted = submission.status == ResearchSubmissionStatus.completed;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      submission.respondentRole,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${submission.department} | ${submission.userName}',
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
-                    if (showCompany) ...[
+    return InkWell(
+      key: ValueKey('research-history-${submission.id}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        submission.respondentRole,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
-                        submission.companyName,
+                        '${submission.department} | ${submission.userName}',
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
+                      if (showCompany) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          submission.companyName,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              _StatusBadge(
-                label: isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
-                color: isCompleted ? AppColors.success : AppColors.amber,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _MetaPill(
-                icon: Icons.schedule_outlined,
-                label: DateFormatter.formatDateTime(submission.createdAt),
-              ),
-              _MetaPill(
-                icon: Icons.question_answer_outlined,
-                label: '${submission.answersCount} respostas',
-              ),
-              _MetaPill(
-                icon: Icons.analytics_outlined,
-                label: submission.overallScore == null
-                    ? 'Score pendente'
-                    : 'Score ${submission.overallScore!.toStringAsFixed(1)}',
-              ),
-            ],
-          ),
-          if (submission.summary != null && submission.summary!.trim().isNotEmpty) ...[
+                _StatusBadge(
+                  label: isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
+                  color: isCompleted ? AppColors.success : AppColors.amber,
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
-            Text(
-              submission.summary!,
-              style: const TextStyle(color: AppColors.textSecondary),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MetaPill(
+                  icon: Icons.schedule_outlined,
+                  label: DateFormatter.formatDateTime(submission.createdAt),
+                ),
+                _MetaPill(
+                  icon: Icons.question_answer_outlined,
+                  label: '${submission.answersCount} respostas',
+                ),
+                _MetaPill(
+                  icon: Icons.analytics_outlined,
+                  label: submission.overallScore == null
+                      ? 'Score pendente'
+                      : 'Score ${submission.overallScore!.toStringAsFixed(1)}',
+                ),
+              ],
+            ),
+            if (submission.summary != null &&
+                submission.summary!.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                submission.summary!,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+            const SizedBox(height: 10),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Ver resultado detalhado',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward, size: 18, color: AppColors.primary),
+              ],
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({
-    required this.icon,
-    required this.label,
-  });
+  const _MetaPill({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -406,10 +432,7 @@ class _MetaPill extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({
-    required this.label,
-    required this.color,
-  });
+  const _StatusBadge({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -424,10 +447,7 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
       ),
     );
   }

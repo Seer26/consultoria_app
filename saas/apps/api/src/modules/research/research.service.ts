@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { ActionPlanService } from '../action-plan/action-plan.service';
 import type { AuthTokenPayload } from '../auth/auth.types';
+import { EntitlementsRepository } from '../entitlements/entitlements.repository';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 import { ResearchRepository } from './research.repository';
 import type {
   CompleteResearchSubmissionInput,
@@ -82,6 +84,9 @@ export class ResearchService {
   constructor(
     private readonly repository: ResearchRepository,
     private readonly actionPlanService: ActionPlanService,
+    private readonly entitlementsService = new EntitlementsService(
+      new EntitlementsRepository(),
+    ),
   ) {}
 
   async createSubmission(
@@ -90,6 +95,7 @@ export class ResearchService {
   ): Promise<ResearchSubmissionRecord> {
     const context = this.getAccessContext(auth);
     this.ensureActiveUser(context);
+    this.ensureRespondent(context);
 
     const respondentRole = input.respondentRole?.trim();
     const department = input.department?.trim();
@@ -123,6 +129,11 @@ export class ResearchService {
       throw new Error('COMPANY_NOT_FOUND');
     }
 
+    this.entitlementsService.assertCanUseFeature(
+      companyId,
+      'RESEARCH_SUBMISSIONS_MONTHLY',
+    );
+
     const now = new Date().toISOString();
     return this.repository.createSubmission({
       id: randomUUID(),
@@ -153,6 +164,7 @@ export class ResearchService {
   ): Promise<ResearchAnswerRecord> {
     const context = this.getAccessContext(auth);
     this.ensureActiveUser(context);
+    this.ensureRespondent(context);
     const submission = this.getAuthorizedSubmission(context, submissionId, true);
 
     const question = input.question?.trim();
@@ -194,6 +206,7 @@ export class ResearchService {
   ): Promise<ResearchSubmissionDetails> {
     const context = this.getAccessContext(auth);
     this.ensureActiveUser(context);
+    this.ensureRespondent(context);
     const submission = this.getAuthorizedSubmission(context, submissionId, true);
     const answers = this.repository.listAnswersBySubmissionId(submission.id);
 
@@ -234,6 +247,11 @@ export class ResearchService {
       throw new Error('COMPANY_ID_REQUIRED');
     }
 
+    const requestedCompanyId = filters.companyId?.trim();
+    if (requestedCompanyId && requestedCompanyId !== context.actor.companyId) {
+      throw new Error('FORBIDDEN');
+    }
+
     if (context.actor.role === 'OWNER') {
       return this.repository.listResearchSubmissions({
         companyId: context.actor.companyId,
@@ -258,6 +276,7 @@ export class ResearchService {
   generateActionPlan(auth: AuthTokenPayload, submissionId: string) {
     const context = this.getAccessContext(auth);
     this.ensureActiveUser(context);
+    this.ensureRespondent(context);
     const submission = this.getAuthorizedSubmission(context, submissionId, false);
 
     return this.actionPlanService.generateFromResearch(auth, {
@@ -501,6 +520,12 @@ export class ResearchService {
   private ensureActiveUser(context: ResearchAccessContext): void {
     if (context.actor.status !== 'ACTIVE') {
       throw new Error('INACTIVE_USER');
+    }
+  }
+
+  private ensureRespondent(context: ResearchAccessContext): void {
+    if (context.actor.role === 'ADMIN') {
+      throw new Error('ADMIN_RESEARCH_READ_ONLY');
     }
   }
 

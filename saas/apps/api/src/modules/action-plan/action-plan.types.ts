@@ -25,6 +25,27 @@ export interface ActionPlanTaskDetails extends ActionPlanTaskRecord {
   companyName: string | null;
   responsibleUserName: string | null;
   responsibleUserEmail: string | null;
+  isOverdue: boolean;
+  daysOverdue: number;
+  isDueSoon: boolean;
+}
+
+export type ActionPlanTaskScope =
+  | 'all'
+  | 'mine'
+  | 'overdue'
+  | 'dueSoon'
+  | 'critical'
+  | 'completed';
+
+export interface ActionPlanAssignee {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  jobRole: string;
+  department: string;
+  companyId: string;
 }
 
 export interface CreateActionPlanTaskInput {
@@ -57,6 +78,8 @@ export interface UpdateActionPlanTaskStatusInput {
 export interface ActionPlanListFilters {
   companyId?: string;
   submissionId?: string;
+  scope?: ActionPlanTaskScope;
+  search?: string;
 }
 
 export interface AuthenticatedActionPlanUser {

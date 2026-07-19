@@ -11,15 +11,77 @@ const controller = new CompaniesController(service);
 
 export const companiesRouter = Router();
 
-companiesRouter.use(authenticate, authorize('ADMIN'));
+companiesRouter.get(
+  '/companies',
+  authenticate,
+  authorize('ADMIN'),
+  controller.listCompanies,
+);
+companiesRouter.get(
+  '/companies/:id',
+  authenticate,
+  authorize('ADMIN'),
+  controller.getCompanyById,
+);
+companiesRouter.post(
+  '/companies',
+  authenticate,
+  authorize('ADMIN'),
+  controller.createCompany,
+);
+companiesRouter.post(
+  '/companies/onboarding',
+  authenticate,
+  authorize('ADMIN'),
+  controller.createCompanyWithOwner,
+);
+companiesRouter.put(
+  '/companies/:id',
+  authenticate,
+  authorize('ADMIN'),
+  controller.updateCompany,
+);
+companiesRouter.patch(
+  '/companies/:id/status',
+  authenticate,
+  authorize('ADMIN'),
+  controller.updateCompanyStatus,
+);
 
-companiesRouter.get('/companies', controller.listCompanies);
-companiesRouter.get('/companies/:id', controller.getCompanyById);
-companiesRouter.post('/companies', controller.createCompany);
-companiesRouter.put('/companies/:id', controller.updateCompany);
-companiesRouter.patch('/companies/:id/status', controller.updateCompanyStatus);
+companiesRouter.get(
+  '/companies/:companyId/users',
+  authenticate,
+  authorize('ADMIN'),
+  controller.listUsersByCompany,
+);
+companiesRouter.post(
+  '/companies/:companyId/users',
+  authenticate,
+  authorize('ADMIN'),
+  controller.createUser,
+);
+companiesRouter.put(
+  '/users/:id',
+  authenticate,
+  authorize('ADMIN'),
+  controller.updateUser,
+);
+companiesRouter.patch(
+  '/users/:id/status',
+  authenticate,
+  authorize('ADMIN'),
+  controller.updateUserStatus,
+);
 
-companiesRouter.get('/companies/:companyId/users', controller.listUsersByCompany);
-companiesRouter.post('/companies/:companyId/users', controller.createUser);
-companiesRouter.put('/users/:id', controller.updateUser);
-companiesRouter.patch('/users/:id/status', controller.updateUserStatus);
+companiesRouter.get(
+  '/company/settings',
+  authenticate,
+  authorize('OWNER'),
+  controller.getOwnCompanySettings,
+);
+companiesRouter.put(
+  '/company/settings',
+  authenticate,
+  authorize('OWNER'),
+  controller.updateOwnCompanySettings,
+);

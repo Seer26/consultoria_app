@@ -45,9 +45,7 @@ class ModulePage extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
+                        style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 6),
@@ -67,7 +65,9 @@ class ModulePage extends StatelessWidget {
           Card(
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
-              leading: const CircleAvatar(child: Icon(Icons.tips_and_updates_outlined)),
+              leading: const CircleAvatar(
+                child: Icon(Icons.tips_and_updates_outlined),
+              ),
               title: const Text('Base pronta para expansao'),
               subtitle: Text(
                 'O modulo $title ja esta protegido por role e integrado a navegacao lateral.',

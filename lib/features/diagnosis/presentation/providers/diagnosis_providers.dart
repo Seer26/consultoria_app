@@ -20,11 +20,13 @@ final submitDiagnosisProvider = Provider<SubmitDiagnosis>((ref) {
   return SubmitDiagnosis(ref.read(diagnosisRepositoryProvider));
 });
 
-final diagnosisControllerProvider = StateNotifierProvider<DiagnosisController, AsyncValue<List<DiagnosisQuestion>>>(
-  (ref) {
-    return DiagnosisController(
-      ref.read(getQuestionsProvider),
-      ref.read(submitDiagnosisProvider),
-    );
-  },
-);
+final diagnosisControllerProvider =
+    StateNotifierProvider<
+      DiagnosisController,
+      AsyncValue<List<DiagnosisQuestion>>
+    >((ref) {
+      return DiagnosisController(
+        ref.read(getQuestionsProvider),
+        ref.read(submitDiagnosisProvider),
+      );
+    });

@@ -4,6 +4,7 @@
 *.pyc
 *.swp
 .DS_Store
+Thumbs.db
 .atom/
 .buildlog/
 .history
@@ -31,6 +32,14 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+**/build/
+**/coverage/
+**/dist/
+**/node_modules/
+**/*.tsbuildinfo
+
+# TypeScript output emitted next to the legacy Vite sources
+/saas/apps/web/src/**/*.js
 
 # Symbolication related
 app.*.symbols
@@ -47,6 +56,26 @@ app.*.map.json
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
+!**/.env.example
+.envrc
+**/.secrets
+**/.secrets.*
+
+# Local databases and temporary beta backups
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite-shm
+**/*.sqlite-wal
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/backups/
+**/*.backup
+**/*.backup.sqlite
+**/*.pre-restore.sqlite
+**/*.dump
 
 # API Keys
 **/api_keys.dart

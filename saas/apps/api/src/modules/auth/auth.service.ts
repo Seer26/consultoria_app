@@ -1,8 +1,13 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { env } from '../../config/env';
+import { audit } from '../../shared/audit';
+import { hashIp } from '../../shared/request-context';
 import { AuthRepository } from './auth.repository';
+import type { EmailService } from './email.service';
+import { assertPasswordPolicy } from './password-policy';
 import type {
   AuthResponse,
   AuthTokenPayload,
@@ -39,27 +44,21 @@ function sanitizeCompany(company: CompanyRecord | null): AuthResponse['company']
   };
 }
 
+const PASSWORD_RESET_GENERIC_MESSAGE =
+  'Se existir uma conta associada a este e-mail, enviaremos as instrucoes de recuperacao.';
+
+function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
 export class AuthService {
-  constructor(private readonly repository: AuthRepository) {}
+  constructor(
+    private readonly repository: AuthRepository,
+    private readonly emailService?: EmailService,
+  ) {}
 
-  async register(input: RegisterInput): Promise<AuthResponse> {
-    this.validateRegisterInput(input);
-
-    const existingUser = this.repository.findUserByEmail(input.email);
-
-    if (existingUser) {
-      throw new Error('EMAIL_ALREADY_IN_USE');
-    }
-
-    const passwordHash = await bcrypt.hash(input.password, 10);
-    const user = this.repository.createUser({
-      ...input,
-      id: `user-${Date.now()}`,
-      email: input.email.trim().toLowerCase(),
-      passwordHash,
-    });
-
-    return this.buildAuthResponse(user);
+  async register(_input: RegisterInput): Promise<AuthResponse> {
+    throw new Error('PUBLIC_REGISTRATION_DISABLED');
   }
 
   async login(input: LoginInput): Promise<AuthResponse> {
@@ -79,6 +78,20 @@ export class AuthService {
       throw new Error('INVALID_CREDENTIALS');
     }
 
+    if (user.status !== 'ACTIVE') {
+      throw new Error('INACTIVE_USER');
+    }
+
+    if (user.companyId) {
+      const company = this.repository.findCompanyById(user.companyId);
+      if (!company) {
+        throw new Error('COMPANY_NOT_FOUND');
+      }
+      if (company.status !== 'ACTIVE') {
+        throw new Error('INACTIVE_COMPANY');
+      }
+    }
+
     return this.buildAuthResponse(user);
   }
 
@@ -87,11 +100,156 @@ export class AuthService {
     return decoded;
   }
 
+  resolveAuthenticatedUser(payload: AuthTokenPayload): AuthTokenPayload {
+    const user = this.repository.findUserById(payload.userId);
+    if (!user) {
+      throw new Error('INVALID_TOKEN');
+    }
+    if (user.status !== 'ACTIVE') {
+      throw new Error('INACTIVE_USER');
+    }
+    if (Number(payload.authVersion ?? 0) !== user.authVersion) {
+      throw new Error('SESSION_REVOKED');
+    }
+
+    if (user.role === 'ADMIN') {
+      return {
+        userId: user.id,
+        role: user.role,
+        companyId: user.companyId,
+        authVersion: user.authVersion,
+      };
+    }
+
+    if (!user.companyId) {
+      throw new Error('INVALID_COMPANY_MEMBERSHIP');
+    }
+    const company = this.repository.findCompanyById(user.companyId);
+    if (!company) {
+      throw new Error('INVALID_COMPANY_MEMBERSHIP');
+    }
+    if (company.status !== 'ACTIVE') {
+      throw new Error('INACTIVE_COMPANY');
+    }
+
+    return {
+      userId: user.id,
+      role: user.role,
+      companyId: user.companyId,
+      authVersion: user.authVersion,
+    };
+  }
+
+  async requestPasswordReset(input: {
+    email?: string;
+    requestId?: string;
+    ip?: string;
+  }): Promise<{ message: string }> {
+    const normalizedEmail = input.email?.trim().toLowerCase() ?? '';
+    const user = normalizedEmail ? this.repository.findUserByEmail(normalizedEmail) : null;
+
+    if (user && user.status === 'ACTIVE') {
+      const token = randomBytes(32).toString('base64url');
+      const now = new Date();
+      const expiresAt = new Date(
+        now.getTime() + env.passwordResetTokenTtlMinutes * 60 * 1000,
+      );
+      this.repository.createPasswordResetToken({
+        id: randomUUID(),
+        userId: user.id,
+        tokenHash: hashResetToken(token),
+        createdAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        usedAt: null,
+        requestedIpHash: hashIp(input.ip) ?? null,
+        requestId: input.requestId ?? null,
+        status: 'PENDING',
+      });
+
+      try {
+        if (!this.emailService) {
+          throw new Error('EMAIL_SERVICE_UNAVAILABLE');
+        }
+        await this.emailService.sendPasswordReset({
+          to: user.email,
+          token,
+          expiresInMinutes: env.passwordResetTokenTtlMinutes,
+          requestId: input.requestId,
+        });
+        audit('password_reset_requested', {
+          requestId: input.requestId,
+          userId: user.id,
+          companyId: user.companyId,
+          ipHash: hashIp(input.ip),
+          result: 'ACCEPTED',
+        });
+      } catch (error) {
+        audit('password_reset_email_failed', {
+          requestId: input.requestId,
+          userId: user.id,
+          companyId: user.companyId,
+          result: 'ERROR',
+          error,
+        });
+      }
+    } else {
+      audit('password_reset_requested', {
+        requestId: input.requestId,
+        ipHash: hashIp(input.ip),
+        result: 'GENERIC_ACCEPTED',
+      });
+    }
+
+    return { message: PASSWORD_RESET_GENERIC_MESSAGE };
+  }
+
+  async resetPassword(input: {
+    token?: string;
+    newPassword?: string;
+    requestId?: string;
+    ip?: string;
+  }): Promise<{ message: string }> {
+    const token = input.token?.trim() ?? '';
+    const newPassword = input.newPassword ?? '';
+    const record = token ? this.repository.findPasswordResetToken(hashResetToken(token)) : null;
+    const invalid = !record || record.status !== 'PENDING' || record.usedAt !== null ||
+      new Date(record.expiresAt).getTime() <= Date.now();
+
+    if (invalid || !record) {
+      audit('password_reset_token_invalid', {
+        requestId: input.requestId,
+        ipHash: hashIp(input.ip),
+        result: 'REJECTED',
+      });
+      throw new Error('INVALID_OR_EXPIRED_RESET_TOKEN');
+    }
+
+    const user = this.repository.findUserById(record.userId);
+    if (!user || user.status !== 'ACTIVE') {
+      throw new Error('INVALID_OR_EXPIRED_RESET_TOKEN');
+    }
+    assertPasswordPolicy(newPassword, user.email);
+
+    const usedAt = new Date().toISOString();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    this.repository.resetPassword(user.id, record.id, passwordHash, usedAt);
+    audit('password_reset_completed', {
+      requestId: input.requestId,
+      userId: user.id,
+      companyId: user.companyId,
+      ipHash: hashIp(input.ip),
+      result: 'SUCCESS',
+    });
+
+    return { message: 'Senha redefinida com sucesso. Entre novamente com a nova senha.' };
+  }
+
   private buildAuthResponse(user: AuthUserRecord): AuthResponse {
     const payload: AuthTokenPayload = {
       userId: user.id,
       role: user.role,
       companyId: user.companyId,
+      authVersion: user.authVersion,
     };
 
     const token = jwt.sign(payload, env.jwtSecret, {
@@ -113,9 +271,7 @@ export class AuthService {
       throw new Error('INVALID_REGISTER_PAYLOAD');
     }
 
-    if (input.password.length < 6) {
-      throw new Error('PASSWORD_TOO_SHORT');
-    }
+    assertPasswordPolicy(input.password, input.email);
 
     if (!this.isValidRole(input.role)) {
       throw new Error('INVALID_ROLE');
