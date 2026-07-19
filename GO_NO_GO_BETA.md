@@ -5,7 +5,7 @@ Data: 19/07/2026. Decisão: **NO-GO**.
 Estado após a Sprint 3.6: **BASELINE LOCAL CONSOLIDADA; PUBLICAÇÃO NÃO
 INICIADA**. A higiene do Git está **APROVADA** para a baseline local: banco e
 artefatos gerados estão fora do versionamento, o backup foi validado, a suíte
-foi revisada e branch/commit/tag locais foram preparados sem push. Isso não
+foi revisada e branch/commits/tag locais foram criados sem push. Isso não
 comprova staging ou beta externo.
 
 | Área | Estado | Evidência / restrição |

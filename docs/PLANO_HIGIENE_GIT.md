@@ -34,7 +34,8 @@ codex/release-baseline
 Commit de baseline:
 
 ```text
-feat: establish validated consultoria saas baseline
+327fce5 feat: establish validated consultoria saas baseline
+docs: record baseline release evidence
 ```
 
 Tag anotada local:
@@ -43,8 +44,9 @@ Tag anotada local:
 baseline-pre-cloud-2026-07-19
 ```
 
-A branch e a tag são exclusivamente locais nesta sprint. Nenhum push ou deploy
-faz parte desta consolidação.
+A branch, os commits e a tag são exclusivamente locais nesta sprint. O segundo
+commit registra os resultados pós-commit e é o alvo da tag. Nenhum push ou
+deploy faz parte desta consolidação.
 
 ## Arquivos retirados do índice
 

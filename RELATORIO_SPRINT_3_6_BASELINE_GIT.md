@@ -220,18 +220,25 @@ foi executado.
 
 ## 13. Commits criados
 
-A consolidação usa:
+A consolidação criou o commit funcional:
 
 ```text
-feat: establish validated consultoria saas baseline
+327fce5 feat: establish validated consultoria saas baseline
 ```
 
-O hash do commit e qualquer commit documental posterior são registrados no
-estado final do Git após a validação pós-commit.
+Depois da verificação de reprodutibilidade, a evidência final é registrada em
+um segundo commit estritamente documental:
+
+```text
+docs: record baseline release evidence
+```
+
+O hash desse segundo commit é o alvo da tag e pode ser consultado diretamente
+no `git log`, evitando autorreferência impossível dentro do próprio commit.
 
 ## 14. Tag local
 
-Tag anotada definida:
+Tag anotada local criada após o commit documental:
 
 ```text
 baseline-pre-cloud-2026-07-19
@@ -240,7 +247,7 @@ baseline-pre-cloud-2026-07-19
 Mensagem: baseline local validada, sem publicação externa, sem PostgreSQL, sem
 pagamentos, banco operacional não versionado e testes aprovados.
 
-A tag é local e não será publicada nesta sprint.
+A tag aponta para o estado final documentado, é local e não foi publicada.
 
 ## 15. Formatação executada
 
@@ -284,7 +291,7 @@ com o mesmo tamanho e SHA-256.
 ## 18. Reprodutibilidade
 
 Antes do primeiro commit, dependências, builds e toda a suíte foram
-reconstruídos com sucesso. A verificação pós-commit executará novamente:
+reconstruídos com sucesso. Depois do commit `327fce5`, a verificação executou:
 
 ```text
 flutter pub get
@@ -294,20 +301,31 @@ npm.cmd --workspace @consultoria/api run build
 npm.cmd --workspace @consultoria/api run test
 ```
 
-O resultado pós-commit será consolidado antes da tag local final.
+Resultados pós-commit:
+
+- `flutter pub get`: aprovado;
+- `npm.cmd install`: aprovado, dependências atualizadas sem mudança de lockfile;
+- `flutter analyze`: aprovado, sem issues;
+- build da API: aprovado;
+- suíte agregada da API: aprovada;
+- artefatos reconstruídos permaneceram ignorados;
+- nenhum banco temporário permaneceu no diretório de dados;
+- banco operacional, WAL e backup mantiveram seus hashes.
 
 ## 19. Estado final do Git
 
-Estado esperado:
+Estado final:
 
 - branch `codex/release-baseline`;
+- commit funcional `327fce5`;
+- commit documental de evidência;
+- tag local `baseline-pre-cloud-2026-07-19` no estado documentado;
 - somente fonte e documentação versionáveis;
 - `node_modules`, `dist`, bancos, WAL/SHM, backups e caches ignorados;
-- worktree limpo depois do registro da evidência;
+- worktree limpo;
 - nenhum push.
 
-O hash final, os commits e a tag serão confirmados depois da validação
-pós-commit.
+Os builds pós-commit não fizeram artefatos reaparecerem no status.
 
 ## 20. Falhas encontradas
 
@@ -371,7 +389,8 @@ backup externo, e-mail real e aprovação jurídica.
 - [x] documentos permanentes preservados;
 - [x] referências verificadas;
 - [x] nenhum push;
-- [ ] hash dos commits e tag confirmados após validação pós-commit.
+- [x] commit funcional, commit documental e tag local confirmados após
+  validação pós-commit.
 
 ## 25. Recomendação para a próxima sprint
 
