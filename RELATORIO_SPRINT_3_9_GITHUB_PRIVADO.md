@@ -14,7 +14,7 @@ PostgreSQL, pagamentos ou abertura automática de pull request.
 
 ## 2. Estado alcançado
 
-Estado validado antes da publicação:
+Estado concluído:
 
 - baseline local preservada na branch `codex/release-baseline`;
 - histórico anterior consolidado neste relatório;
@@ -24,7 +24,9 @@ Estado validado antes da publicação:
 - documentação de revisão e de novo dispositivo preparada;
 - validação obrigatória concluída com sucesso;
 - banco operacional, WAL e SHM preservados byte a byte;
-- publicação da branch pendente no momento desta consolidação.
+- branch publicada no GitHub privado;
+- clonagem limpa validada e diretório temporário removido;
+- `main`, tag, deploy e pull requests não alterados.
 
 ## 3. Histórico consolidado das sprints anteriores
 
@@ -171,13 +173,20 @@ O SHM permaneceu com 32.768 bytes e SHA-256
 
 ## 11. Branch publicada
 
-Pendente. A publicação autorizada será exclusivamente:
+A branch foi publicada com sucesso:
 
 ```powershell
 git push -u origin codex/release-baseline
 ```
 
-Não será feito push em `main`, force push ou merge.
+- commit publicado inicialmente: `459015076cf2f1873236d1273b8128bd4a05ab11`;
+- upstream: `origin/codex/release-baseline`;
+- branch remota criada sem force push;
+- `main` permaneceu em `e039fc6`;
+- nenhum merge foi executado.
+
+O commit documental final deste relatório é posterior ao primeiro push e pode
+ser confirmado no topo de `git log`.
 
 ## 12. Tag local
 
@@ -192,14 +201,54 @@ somente local, aguardando revisão humana da branch.
 
 ## 13. Revisão no GitHub
 
-O procedimento está em `docs/REVISAO_BASELINE_GITHUB.md`. Não haverá merge,
-alteração de `main`, exclusão da branch ou pull request automático.
+O procedimento está em `docs/REVISAO_BASELINE_GITHUB.md`. A branch apareceu no
+remoto e o próprio GitHub ofereceu o link padrão para criar PR. Nenhum PR foi
+aberto, nenhum merge ocorreu e `main` não foi alterada.
 
 ## 14. Validação por clonagem limpa
 
-Pendente da publicação da branch. A clonagem deverá ocorrer em diretório
-temporário fora do projeto, sem credenciais reais e sem usar o banco
-operacional.
+Clonagem executada fora do projeto em diretório temporário:
+
+```text
+C:\tmp\consultoria-sprint-3-9-clean-clone-20260719
+```
+
+Estado inicial da cópia:
+
+- branch `codex/release-baseline`;
+- commit `459015076cf2f1873236d1273b8128bd4a05ab11`;
+- 457 arquivos rastreados;
+- zero arquivos proibidos rastreados;
+- `pubspec.lock` e `saas/package-lock.json` presentes;
+- zero SQLite, backup, `.env.local`, `node_modules` ou `dist`;
+- worktree limpo antes da geração local.
+
+Validação na cópia:
+
+- `flutter pub get`: aprovado;
+- `flutter analyze`: aprovado, sem issues;
+- `npm.cmd install`: aprovado, 259 pacotes instalados;
+- `npm.cmd run build`: domínio, API e web aprovados;
+- build isolado da API, após o domínio: aprovado.
+
+O primeiro `npm.cmd install` e a primeira emissão de `dist` foram bloqueados
+pelo sandbox. A repetição autorizada no diretório temporário passou.
+
+O build isolado da API antes do domínio também acusou a dependência
+`@consultoria/domain`; o fluxo documentado `npm.cmd run build` já usa a ordem
+correta domínio → API → web. Depois desse build, a API isolada passou.
+
+O `npm install` reportou 6 vulnerabilidades nas dependências: 2 baixas, 3
+moderadas e 1 alta. Nenhum `npm audit fix` foi executado para não alterar
+dependências ou lockfile sem análise específica.
+
+No Windows, após `flutter pub get`, sete registradores gerados desktop ficaram
+marcados no status por normalização LF/CRLF, embora `git diff` não exibisse
+mudança lógica e os hashes de blob informados permanecessem iguais. O clone
+inicial era limpo e o código compilou; a normalização deve ser tratada em uma
+sprint de higiene multiplataforma.
+
+O diretório temporário foi removido explicitamente após a validação.
 
 ## 15. Configuração em outro dispositivo
 
@@ -211,13 +260,14 @@ O banco operacional, `.env.local` e secrets não são transferidos pelo GitHub.
 
 ## 16. Estado final do Git
 
-Pendente da validação, commit documental e publicação. O estado esperado é:
-
-- branch `codex/release-baseline` rastreando
-  `origin/codex/release-baseline`;
-- worktree limpo;
-- `main` inalterada;
-- tag somente local.
+- branch `codex/release-baseline`;
+- upstream `origin/codex/release-baseline`;
+- commit de publicação inicial `4590150`;
+- commit documental final posterior, sem mudança funcional;
+- `main` local e remota em `e039fc6`;
+- tag `baseline-pre-cloud-2026-07-19` somente local em `0c0e032`;
+- nenhum force push, merge, PR ou deploy;
+- worktree esperado limpo após o commit documental final.
 
 ## 17. Falhas encontradas
 
@@ -225,6 +275,11 @@ Pendente da validação, commit documental e publicação. O estado esperado é:
 - o conector GitHub não possui acesso ao repositório privado;
 - a rede do sandbox bloqueou a primeira tentativa de consulta;
 - a verificação somente leitura foi repetida com autorização e concluída.
+- o primeiro `flutter test` ficou sem saída no sandbox e passou na repetição;
+- instalação e build do clone exigiram execução fora do sandbox;
+- build isolado da API exige que o domínio seja compilado antes;
+- Flutter marcou sete arquivos gerados por LF/CRLF no clone Windows, sem diff
+  lógico.
 
 O Git Credential Manager local permite o acesso necessário sem expor
 credenciais. A ausência do `gh` impede automações de PR, que não fazem parte
@@ -240,6 +295,9 @@ desta sprint.
 - OpenAI depende de chave, crédito e disponibilidade;
 - dados reais autorizados ainda não completaram a validação funcional;
 - revisão humana da branch continua obrigatória.
+- `npm install` reporta 6 vulnerabilidades, incluindo 1 alta;
+- normalização LF/CRLF dos registradores Flutter pode sujar o status em um
+  clone Windows após `flutter pub get`.
 
 ## 19. Pendências externas
 
@@ -262,20 +320,21 @@ desta sprint.
 - [x] privacidade confirmada;
 - [x] banco, backup, secrets e artefatos fora do estado rastreado;
 - [x] testes finais aprovados;
-- [ ] branch publicada;
+- [x] branch publicada;
 - [x] `main` não alterada;
 - [x] nenhum force push;
 - [x] tag não publicada;
-- [ ] clonagem limpa validada;
+- [x] clonagem limpa validada;
 - [x] documentação de novo dispositivo atualizada;
 - [x] nenhum deploy executado.
 
 ## 21. Recomendação para a próxima sprint
 
-Após a publicação, revisar a branch no GitHub e somente então decidir sobre um
-pull request e a futura publicação da tag. O beta externo permanece NO-GO até
-que infraestrutura, persistência, backup, e-mail, jurídico e suporte estejam
-aprovados.
+Revisar a branch no GitHub e somente então decidir sobre um pull request e a
+futura publicação da tag. Antes disso, abrir uma sprint curta para analisar a
+vulnerabilidade alta apontada pelo npm e padronizar LF/CRLF dos arquivos Flutter
+gerados. O beta externo permanece NO-GO até que infraestrutura, persistência,
+backup, e-mail, jurídico e suporte estejam aprovados.
 
 ## Histórico consolidado das sprints anteriores
 

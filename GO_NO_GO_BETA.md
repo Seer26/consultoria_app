@@ -2,15 +2,15 @@
 
 Data: 19/07/2026. Decisão: **NO-GO**.
 
-Estado após a Sprint 3.6: **BASELINE LOCAL CONSOLIDADA; PUBLICAÇÃO NÃO
-INICIADA**. A higiene do Git está **APROVADA** para a baseline local: banco e
-artefatos gerados estão fora do versionamento, o backup foi validado, a suíte
-foi revisada e branch/commits/tag locais foram criados sem push. Isso não
-comprova staging ou beta externo.
+Estado após a Sprint 3.9: **BASELINE PUBLICADA EM GITHUB PRIVADO; REVISÃO
+HUMANA PENDENTE**. A higiene do Git está **APROVADA**: banco e artefatos
+gerados estão fora do versionamento, o backup foi validado, a suíte passou, a
+branch foi publicada e uma clonagem limpa foi validada. A tag permanece local.
+Isso não comprova staging ou beta externo.
 
 | Área | Estado | Evidência / restrição |
 |---|---|---|
-| Higiene do Git | APROVADO | baseline local revisada; dependências, builds, banco e secrets fora do versionamento; nenhum push |
+| Higiene do Git | APROVADO | branch em GitHub privado; dependências, builds, banco e secrets fora do versionamento; clone limpo validado |
 | Infraestrutura | REPROVADO | nenhum provedor escolhido, autorizado ou configurado |
 | Docker | NÃO VALIDADO | Docker e Compose indisponíveis; somente validação estática |
 | HTTPS | NÃO VALIDADO | frontend/API não publicados e certificado inexistente |
@@ -49,10 +49,11 @@ comprova staging ou beta externo.
 
 Consulte `docs/RECURSOS_EXTERNOS_STAGING.md` e `docs/STATUS_JURIDICO_BETA.md`.
 
-## Decisão da Sprint 3.6
+## Decisão da Sprint 3.9
 
 - apresentação local assistida: permitida com as restrições do
   `CHECKLIST_APRESENTACAO_MVP.md`;
-- baseline Git local: `APROVADO`;
+- baseline Git privada: `APROVADO PARA REVISÃO`;
 - beta externo: `NO-GO`;
-- push, deploy, PostgreSQL e pagamentos: não executados.
+- push apenas da branch: executado;
+- tag, PR, merge, deploy, PostgreSQL e pagamentos: não executados.

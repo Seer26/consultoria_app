@@ -21,9 +21,13 @@ Commits principais antes da documentação da Sprint 3.9:
 ```text
 327fce5 feat: establish validated consultoria saas baseline
 0c0e032 docs: record baseline release evidence
+4590150 docs: prepare private GitHub baseline publication
 ```
 
 Não fazer merge, excluir a branch ou publicar a tag sem revisão humana.
+
+A branch foi publicada no repositório privado e rastreia
+`origin/codex/release-baseline`. Nenhum pull request foi aberto.
 
 ## Arquivos proibidos verificados
 
@@ -61,6 +65,11 @@ Os testes de API utilizaram bancos temporários. Os resultados e hashes de
 preservação do banco operacional ficam registrados em
 `RELATORIO_SPRINT_3_9_GITHUB_PRIVADO.md`.
 
+Uma clonagem temporária do commit `4590150` também aprovou `flutter analyze`,
+instalação npm, build raiz e build isolado da API após o domínio. A instalação
+npm reportou 6 vulnerabilidades (2 baixas, 3 moderadas e 1 alta), ainda
+pendentes de análise.
+
 ## Comparar com main
 
 No dispositivo local:
@@ -86,6 +95,8 @@ banco, configuração, CI e remoções de artefatos.
 - [ ] verificar migrations e scripts operacionais;
 - [ ] revisar contratos `.env.example` sem inserir valores reais;
 - [ ] conferir resultados de Flutter, API e clone limpo;
+- [ ] avaliar as 6 vulnerabilidades reportadas pelo npm, especialmente a alta;
+- [ ] decidir a política LF/CRLF para registradores Flutter gerados no Windows;
 - [ ] confirmar que `main` não foi alterada;
 - [ ] aprovar ou solicitar correções;
 - [ ] decidir separadamente se um pull request deve ser aberto.

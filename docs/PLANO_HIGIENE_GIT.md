@@ -44,9 +44,9 @@ Tag anotada local:
 baseline-pre-cloud-2026-07-19
 ```
 
-A branch, os commits e a tag são exclusivamente locais nesta sprint. O segundo
-commit registra os resultados pós-commit e é o alvo da tag. Nenhum push ou
-deploy faz parte desta consolidação.
+A branch e os commits foram publicados no repositório GitHub privado durante a
+Sprint 3.9. O segundo commit registra os resultados pós-commit e é o alvo da
+tag. A tag continua exclusivamente local. Nenhum deploy foi executado.
 
 ## Arquivos retirados do índice
 
@@ -136,21 +136,24 @@ Todos os testes de API devem apontar para bancos temporários, nunca para
 
 ## Procedimento futuro de push
 
-Somente após revisão do responsável:
+A branch `codex/release-baseline` já está publicada no remoto privado. Para
+novas alterações:
 
-1. conferir a branch e o status;
-2. revisar o commit e a tag local;
-3. confirmar novamente que não há secrets ou dados locais no commit;
-4. publicar primeiro a branch;
-5. abrir revisão;
-6. publicar a tag somente depois da aprovação da baseline.
+1. conferir branch, upstream e status;
+2. revisar somente os arquivos intencionais;
+3. confirmar novamente que não há secrets ou dados locais;
+4. executar a suíte aplicável;
+5. criar commit sem reescrever o histórico;
+6. usar `git push`, sem force;
+7. revisar no GitHub antes de qualquer merge.
 
-Comandos previstos, mas não executados nesta sprint:
+A tag só pode ser publicada depois da aprovação humana:
 
 ```powershell
-git push -u origin codex/release-baseline
 git push origin baseline-pre-cloud-2026-07-19
 ```
+
+Não usar `git push --tags`.
 
 ## Procedimento para outro dispositivo
 
@@ -182,5 +185,5 @@ Para dados:
 - SQLite continua limitado a instância única;
 - staging externo, PostgreSQL e backup remoto continuam pendentes;
 - a tag local não substitui backup externo;
-- a primeira publicação remota exige revisão humana do baseline;
+- a branch privada foi publicada, mas ainda exige revisão humana do baseline;
 - a migração para PostgreSQL deve ocorrer em sprint separada.
