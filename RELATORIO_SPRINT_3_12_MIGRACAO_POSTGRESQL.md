@@ -85,4 +85,3 @@ Após aprovação e merge, devem ser repetidos os gates críticos no hash exato 
 baseline. Tag, staging e produção exigem autorizações e validações próprias. O
 beta externo continua condicionado aos gates operacionais, jurídicos e de
 infraestrutura já documentados no projeto.
-

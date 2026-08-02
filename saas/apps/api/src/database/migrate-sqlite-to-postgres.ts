@@ -26,6 +26,78 @@ const orderedTables = [
 type MigratedTable = (typeof orderedTables)[number];
 type CountMap = Record<MigratedTable, number>;
 
+const expectedColumns: Record<MigratedTable, readonly string[]> = {
+  companies: [
+    'id', 'name', 'slug', 'status', 'sector', 'size', 'phone',
+    'responsible_name', 'notes', 'created_at', 'updated_at',
+  ],
+  plans: [
+    'id', 'slug', 'name', 'description', 'status', 'max_users',
+    'max_research_submissions_monthly', 'max_report_pdfs_monthly',
+    'max_active_action_tasks', 'max_ai_questions_monthly', 'created_at',
+    'updated_at',
+  ],
+  users: [
+    'id', 'name', 'email', 'password_hash', 'role', 'company_id',
+    'created_at', 'updated_at', 'status', 'auth_version',
+  ],
+  company_subscriptions: [
+    'id', 'company_id', 'plan_id', 'status', 'current_period_start',
+    'current_period_end', 'created_at', 'updated_at',
+  ],
+  diagnosis_submissions: [
+    'id', 'company_id', 'user_id', 'submission_type', 'questionnaire_id',
+    'respondent_role', 'department', 'status', 'overall_score', 'summary',
+    'critical_points', 'opportunities', 'recommendations', 'next_steps',
+    'pillar_scores', 'created_at', 'updated_at', 'completed_at',
+  ],
+  diagnosis_answers: [
+    'id', 'submission_id', 'question_id', 'question', 'answer', 'pillar',
+    'value', 'score', 'created_at',
+  ],
+  action_tasks: [
+    'id', 'submission_id', 'pillar', 'title', 'description', 'priority',
+    'status',
+  ],
+  action_plan_tasks: [
+    'id', 'company_id', 'submission_id', 'title', 'description', 'pillar',
+    'priority', 'status', 'due_date', 'responsible_user_id', 'source',
+    'created_at', 'updated_at', 'completed_at',
+  ],
+  usage_counters: [
+    'id', 'company_id', 'feature', 'period', 'quantity', 'updated_at',
+  ],
+  company_subscription_events: [
+    'id', 'company_id', 'previous_plan_id', 'new_plan_id', 'actor_user_id',
+    'origin', 'reason', 'created_at',
+  ],
+  password_reset_tokens: [
+    'id', 'user_id', 'token_hash', 'created_at', 'expires_at', 'used_at',
+    'requested_ip_hash', 'request_id', 'status',
+  ],
+  legal_acceptances: [
+    'id', 'user_id', 'company_id', 'document_type', 'document_version',
+    'accepted_at', 'ip_hash', 'request_id', 'origin', 'metadata',
+  ],
+};
+
+function quoteExpectedIdentifier(
+  identifier: string,
+  allowedIdentifiers: readonly string[],
+): string {
+  if (
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier) ||
+    !allowedIdentifiers.includes(identifier)
+  ) {
+    throw new Error('SQLITE_SCHEMA_UNEXPECTED_IDENTIFIER');
+  }
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function quoteTable(table: MigratedTable): string {
+  return quoteExpectedIdentifier(table, orderedTables);
+}
+
 export interface MigrationOptions {
   sourcePath: string;
   dryRun: boolean;
@@ -116,7 +188,7 @@ function sqliteCounts(sqlite: Database.Database): CountMap {
   return Object.fromEntries(
     orderedTables.map((table) => {
       if (!existing.has(table)) return [table, 0];
-      const row = sqlite.prepare(`SELECT COUNT(*) AS total FROM "${table}"`).get() as {
+      const row = sqlite.prepare(`SELECT COUNT(*) AS total FROM ${quoteTable(table)}`).get() as {
         total: number;
       };
       return [table, Number(row.total)];
@@ -128,7 +200,7 @@ async function postgresCounts(client: ReturnType<typeof createPostgresClient>): 
   const entries: Array<[MigratedTable, number]> = [];
   for (const table of orderedTables) {
     const result = await client.query<{ total: string }>(
-      `SELECT COUNT(*) AS total FROM "${table}"`,
+      `SELECT COUNT(*) AS total FROM ${quoteTable(table)}`,
     );
     entries.push([table, Number(result.rows[0]?.total ?? 0)]);
   }
@@ -162,10 +234,24 @@ async function assertDestinationEmpty(
   }
 }
 
-function tableColumns(sqlite: Database.Database, table: string): string[] {
-  return (sqlite.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
+function tableColumns(sqlite: Database.Database, table: MigratedTable): string[] {
+  return (sqlite.prepare(`PRAGMA table_info(${quoteTable(table)})`).all() as Array<{
     name: string;
   }>).map((row) => row.name);
+}
+
+function validateSourceSchema(sqlite: Database.Database): void {
+  const existing = sqliteTables(sqlite);
+  for (const table of existing) {
+    if (table.startsWith('sqlite_')) continue;
+    quoteExpectedIdentifier(table, orderedTables);
+  }
+  for (const table of orderedTables) {
+    if (!existing.has(table)) continue;
+    for (const column of tableColumns(sqlite, table)) {
+      quoteExpectedIdentifier(column, expectedColumns[table]);
+    }
+  }
 }
 
 async function importTable(
@@ -175,14 +261,17 @@ async function importTable(
 ): Promise<number> {
   if (!sqliteTables(sqlite).has(table)) return 0;
   const columns = tableColumns(sqlite, table);
-  const rows = sqlite.prepare(`SELECT * FROM "${table}"`).all() as Array<
+  const tableSql = quoteTable(table);
+  const rows = sqlite.prepare(`SELECT * FROM ${tableSql}`).all() as Array<
     Record<string, unknown>
   >;
   if (columns.length === 0 || rows.length === 0) return 0;
-  const columnSql = columns.map((column) => `"${column}"`).join(', ');
+  const columnSql = columns
+    .map((column) => quoteExpectedIdentifier(column, expectedColumns[table]))
+    .join(', ');
   const placeholders = columns.map((_column, index) => `$${index + 1}`).join(', ');
   const sql = `
-    INSERT INTO "${table}" (${columnSql})
+    INSERT INTO ${tableSql} (${columnSql})
     VALUES (${placeholders})
     ON CONFLICT DO NOTHING
   `;
@@ -241,6 +330,7 @@ export async function migrateSqliteToPostgres(
   const sqlite = validateSource(options);
   let client: ReturnType<typeof createPostgresClient> | null = null;
   try {
+    validateSourceSchema(sqlite);
     const sourceCounts = sqliteCounts(sqlite);
     if (!options.dryRun) await runPostgresMigrations();
     client = createPostgresClient();

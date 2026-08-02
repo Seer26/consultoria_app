@@ -32,6 +32,7 @@ const scenarios = [
   'import-failure',
   'count-failure',
   'orphan-failure',
+  'identifier-failure',
 ] as const;
 type Scenario = (typeof scenarios)[number];
 
@@ -93,6 +94,15 @@ function createFixture(filename: string, invalidRole = false): void {
   sqlite.close();
 }
 
+function addManipulatedIdentifier(filename: string): void {
+  const sqlite = new Database(filename);
+  sqlite.exec(
+    'ALTER TABLE companies ADD COLUMN "unexpected""; DROP TABLE companies; --" TEXT',
+  );
+  assert.equal(sqlite.pragma('quick_check', { simple: true }), 'ok');
+  sqlite.close();
+}
+
 async function runChild(scenario: Scenario, sourcePath: string): Promise<void> {
   const { migrateSqliteToPostgres } = await import(
     '../database/migrate-sqlite-to-postgres'
@@ -117,7 +127,9 @@ async function runChild(scenario: Scenario, sourcePath: string): Promise<void> {
   }
   let expected: RegExp;
   let hooks: MigrationTestHooks | undefined;
-  if (scenario === 'import-failure') {
+  if (scenario === 'identifier-failure') {
+    expected = /SQLITE_SCHEMA_UNEXPECTED_IDENTIFIER/;
+  } else if (scenario === 'import-failure') {
     expected = /users_role_check/;
   } else if (scenario === 'count-failure') {
     expected = /MIGRATION_COUNT_MISMATCH:action_tasks/;
@@ -157,8 +169,11 @@ async function parent(): Promise<void> {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consultoria-migrator-'));
   const validSource = path.join(tempDir, 'migration-valid.sqlite');
   const invalidSource = path.join(tempDir, 'migration-invalid.sqlite');
+  const manipulatedSource = path.join(tempDir, 'migration-manipulated.sqlite');
   createFixture(validSource);
   createFixture(invalidSource, true);
+  createFixture(manipulatedSource);
+  addManipulatedIdentifier(manipulatedSource);
   const names = Object.fromEntries(
     scenarios.map((scenario) => [scenario, `consultoria_migrator_${scenario.replace(/-/g, '_')}_test`]),
   ) as Record<Scenario, string>;
@@ -173,7 +188,11 @@ async function parent(): Promise<void> {
       }
     });
     for (const scenario of scenarios) {
-      const source = scenario === 'import-failure' ? invalidSource : validSource;
+      const source = scenario === 'import-failure'
+        ? invalidSource
+        : scenario === 'identifier-failure'
+          ? manipulatedSource
+          : validSource;
       const child = spawnSync(
         process.execPath,
         ['--import', 'tsx', fileURLToPath(import.meta.url), `--scenario=${scenario}`, `--source=${source}`],
@@ -189,6 +208,17 @@ async function parent(): Promise<void> {
       );
       if (child.status !== 0) {
         throw new Error(`SCENARIO_FAILED:${scenario}:${child.stderr || child.stdout}`);
+      }
+      if (scenario === 'identifier-failure') {
+        await withClient(databaseUrl(baseUrl, names[scenario]), async (client) => {
+          const migratedTables = await client.query(
+            'SELECT COUNT(*)::int AS total FROM information_schema.tables ' +
+            "WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
+            [[...tables]],
+          );
+          assert.equal(Number(migratedTables.rows[0].total), 0);
+        });
+        continue;
       }
       const counts: Record<string, number> = await withClient<Record<string, number>>(
         databaseUrl(baseUrl, names[scenario]),
@@ -222,6 +252,7 @@ async function parent(): Promise<void> {
       importFailureRollback: true,
       countValidationRollback: true,
       orphanValidationRollback: true,
+      manipulatedIdentifierRejectedBeforeImport: true,
       dryRunNoPersistence: true,
     }));
   } finally {

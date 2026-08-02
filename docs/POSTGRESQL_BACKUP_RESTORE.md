@@ -63,7 +63,8 @@ Checklist:
 
 ## Situação da Sprint 3.12
 
-`pg_dump`, `pg_restore` e `psql` não estavam instalados nesta máquina.
-Scripts e procedimento foram preparados; backup e restore PostgreSQL ficaram
-bloqueados e não estão aprovados.
-
+Na Sprint 3.12, `pg_dump`, `pg_restore` e `psql` ainda não estavam instalados
+nesta máquina, portanto o gate ficou historicamente bloqueado. O PostgreSQL
+16.14 foi instalado posteriormente no host, e o backup e o restore foram
+aprovados na Sprint 3.12.1. O relatório técnico final contém as evidências
+atuais dessa validação.

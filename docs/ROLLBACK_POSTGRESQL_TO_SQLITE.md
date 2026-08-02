@@ -53,4 +53,3 @@ Não prossiga se:
 Pare a API, restaure `DATABASE_URL`, execute `db:migrate` e `db:validate` e
 suba a API novamente. Não migre automaticamente alterações feitas no SQLite;
 qualquer nova reconciliação exige plano e autorização próprios.
-

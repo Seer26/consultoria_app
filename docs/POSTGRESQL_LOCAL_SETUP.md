@@ -86,4 +86,3 @@ Valide também:
 
 Pare a API, remova `DATABASE_URL` do ambiente e configure `DATABASE_PATH`.
 Consulte `ROLLBACK_POSTGRESQL_TO_SQLITE.md`.
-

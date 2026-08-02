@@ -102,4 +102,3 @@ npm.cmd --workspace @consultoria/api run test:smoke:postgres
 O código foi preparado na Sprint 3.12, mas não foi executado localmente contra
 PostgreSQL porque Docker e as ferramentas PostgreSQL estavam indisponíveis.
 Não trate esta documentação como evidência de migração aprovada.
-
