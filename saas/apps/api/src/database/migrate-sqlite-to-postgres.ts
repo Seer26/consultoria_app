@@ -26,13 +26,19 @@ const orderedTables = [
 type MigratedTable = (typeof orderedTables)[number];
 type CountMap = Record<MigratedTable, number>;
 
-interface MigrationOptions {
+export interface MigrationOptions {
   sourcePath: string;
   dryRun: boolean;
   allowNonEmptyDestination: boolean;
   allowProductionDestination: boolean;
   allowOperationalBackup: boolean;
   confirmed: boolean;
+}
+
+export interface MigrationTestHooks {
+  beforeValidation?: (
+    client: ReturnType<typeof createPostgresClient>,
+  ) => Promise<void>;
 }
 
 function argumentValue(name: string): string | undefined {
@@ -221,6 +227,7 @@ async function orphanCounts(
 
 export async function migrateSqliteToPostgres(
   options = readOptions(),
+  testHooks?: MigrationTestHooks,
 ): Promise<{
   dryRun: boolean;
   sourceCounts: CountMap;
@@ -228,6 +235,9 @@ export async function migrateSqliteToPostgres(
   importedCounts: CountMap;
   orphanCounts: Record<string, number>;
 }> {
+  if (testHooks && env.nodeEnv !== 'test') {
+    throw new Error('MIGRATION_TEST_HOOKS_REQUIRE_TEST_ENVIRONMENT');
+  }
   const sqlite = validateSource(options);
   let client: ReturnType<typeof createPostgresClient> | null = null;
   try {
@@ -258,30 +268,33 @@ export async function migrateSqliteToPostgres(
       for (const table of orderedTables) {
         importedCounts[table] = await importTable(sqlite, client, table);
       }
+
+      await testHooks?.beforeValidation?.(client);
+
+      const destinationCounts = await postgresCounts(client);
+      const orphans = await orphanCounts(client);
+      const mismatches = orderedTables.filter(
+        (table) => destinationCounts[table] !== sourceCounts[table],
+      );
+      if (mismatches.length > 0) {
+        throw new Error(`MIGRATION_COUNT_MISMATCH:${mismatches.join(',')}`);
+      }
+      if (Object.values(orphans).some((count) => count !== 0)) {
+        throw new Error('MIGRATION_ORPHAN_RECORDS_FOUND');
+      }
+
       await client.query('COMMIT');
+      return {
+        dryRun: false,
+        sourceCounts,
+        destinationCounts,
+        importedCounts,
+        orphanCounts: orphans,
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     }
-
-    const destinationCounts = await postgresCounts(client);
-    const orphans = await orphanCounts(client);
-    const mismatches = orderedTables.filter(
-      (table) => destinationCounts[table] !== sourceCounts[table],
-    );
-    if (mismatches.length > 0) {
-      throw new Error(`MIGRATION_COUNT_MISMATCH:${mismatches.join(',')}`);
-    }
-    if (Object.values(orphans).some((count) => count !== 0)) {
-      throw new Error('MIGRATION_ORPHAN_RECORDS_FOUND');
-    }
-    return {
-      dryRun: false,
-      sourceCounts,
-      destinationCounts,
-      importedCounts,
-      orphanCounts: orphans,
-    };
   } finally {
     sqlite.close();
     if (client) await client.end();
