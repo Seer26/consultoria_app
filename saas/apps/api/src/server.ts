@@ -1,7 +1,6 @@
 import { app } from './app';
 import { env } from './config/env';
 import { dataSource } from './database/data-source';
-import { initDatabase } from './database/init';
 import { runPostgresMigrations } from './database/migrate';
 import { logger } from './shared/logger';
 
@@ -11,6 +10,7 @@ async function start() {
       await runPostgresMigrations();
     }
   } else {
+    const { initDatabase } = await import('./database/init');
     await initDatabase();
   }
 

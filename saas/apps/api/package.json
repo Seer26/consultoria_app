@@ -25,6 +25,7 @@
     "test:e2e:sqlite": "npm run test:e2e",
     "test:e2e:postgres": "tsx src/tests/postgres-runtime.e2e.ts",
     "test:postgres:unavailable": "tsx src/tests/postgres-readiness-unavailable.e2e.ts",
+    "test:runtime:isolation": "tsx src/tests/runtime-provider-isolation.e2e.ts",
     "test:migrator:postgres": "tsx src/tests/sqlite-to-postgres-migration.e2e.ts",
     "test:smoke": "npm run test:e2e",
     "test:smoke:sqlite": "npm run test:smoke",
