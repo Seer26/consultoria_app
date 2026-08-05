@@ -65,6 +65,25 @@ npm.cmd --workspace @consultoria/api start
 
 A segunda execução de `db:migrate` deve ser idempotente.
 
+## Cadastrar o primeiro ADMIN
+
+Depois de aplicar e validar as migrations, use `admin:bootstrap` somente em
+ambiente local ou de teste e apenas quando ainda não existir um ADMIN. Defina
+as variáveis temporárias com dados fictícios e a confirmação exata:
+
+```powershell
+$env:BOOTSTRAP_ADMIN_NAME='<NOME_FICTICIO>'
+$env:BOOTSTRAP_ADMIN_EMAIL='<EMAIL_FICTICIO>'
+$env:BOOTSTRAP_ADMIN_PASSWORD='<SENHA_FICTICIA_FORTE>'
+$env:BOOTSTRAP_CONFIRM='CREATE-FIRST-ADMIN'
+npm.cmd --workspace @consultoria/api run admin:bootstrap
+Remove-Item Env:BOOTSTRAP_ADMIN_NAME, Env:BOOTSTRAP_ADMIN_EMAIL,
+  Env:BOOTSTRAP_ADMIN_PASSWORD, Env:BOOTSTRAP_CONFIRM
+```
+
+O comando exige `DATABASE_URL` PostgreSQL, recusa `NODE_ENV=production`, não
+executa migrations automaticamente e falha se já existir um ADMIN.
+
 ## Validação
 
 ```powershell
