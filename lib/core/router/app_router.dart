@@ -20,6 +20,9 @@ import '../../features/diagnosis/presentation/pages/diagnosis_page.dart';
 import '../../features/diagnosis/presentation/pages/chat_diagnosis_page.dart';
 import '../../features/diagnosis/presentation/pages/research_details_page.dart';
 import '../../features/reports/presentation/pages/reports_page.dart';
+import '../../features/legal/presentation/pages/legal_acceptance_page.dart';
+import '../../features/legal/presentation/providers/legal_acceptance_providers.dart';
+import '../../features/legal/presentation/state/legal_acceptance_state.dart';
 import '../auth/role_guard.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/app_state_widgets.dart';
@@ -27,6 +30,7 @@ import '../../widgets/role_guard.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authControllerProvider);
+  final legalState = ref.watch(legalAcceptanceControllerProvider);
   final currentRole = authState.user?.role;
 
   return GoRouter(
@@ -36,15 +40,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/',
         name: 'splash',
         builder: (context, state) => const AuthSplashPage(),
-        redirect: (context, state) {
-          if (authState.status == AuthStatus.unknown) {
-            return null;
-          }
-          if (authState.status != AuthStatus.authenticated) {
-            return '/login';
-          }
-          return RoleGuard.defaultRouteForRole(currentRole);
-        },
       ),
       GoRoute(
         path: '/login',
@@ -69,6 +64,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             removeTokenFromUrl: queryToken != null && queryToken.isNotEmpty,
           );
         },
+      ),
+      GoRoute(
+        path: '/legal-acceptance',
+        name: 'legalAcceptance',
+        builder: (context, state) => const LegalAcceptancePage(),
       ),
       GoRoute(
         path: '/unavailable',
@@ -294,32 +294,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (context, state) {
-      final isLoggedIn = authState.status == AuthStatus.authenticated;
-      final isLoadingSession = authState.status == AuthStatus.unknown;
-      final isLoginRoute = state.matchedLocation == '/login';
-      final isPublicAuthRoute =
-          isLoginRoute ||
-          state.matchedLocation == '/forgot-password' ||
-          state.matchedLocation == '/reset-password';
-
-      if (isLoadingSession) {
-        return null;
-      }
-
-      if (!isLoggedIn && !isPublicAuthRoute) {
-        return '/login';
-      }
-
-      if (isLoggedIn && isPublicAuthRoute) {
-        return RoleGuard.defaultRouteForRole(currentRole);
-      }
-
-      if (isLoggedIn &&
-          !RoleGuard.canAccessRoute(currentRole, state.matchedLocation)) {
-        return RoleGuard.defaultRouteForRole(currentRole);
-      }
-
-      return null;
+      return resolveAppRedirect(
+        authState: authState,
+        legalState: legalState,
+        location: state.matchedLocation,
+      );
     },
     errorBuilder: (context, state) => Scaffold(
       body: AppErrorState(
@@ -335,6 +314,46 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
+
+String? resolveAppRedirect({
+  required AuthState authState,
+  required LegalAcceptanceState legalState,
+  required String location,
+}) {
+  final isLoggedIn = authState.status == AuthStatus.authenticated;
+  final isLoadingSession = authState.status == AuthStatus.unknown;
+  final isPublicAuthRoute =
+      location == '/login' ||
+      location == '/forgot-password' ||
+      location == '/reset-password';
+
+  if (isLoadingSession) {
+    return location == '/' ? null : '/';
+  }
+
+  if (!isLoggedIn) {
+    return isPublicAuthRoute ? null : '/login';
+  }
+
+  if (legalState.isChecking) {
+    return location == '/' ? null : '/';
+  }
+
+  if (legalState.blocksApp) {
+    return location == '/legal-acceptance' ? null : '/legal-acceptance';
+  }
+
+  final defaultRoute = RoleGuard.defaultRouteForRole(authState.user?.role);
+  if (location == '/' || location == '/legal-acceptance' || isPublicAuthRoute) {
+    return defaultRoute;
+  }
+
+  if (!RoleGuard.canAccessRoute(authState.user?.role, location)) {
+    return defaultRoute;
+  }
+
+  return null;
+}
 
 class _UnavailableFeaturePage extends ConsumerWidget {
   const _UnavailableFeaturePage();

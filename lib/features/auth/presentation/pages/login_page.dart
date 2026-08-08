@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/auth/role_guard.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../providers/auth_providers.dart';
@@ -45,7 +44,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         message: 'Sessao iniciada com sucesso.',
         type: AppFeedbackType.success,
       );
-      context.go(RoleGuard.defaultRouteForRole(state.user?.role));
+      context.go('/');
     }
   }
 

@@ -84,6 +84,31 @@ async function main(): Promise<void> {
       body: { email: 'admin.ops@teste.com', password: 'SenhaBeta123' },
     });
     assert.equal(adminLogin.status, 200);
+    const adminPendingBeforeAcceptance = await call<{
+      pending: Array<{
+        documentType: string;
+        version: string;
+        title: string;
+        content: string;
+      }>;
+    }>(baseUrl, 'GET', '/legal/documents/pending', {
+      token: adminLogin.body.token,
+    });
+    assert.equal(adminPendingBeforeAcceptance.status, 200);
+    assert.equal(adminPendingBeforeAcceptance.body.pending.length, 2);
+    for (const document of adminPendingBeforeAcceptance.body.pending) {
+      assert(document.title.length > 0);
+      assert(document.content.length > 0);
+      const accepted = await call(baseUrl, 'POST', '/legal/acceptances', {
+        token: adminLogin.body.token,
+        body: {
+          documentType: document.documentType,
+          documentVersion: document.version,
+          origin: 'FLUTTER_APP',
+        },
+      });
+      assert.equal(accepted.status, 201);
+    }
     const onboarding = await call<{
       company: { id: string };
       owner: { id: string };
@@ -253,6 +278,7 @@ async function main(): Promise<void> {
       readinessChecked: true,
       legalAcceptanceChecked: true,
       legalVersioningChecked: true,
+      adminLegalAcceptanceChecked: true,
       employeeLegalAcceptanceChecked: true,
       legalAuditFieldsChecked: true,
       metricsAuthorizationChecked: true,

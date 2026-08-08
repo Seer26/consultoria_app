@@ -3,16 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { env } from '../../config/env';
 import { audit } from '../../shared/audit';
 import type { AuthTokenPayload } from '../auth/auth.types';
-import { LegalRepository, type LegalDocumentType } from './legal.repository';
+import { requiredLegalDocuments } from './legal.documents';
+import { LegalRepository } from './legal.repository';
 
-const requiredDocuments = (): Array<{
-  documentType: LegalDocumentType;
-  version: string;
-  title: string;
-}> => [
-  { documentType: 'TERMS_OF_USE', version: env.termsVersion, title: 'Termos de Uso do Beta' },
-  { documentType: 'PRIVACY_POLICY', version: env.privacyVersion, title: 'Politica de Privacidade' },
-];
+const requiredDocuments = () => requiredLegalDocuments({
+  termsVersion: env.termsVersion,
+  privacyVersion: env.privacyVersion,
+});
 
 export class LegalService {
   constructor(private readonly repository = new LegalRepository()) {}
@@ -27,7 +24,6 @@ export class LegalService {
   }
 
   async listPending(auth: AuthTokenPayload) {
-    if (auth.role === 'ADMIN') return [];
     const accepted = new Set(
       (await this.repository.listForUser(auth.userId))
         .map((row) => `${row.document_type}:${row.document_version}`),

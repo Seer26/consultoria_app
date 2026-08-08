@@ -125,6 +125,7 @@ class RoleGuard {
 
   static bool _isSafeUtilityRoute(String location) {
     return location == '/unavailable' ||
+        location == '/legal-acceptance' ||
         location == '/clients' ||
         location.startsWith('/clients/') ||
         location == '/forms' ||

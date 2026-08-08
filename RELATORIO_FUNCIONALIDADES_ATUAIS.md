@@ -21,15 +21,15 @@ O levantamento encontrou **59 funcionalidades ou capacidades**, classificadas as
 | Classe | Significado | Quantidade |
 | --- | --- | ---: |
 | A | Funcional e aparentemente completa | 31 |
-| B | Funcional, mas precisa de melhoria | 8 |
+| B | Funcional, mas precisa de melhoria | 9 |
 | C | Implementada parcialmente | 2 |
 | D | Somente interface/mock ou legado desativado | 5 |
-| E | Backend existe, mas o Flutter ativo não utiliza | 4 |
+| E | Backend existe, mas o Flutter ativo não utiliza | 3 |
 | F | Flutter existe, mas o backend não suporta completamente | 1 |
 | G | Ausente | 8 |
 | **Total** |  | **59** |
 
-Não foi identificado um defeito confirmado que impeça o núcleo técnico de funcionar. Os bloqueios imediatos para primeiro uso real são operacionais: validar o fluxo completo com uma empresa autorizada, configurar entrega real de e-mail para recuperação de senha e decidir/implementar a aceitação jurídica no Flutter. IA continua dependente de chave, crédito e disponibilidade externa.
+Não foi identificado um defeito confirmado que impeça o núcleo técnico de funcionar. Os bloqueios imediatos para primeiro uso real são operacionais: validar o fluxo completo com uma empresa autorizada, configurar entrega real de e-mail para recuperação de senha e submeter os textos jurídicos canônicos à revisão e aprovação profissional. O aceite obrigatório já está integrado ao primeiro login no Flutter. IA continua dependente de chave, crédito e disponibilidade externa.
 
 ## 2. Critério de classificação
 
@@ -75,7 +75,7 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 | F06 | RBAC e isolamento de rota | Todos | `RoleGuard`, `RbacGuard`, `GoRouter` | `authenticate`, `authorize`, escopo nos services | todas as tabelas multiempresa | A | Defesa no Flutter e backend; E2E cobre isolamento central. | P0 |
 | F07 | Cadastro público | Público | Sem tela | `POST /auth/register` responde `PUBLIC_REGISTRATION_DISABLED` | `users` | G | Ausência intencional para beta assistido. | P3 |
 | F08 | Alterar senha estando logado | Todos | Sem tela | Sem endpoint específico | `users` | G | Usuário depende do fluxo “esqueci minha senha” ou alteração administrativa. | P1 |
-| F09 | Aceite de termos/políticas | Todos | Sem consumidor | `GET /legal/documents/pending`, `GET /legal/acceptances/current`, `POST /legal/acceptances` | `legal`; `LegalRepository` | E | Backend pronto, mas primeiro login não apresenta nem registra aceite no Flutter. | P0 |
+| F09 | Aceite de termos/políticas | Todos | `/legal-acceptance`, `LegalAcceptanceController` | `GET /legal/documents/pending`, `GET /legal/acceptances/current`, `POST /legal/acceptances` | `legal`; `LegalRepository` | B | Fluxo obrigatório, versionado e sem bypass para ADMIN/OWNER/EMPLOYEE; os textos canônicos permanecem rascunhos sujeitos à revisão jurídica. | P0 |
 | F10 | Health/readiness | Operação | Sem tela | `GET /health`, `GET /ready` | `dataSource`, migrations | E | Correto como capacidade operacional; não precisa de UI de usuário. | P0 |
 | F11 | Métricas internas | ADMIN/operação | Sem tela | `GET /operations/metrics` | métricas em memória | E | Desabilitada por padrão e sem observabilidade externa/tela. | P2 |
 | F12 | Notificações | Todos | Dependência e feature flag declaradas, sem uso | Sem módulo/endpoint | nenhuma | G | Sem lembretes de tarefa, push ou central de notificações. | P2 |
@@ -129,7 +129,7 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 
 ## 5. Telas Flutter
 
-Foram identificadas **26 superfícies de tela** (25 classes públicas terminadas em `Page` e a tela privada de indisponibilidade). `AdminDashboardPage`, `OwnerDashboardPage` e `EmployeeHomePage` são wrappers de rota sobre `DashboardPage`; foram contadas porque representam entradas distintas por perfil.
+Foram identificadas **27 superfícies de tela** (26 classes públicas terminadas em `Page` e a tela privada de indisponibilidade). `AdminDashboardPage`, `OwnerDashboardPage` e `EmployeeHomePage` são wrappers de rota sobre `DashboardPage`; foram contadas porque representam entradas distintas por perfil.
 
 | Tela | Rota/entrada | Perfil | Finalidade | Dados reais | Mock/hardcode, botão sem ação, TODO ou fluxo incompleto |
 | --- | --- | --- | --- | :---: | --- |
@@ -137,6 +137,7 @@ Foram identificadas **26 superfícies de tela** (25 classes públicas terminadas
 | `LoginPage` | `/login` | Público | Autenticar | Sim | Credenciais demo só aparecem por flag; fluxo atual é real |
 | `ForgotPasswordPage` | `/forgot-password` | Público | Solicitar recuperação | Sim | Depende do serviço de e-mail |
 | `ResetPasswordPage` | `/reset-password?token=...` | Público | Definir nova senha | Sim | Requer token recebido externamente |
+| `LegalAcceptancePage` | `/legal-acceptance` | Todos autenticados | Exibir e registrar aceite obrigatório dos documentos jurídicos pendentes | Sim | Textos canônicos ainda exigem revisão jurídica profissional |
 | `_UnavailableFeaturePage` | `/unavailable` | Autenticado | Informar recurso fora da versão | Não aplicável | Tela intencional, botão voltar funcional |
 | `AdminDashboardPage` | `/admin` | ADMIN | Entrada do dashboard global | Sim | Wrapper sem lógica própria |
 | `OwnerDashboardPage` | `/owner` | OWNER | Entrada do dashboard empresarial | Sim | Wrapper sem lógica própria |
@@ -165,7 +166,7 @@ Observação: `ResearchStartPage` e `DashboardPage` são superfícies funcionais
 
 ## 6. Endpoints da API
 
-A API declara **50 endpoints em 12 grupos de router/entrada**. O Flutter ativo consome diretamente **37**; **13** são operacionais, aliases, legados ou não possuem consumidor ativo.
+A API declara **50 endpoints em 12 grupos de router/entrada**. O Flutter ativo consome diretamente **39**; **11** são operacionais, aliases, legados ou não possuem consumidor ativo.
 
 ### 6.1 Auth — 4 endpoints
 
@@ -256,7 +257,7 @@ Todos possuem consumidor Flutter em Plano Atual ou Empresas ADMIN.
 - `GET /legal/acceptances/current`
 - `POST /legal/acceptances`
 
-Não há tela Flutter correspondente.
+`LegalAcceptancePage` consome a consulta de pendências e o registro de aceite. A consulta de aceites atuais permanece disponível na API, sem consumo direto pela tela.
 
 ### 6.11 Health/readiness — 2 endpoints
 
@@ -288,7 +289,7 @@ São endpoints operacionais, sem necessidade de tela de produto.
 - `DiagnosisRemoteDataSource` contém TODO para envio ao backend, mas o fluxo oficial usa `ResearchService`.
 - `AIService` aponta para `/ai-diagnosis`, endpoint legado 410; a rota está indisponível e o serviço oficial é `AiQuestionService`.
 - Flutter declara `flutter_local_notifications` e `enablePushNotifications`, mas não inicializa nem usa notificações.
-- Legal acceptance possui API e persistência, sem interface.
+- O aceite jurídico está integrado ao Flutter e à persistência; os textos canônicos são rascunhos e ainda precisam de revisão jurídica profissional.
 - `GET /companies/:id`, `GET /action-plan/tasks/:id` e o alias `/ai/question/next` não possuem consumo ativo identificado.
 - EMPLOYEE pode ter escopo de mutação de tarefas mais amplo que o esperado pelo discurso do produto.
 - A URL padrão Flutter é local (`http://127.0.0.1:3000`); Android físico exige `API_BASE_URL` com IP da máquina.
@@ -309,7 +310,7 @@ São endpoints operacionais, sem necessidade de tela de produto.
 | Starter/Growth | Assinatura interna, limites, uso, troca e histórico | Adequada para beta manual; sem cobrança |
 | Limites/permissões | Backend aplica assentos, pesquisas, PDFs, tarefas e IA | Adequada; formalizar permissão intraempresa do EMPLOYEE |
 | Onboarding | ADMIN cria empresa + OWNER | Parcial no pós-login |
-| Segurança | JWT, bcrypt, rate limits, headers, CORS configurável, auditoria e reset | Boa base; faltam refresh/revogação, aceite UI e troca autenticada |
+| Segurança | JWT, bcrypt, rate limits, headers, CORS configurável, auditoria, reset e aceite jurídico obrigatório | Boa base; faltam refresh/revogação e troca autenticada; textos jurídicos aguardam revisão profissional |
 | Recuperação de senha | API e Flutter completos | Depende da configuração real do e-mail |
 | Notificações | Apenas dependência/flag | Ausente |
 | Cobrança | Sem implementação | Fora do beta manual |
@@ -321,7 +322,7 @@ São endpoints operacionais, sem necessidade de tela de produto.
 Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de colocar uma empresa real:
 
 1. Configurar e provar entrega de e-mail de recuperação de senha, especialmente para o primeiro ADMIN.
-2. Integrar ou decidir formalmente o aceite jurídico no primeiro login; o backend já está pronto.
+2. Revisar e aprovar profissionalmente os textos jurídicos canônicos antes do uso real; o fluxo técnico obrigatório já está concluído.
 3. Executar checklist assistido ponta a ponta com dados autorizados: onboarding → login OWNER → pesquisa → plano → dashboard → relatório/PDF.
 4. Configurar `API_BASE_URL` correta no alvo usado na demonstração e confirmar conectividade antes da sessão.
 5. Confirmar disponibilidade/limites da OpenAI ou comunicar claramente que a pesquisa pode ser concluída sem próxima pergunta de IA.
@@ -357,11 +358,12 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 
 ## 10. Próximas sprints sugeridas
 
-### Sprint 3.13 — Primeiro cliente real e recuperação segura
+### Sprint 3.13 — Aceite jurídico obrigatório e primeiro cliente real
 
 - validar o fluxo real completo com dados autorizados;
 - configurar e testar e-mail de recuperação;
-- integrar aceite jurídico no Flutter ou registrar decisão explícita;
+- aceite jurídico obrigatório no Flutter concluído, com versionamento, restauração de sessão e bloqueio de bypass;
+- submeter os textos canônicos à revisão jurídica profissional;
 - adicionar troca de senha autenticada;
 - fechar checklist operacional de primeiro login.
 
@@ -441,6 +443,6 @@ Essa remoção não deve ocorrer antes de preservar testes de isolamento, segura
 
 ## 12. Conclusão
 
-O aplicativo já é mais do que uma interface demonstrativa: o núcleo de consultoria está integrado e persistente em PostgreSQL, com três perfis, isolamento multiempresa, pesquisa, plano de ação, dashboards, relatórios e limites comerciais internos. A principal diferença entre o estado atual e um MVP utilizável por cliente real está menos no domínio central e mais no acabamento operacional: recuperação de senha comprovada, aceite jurídico, onboarding dentro do produto, gestão de equipe, política final de permissões e remoção da ambiguidade causada por módulos legados/mock.
+O aplicativo já é mais do que uma interface demonstrativa: o núcleo de consultoria está integrado e persistente em PostgreSQL, com três perfis, isolamento multiempresa, pesquisa, plano de ação, dashboards, relatórios, limites comerciais internos e aceite jurídico obrigatório no primeiro acesso. A principal diferença entre o estado atual e um MVP utilizável por cliente real está menos no domínio central e mais no acabamento operacional: recuperação de senha comprovada, revisão profissional dos textos jurídicos, onboarding dentro do produto, gestão de equipe, política final de permissões e remoção da ambiguidade causada por módulos legados/mock.
 
-A próxima sprint recomendada é **Sprint 3.13 — Primeiro cliente real e recuperação segura**, porque reduz o maior risco de uso sem expandir prematuramente o escopo comercial. Pagamentos e recursos futuros devem esperar a validação assistida do fluxo completo por uma empresa autorizada.
+A **Sprint 3.13 — Aceite jurídico obrigatório e primeiro cliente real** já concluiu o gate técnico de aceite. Os próximos passos da sprint são a revisão profissional dos textos, a recuperação segura e a validação assistida do fluxo completo por uma empresa autorizada. Pagamentos e recursos futuros devem esperar essa validação.
