@@ -102,7 +102,52 @@ async function main(): Promise<void> {
     assert(adminCount.rows[0]?.count === '1', 'ADMIN_BOOTSTRAP_SECOND_ADMIN_CREATED');
 
     await clearSyntheticData(client);
-    await expectFailure('WEAK_PASSWORD', { BOOTSTRAP_ADMIN_PASSWORD: '12345678' });
+    const concurrentResults = await Promise.allSettled([
+      bootstrapFirstAdmin(bootstrapEnv({
+        BOOTSTRAP_ADMIN_EMAIL: 'concurrent.one@example.invalid',
+      })),
+      bootstrapFirstAdmin(bootstrapEnv({
+        BOOTSTRAP_ADMIN_EMAIL: 'concurrent.two@example.invalid',
+      })),
+    ]);
+    const concurrentSuccesses = concurrentResults.filter(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof bootstrapFirstAdmin>>> =>
+        result.status === 'fulfilled',
+    );
+    const concurrentFailures = concurrentResults.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    assert(concurrentSuccesses.length === 1, 'ADMIN_BOOTSTRAP_CONCURRENT_SUCCESS_COUNT');
+    assert(concurrentFailures.length === 1, 'ADMIN_BOOTSTRAP_CONCURRENT_FAILURE_COUNT');
+    assert(concurrentFailures[0]?.reason instanceof Error &&
+      concurrentFailures[0].reason.message === 'ADMIN_ALREADY_EXISTS',
+    'ADMIN_BOOTSTRAP_CONCURRENT_GUARD_FAILED');
+    const concurrentAdminCount = await client.query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM users WHERE role = 'ADMIN'",
+    );
+    assert(concurrentAdminCount.rows[0]?.count === '1',
+      'ADMIN_BOOTSTRAP_CONCURRENT_CREATED_MULTIPLE');
+
+    const nowForSecondAdmin = new Date().toISOString();
+    await client.query(
+      `INSERT INTO users (id, name, email, password_hash, role, company_id,
+        created_at, updated_at, status, auth_version)
+       VALUES ($1, 'Synthetic Second Admin', 'second.seeded.admin@example.invalid',
+        'synthetic-not-used', 'ADMIN', NULL, $2, $2, 'ACTIVE', 0)`,
+      [randomUUID(), nowForSecondAdmin],
+    );
+    await expectFailure('ADMIN_ALREADY_EXISTS', {
+      BOOTSTRAP_ADMIN_EMAIL: 'third.admin@example.invalid',
+    });
+    const multipleAdminCount = await client.query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM users WHERE role = 'ADMIN'",
+    );
+    assert(multipleAdminCount.rows[0]?.count === '2', 'ADMIN_BOOTSTRAP_MULTI_ADMIN_GUARD');
+
+    await clearSyntheticData(client);
+    await expectFailure('ADMIN_BOOTSTRAP_PASSWORD_POLICY', {
+      BOOTSTRAP_ADMIN_PASSWORD: '12345678',
+    });
     await expectFailure('ADMIN_EMAIL_INVALID', { BOOTSTRAP_ADMIN_EMAIL: 'invalid-email' });
     await expectFailure('ADMIN_BOOTSTRAP_CONFIRMATION_REQUIRED', { BOOTSTRAP_CONFIRM: '' });
     await expectFailure('ADMIN_BOOTSTRAP_CONFIRMATION_REQUIRED', {
@@ -127,11 +172,32 @@ async function main(): Promise<void> {
       RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic rollback'; END $$`);
     await client.query(`CREATE TRIGGER reject_bootstrap_admin_test
       BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION reject_bootstrap_admin_test()`);
-    await expectFailure('ADMIN_BOOTSTRAP_FAILED', {});
+    await expectFailure('ADMIN_BOOTSTRAP_TRANSACTION_FAILED', {});
     const afterRollback = await client.query<{ count: string }>(
       'SELECT COUNT(*)::text AS count FROM users WHERE email = $1', [normalizedEmail],
     );
     assert(afterRollback.rows[0]?.count === '0', 'ADMIN_BOOTSTRAP_ROLLBACK_FAILED');
+    const failedTransactionChild = spawnSync(process.execPath,
+      ['--import', import.meta.resolve('tsx'), bootstrapFile], {
+        cwd: isolatedWorkingDirectory,
+        env: bootstrapEnv(),
+        encoding: 'utf8',
+        windowsHide: true,
+      });
+    const failedTransactionOutput =
+      `${failedTransactionChild.stdout ?? ''}${failedTransactionChild.stderr ?? ''}`;
+    assert(failedTransactionChild.status !== 0,
+      'ADMIN_BOOTSTRAP_TRANSACTION_EXIT_CODE_INVALID');
+    assert(failedTransactionOutput.includes('ADMIN_BOOTSTRAP_TRANSACTION_FAILED'),
+      'ADMIN_BOOTSTRAP_TRANSACTION_CODE_MISSING');
+    assert(failedTransactionOutput.includes('consultoria_admin_guard_test'),
+      'ADMIN_BOOTSTRAP_TRANSACTION_DATABASE_MISSING');
+    assert(!failedTransactionOutput.includes(syntheticPassword) &&
+      !failedTransactionOutput.includes(databaseUrl) &&
+      !failedTransactionOutput.includes(normalizedEmail) &&
+      !failedTransactionOutput.includes('password_hash') &&
+      !failedTransactionOutput.toLowerCase().includes('token'),
+    'ADMIN_BOOTSTRAP_TRANSACTION_OUTPUT_EXPOSED_SECRET');
     await client.query('DROP TRIGGER reject_bootstrap_admin_test ON users');
     await client.query('DROP FUNCTION reject_bootstrap_admin_test()');
 
@@ -146,7 +212,45 @@ async function main(): Promise<void> {
     assert(!output.includes(normalizedEmail), 'ADMIN_BOOTSTRAP_OUTPUT_EXPOSED_EMAIL');
     assert(!output.includes('password_hash') && !output.includes('$2'),
       'ADMIN_BOOTSTRAP_OUTPUT_EXPOSED_HASH');
+    assert(!output.toLowerCase().includes('token'), 'ADMIN_BOOTSTRAP_OUTPUT_EXPOSED_TOKEN');
     assert(output.includes('"adminCreated":true'), 'ADMIN_BOOTSTRAP_OUTPUT_INVALID');
+
+    const existingAdminChild = spawnSync(process.execPath,
+      ['--import', import.meta.resolve('tsx'), bootstrapFile], {
+        cwd: isolatedWorkingDirectory,
+        env: bootstrapEnv({ BOOTSTRAP_ADMIN_EMAIL: 'blocked.admin@example.invalid' }),
+        encoding: 'utf8',
+        windowsHide: true,
+      });
+    const existingAdminOutput =
+      `${existingAdminChild.stdout ?? ''}${existingAdminChild.stderr ?? ''}`;
+    assert(existingAdminChild.status !== 0, 'ADMIN_BOOTSTRAP_EXISTING_EXIT_CODE_INVALID');
+    assert(existingAdminOutput.includes('ADMIN_ALREADY_EXISTS'),
+      'ADMIN_BOOTSTRAP_EXISTING_CODE_MISSING');
+    assert(existingAdminOutput.includes('consultoria_admin_guard_test'),
+      'ADMIN_BOOTSTRAP_EXISTING_DATABASE_MISSING');
+    assert(!existingAdminOutput.includes(syntheticPassword) &&
+      !existingAdminOutput.includes(databaseUrl) &&
+      !existingAdminOutput.includes(normalizedEmail) &&
+      !existingAdminOutput.toLowerCase().includes('token'),
+    'ADMIN_BOOTSTRAP_EXISTING_OUTPUT_EXPOSED_SECRET');
+
+    await clearSyntheticData(client);
+    const weakChild = spawnSync(process.execPath,
+      ['--import', import.meta.resolve('tsx'), bootstrapFile], {
+        cwd: isolatedWorkingDirectory,
+        env: bootstrapEnv({ BOOTSTRAP_ADMIN_PASSWORD: '12345678' }),
+        encoding: 'utf8',
+        windowsHide: true,
+      });
+    const weakOutput = `${weakChild.stdout ?? ''}${weakChild.stderr ?? ''}`;
+    assert(weakChild.status !== 0, 'ADMIN_BOOTSTRAP_WEAK_PASSWORD_EXIT_CODE_INVALID');
+    assert(weakOutput.includes('ADMIN_BOOTSTRAP_PASSWORD_POLICY'),
+      'ADMIN_BOOTSTRAP_WEAK_PASSWORD_CODE_MISSING');
+    assert(!weakOutput.includes('ADMIN_BOOTSTRAP_FAILED'),
+      'ADMIN_BOOTSTRAP_WEAK_PASSWORD_GENERIC_ERROR');
+    assert(!weakOutput.includes('12345678') && !weakOutput.includes(databaseUrl),
+      'ADMIN_BOOTSTRAP_WEAK_PASSWORD_OUTPUT_EXPOSED_SECRET');
 
     const sqliteEnvironment = bootstrapEnv();
     delete sqliteEnvironment.DATABASE_URL;

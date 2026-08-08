@@ -7,6 +7,7 @@ import { Client } from 'pg';
 
 import { assertPasswordPolicy } from '../modules/auth/password-policy';
 import { audit } from '../shared/audit';
+import { logger } from '../shared/logger';
 
 const BOOTSTRAP_CONFIRMATION = 'CREATE-FIRST-ADMIN';
 const EXPECTED_MIGRATIONS = [
@@ -26,7 +27,7 @@ const REQUIRED_USER_COLUMNS = [
 ] as const;
 
 class AdminBootstrapError extends Error {
-  constructor(readonly code: string) {
+  constructor(readonly code: string, readonly database?: string) {
     super(code);
     this.name = 'AdminBootstrapError';
   }
@@ -81,7 +82,11 @@ function readInput(rawEnv: NodeJS.ProcessEnv): BootstrapInput {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail('ADMIN_EMAIL_INVALID');
   const password = rawEnv.BOOTSTRAP_ADMIN_PASSWORD ?? '';
   if (!password) fail('ADMIN_PASSWORD_REQUIRED');
-  assertPasswordPolicy(password, email);
+  try {
+    assertPasswordPolicy(password, email);
+  } catch {
+    fail('ADMIN_BOOTSTRAP_PASSWORD_POLICY');
+  }
   return { name, email, password, databaseUrl, databaseName };
 }
 
@@ -134,24 +139,38 @@ export async function bootstrapFirstAdmin(
   let passwordHash = '';
   let transactionStarted = false;
   let committed = false;
+  let phase = 'connect';
   try {
     await client.connect();
+    phase = 'begin';
     await client.query('BEGIN');
     transactionStarted = true;
+    phase = 'lock';
     await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
+    phase = 'validate_database';
     await validateDatabase(client);
-    const admins = await client.query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM users WHERE role = 'ADMIN'`,
+    phase = 'admin_guard';
+    const admins = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS(SELECT 1 FROM users WHERE role = 'ADMIN') AS exists`,
     );
-    if (admins.rows[0]?.count !== '0') fail('ADMIN_ALREADY_EXISTS');
+    const adminExists = admins.rows[0]?.exists;
+    if (typeof adminExists !== 'boolean') fail('ADMIN_BOOTSTRAP_ADMIN_GUARD_INVALID');
+    if (adminExists === true) fail('ADMIN_ALREADY_EXISTS');
+    phase = 'duplicate_email_guard';
     const duplicate = await client.query<{ exists: boolean }>(
       'SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = $1) AS exists',
       [input.email],
     );
-    if (duplicate.rows[0]?.exists) fail('ADMIN_EMAIL_ALREADY_EXISTS');
+    const duplicateEmailExists = duplicate.rows[0]?.exists;
+    if (typeof duplicateEmailExists !== 'boolean') {
+      fail('ADMIN_BOOTSTRAP_EMAIL_GUARD_INVALID');
+    }
+    if (duplicateEmailExists === true) fail('ADMIN_EMAIL_ALREADY_EXISTS');
+    phase = 'hash_password';
     passwordHash = await bcrypt.hash(input.password, 10);
     input.password = '';
     if (rawEnv === process.env) delete process.env.BOOTSTRAP_ADMIN_PASSWORD;
+    phase = 'insert_user';
     await client.query(
       `INSERT INTO users (
         id, name, email, password_hash, role, company_id,
@@ -159,20 +178,32 @@ export async function bootstrapFirstAdmin(
       ) VALUES ($1, $2, $3, $4, 'ADMIN', NULL, $5, $5, 'ACTIVE', 0)`,
       [id, input.name, input.email, passwordHash, now],
     );
+    phase = 'insert_audit';
     await client.query(
       `INSERT INTO audit_events (
         id, company_id, actor_user_id, event_type, result, metadata, created_at
       ) VALUES ($1, NULL, $2, 'ADMIN_BOOTSTRAP_CREATED', 'SUCCESS', $3::jsonb, NOW())`,
       [randomUUID(), id, JSON.stringify({ source: 'admin:bootstrap' })],
     );
+    phase = 'commit';
     await client.query('COMMIT');
     committed = true;
   } catch (error) {
     if (transactionStarted && !committed) {
       try { await client.query('ROLLBACK'); } catch { /* preserve original */ }
     }
-    if (error instanceof AdminBootstrapError) throw error;
-    throw new AdminBootstrapError('ADMIN_BOOTSTRAP_FAILED');
+    if (error instanceof AdminBootstrapError) {
+      throw new AdminBootstrapError(error.code, input.databaseName);
+    }
+    logger.error('admin_bootstrap_transaction_failed', {
+      phase,
+      database: input.databaseName,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    throw new AdminBootstrapError(
+      'ADMIN_BOOTSTRAP_TRANSACTION_FAILED',
+      input.databaseName,
+    );
   } finally {
     passwordHash = '';
     input.password = '';
@@ -202,7 +233,12 @@ if (isCli) {
     .catch((error) => {
       console.error(JSON.stringify({
         ok: false,
-        error: error instanceof AdminBootstrapError ? error.code : 'ADMIN_BOOTSTRAP_FAILED',
+        error: error instanceof AdminBootstrapError
+          ? error.code
+          : 'ADMIN_BOOTSTRAP_TRANSACTION_FAILED',
+        ...(error instanceof AdminBootstrapError && error.database
+          ? { database: error.database }
+          : {}),
       }));
       process.exitCode = 1;
     });
