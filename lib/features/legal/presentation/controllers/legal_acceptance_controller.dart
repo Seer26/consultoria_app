@@ -15,13 +15,14 @@ class LegalAcceptanceController extends StateNotifier<LegalAcceptanceState> {
     state = const LegalAcceptanceState(status: LegalAcceptanceStatus.loading);
 
     try {
-      final pending = await _api.getPendingDocuments();
+      final result = await _api.getStatus();
       if (generation != _requestGeneration) return;
       state = LegalAcceptanceState(
-        status: pending.isEmpty
+        status: !result.enforcementRequired || result.pendingDocuments.isEmpty
             ? LegalAcceptanceStatus.clear
             : LegalAcceptanceStatus.required,
-        pendingDocuments: pending,
+        enforcementRequired: result.enforcementRequired,
+        pendingDocuments: result.pendingDocuments,
       );
     } catch (_) {
       if (generation != _requestGeneration) return;
@@ -38,23 +39,26 @@ class LegalAcceptanceController extends StateNotifier<LegalAcceptanceState> {
     final generation = ++_requestGeneration;
     state = LegalAcceptanceState(
       status: LegalAcceptanceStatus.submitting,
+      enforcementRequired: state.enforcementRequired,
       pendingDocuments: currentDocuments,
     );
 
     try {
       await _api.acceptDocument(document);
-      final pending = await _api.getPendingDocuments();
+      final result = await _api.getStatus();
       if (generation != _requestGeneration) return;
       state = LegalAcceptanceState(
-        status: pending.isEmpty
+        status: !result.enforcementRequired || result.pendingDocuments.isEmpty
             ? LegalAcceptanceStatus.clear
             : LegalAcceptanceStatus.required,
-        pendingDocuments: pending,
+        enforcementRequired: result.enforcementRequired,
+        pendingDocuments: result.pendingDocuments,
       );
     } catch (_) {
       if (generation != _requestGeneration) return;
       state = LegalAcceptanceState(
         status: LegalAcceptanceStatus.error,
+        enforcementRequired: state.enforcementRequired,
         pendingDocuments: currentDocuments,
         error:
             'O aceite nao foi registrado. Voce continua nesta tela; tente novamente.',

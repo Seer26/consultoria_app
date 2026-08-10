@@ -4,6 +4,7 @@ import { env } from '../../config/env';
 import { audit } from '../../shared/audit';
 import type { AuthTokenPayload } from '../auth/auth.types';
 import { requiredLegalDocuments } from './legal.documents';
+import { isLegalAcceptanceRequired } from './legal.policy';
 import { LegalRepository } from './legal.repository';
 
 const requiredDocuments = () => requiredLegalDocuments({
@@ -34,7 +35,7 @@ export class LegalService {
   }
 
   async hasPending(auth: AuthTokenPayload): Promise<boolean> {
-    return env.requireLegalAcceptance && (await this.listPending(auth)).length > 0;
+    return isLegalAcceptanceRequired() && (await this.listPending(auth)).length > 0;
   }
 
   async accept(auth: AuthTokenPayload, input: {

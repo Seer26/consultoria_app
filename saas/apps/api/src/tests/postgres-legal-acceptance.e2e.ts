@@ -7,6 +7,12 @@ import { Client, type QueryResult } from 'pg';
 
 dotenv.config({ path: '.env.local', override: true });
 
+const enforcementMode = process.argv[2] ?? 'true';
+if (!['true', 'false', 'absent'].includes(enforcementMode)) {
+  throw new Error('POSTGRES_LEGAL_TEST_ENFORCEMENT_MODE_INVALID');
+}
+const enforcementRequired = enforcementMode === 'true';
+
 const sourceDatabaseUrl = process.env.DATABASE_URL?.trim();
 if (!sourceDatabaseUrl) {
   throw new Error('POSTGRES_LEGAL_TEST_REQUIRES_DATABASE_URL');
@@ -34,7 +40,11 @@ process.env.APP_ENV = 'test';
 process.env.ENABLE_DEMO_SEED = 'false';
 process.env.DATABASE_URL = targetDatabaseUrl;
 process.env.JWT_SECRET = 'postgres-legal-e2e-secret-with-adequate-length';
-process.env.REQUIRE_LEGAL_ACCEPTANCE = 'true';
+if (enforcementMode === 'absent') {
+  delete process.env.REQUIRE_LEGAL_ACCEPTANCE;
+} else {
+  process.env.REQUIRE_LEGAL_ACCEPTANCE = enforcementMode;
+}
 process.env.TERMS_VERSION = 'legal-e2e-v2';
 process.env.PRIVACY_VERSION = 'legal-e2e-v2';
 
@@ -132,6 +142,10 @@ async function main(): Promise<void> {
 
     const { app } = await import('../app');
     const importedDataSource = await import('../database/data-source');
+    const { isLegalAcceptanceRequired } = await import(
+      '../modules/legal/legal.policy'
+    );
+    assert.equal(isLegalAcceptanceRequired(), enforcementRequired);
     dataSource = importedDataSource.dataSource;
     server = http.createServer(app);
     await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
@@ -154,22 +168,28 @@ async function main(): Promise<void> {
       });
       assert.equal(login.status, 200);
 
-      const blocked = await call<{ error: string }>(
+      const protectedRoute = await call<{ error?: string }>(
         baseUrl,
         'GET',
         actor.route,
         { token: login.body.token },
       );
-      assert.equal(blocked.status, 428);
-      assert.equal(blocked.body.error, 'LEGAL_ACCEPTANCE_REQUIRED');
+      assert.equal(protectedRoute.status, enforcementRequired ? 428 : 200);
+      if (enforcementRequired) {
+        assert.equal(protectedRoute.body.error, 'LEGAL_ACCEPTANCE_REQUIRED');
+      }
 
-      const pending = await call<{ pending: PendingDocument[] }>(
+      const pending = await call<{
+        enforcementRequired: boolean;
+        pending: PendingDocument[];
+      }>(
         baseUrl,
         'GET',
         '/legal/documents/pending',
         { token: login.body.token },
       );
       assert.equal(pending.status, 200);
+      assert.equal(pending.body.enforcementRequired, enforcementRequired);
       assert.equal(pending.body.pending.length, 2);
       assert(pending.body.pending.every((document) =>
         document.version === 'legal-e2e-v2' &&
@@ -183,6 +203,18 @@ async function main(): Promise<void> {
              WHERE user_id = 'employee-legal'`,
           );
         assert.equal(employeeStillPending.rows[0]?.total, '0');
+      }
+
+      if (!enforcementRequired) {
+        const storedWithoutAutomaticAcceptance: QueryResult<{ total: string }> =
+          await testClient.query<{ total: string }>(
+            `SELECT COUNT(*)::text AS total
+             FROM legal_acceptances
+             WHERE user_id = $1 AND document_version = 'legal-e2e-v2'`,
+            [actor.id],
+          );
+        assert.equal(storedWithoutAutomaticAcceptance.rows[0]?.total, '0');
+        continue;
       }
 
       for (const document of pending.body.pending) {
@@ -207,13 +239,17 @@ async function main(): Promise<void> {
       });
       assert.equal(duplicate.status, 201);
 
-      const noPending = await call<{ pending: PendingDocument[] }>(
+      const noPending = await call<{
+        enforcementRequired: boolean;
+        pending: PendingDocument[];
+      }>(
         baseUrl,
         'GET',
         '/legal/documents/pending',
         { token: login.body.token },
       );
       assert.equal(noPending.status, 200);
+      assert.equal(noPending.body.enforcementRequired, true);
       assert.equal(noPending.body.pending.length, 0);
 
       const current = await call<{ acceptances: unknown[] }>(
@@ -249,12 +285,15 @@ async function main(): Promise<void> {
       provider: 'postgres',
       temporaryDatabase: true,
       rolesChecked: ['ADMIN', 'OWNER', 'EMPLOYEE'],
+      enforcementMode,
+      enforcementRequired,
       pendingChecked: true,
       contentChecked: true,
       acceptanceChecked: true,
       idempotencyChecked: true,
       newVersionChecked: true,
       userIsolationChecked: true,
+      noAutomaticAcceptanceChecked: !enforcementRequired,
     }));
   } finally {
     if (server) {

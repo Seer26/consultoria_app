@@ -31,3 +31,13 @@ class LegalDocument {
     return document;
   }
 }
+
+class LegalAcceptanceStatusResult {
+  const LegalAcceptanceStatusResult({
+    required this.enforcementRequired,
+    required this.pendingDocuments,
+  });
+
+  final bool enforcementRequired;
+  final List<LegalDocument> pendingDocuments;
+}

@@ -35,3 +35,12 @@ Responsável interno pelo aceite: `[DEFINIR]`.
 Data prevista: `[DEFINIR]`.
 
 O aceite técnico versionado demonstra concordância do usuário com uma versão configurada, mas não transforma o rascunho em documento juridicamente aprovado. `REQUIRE_LEGAL_ACCEPTANCE=true` deve permanecer um controle técnico; o beta continua bloqueado até autorização jurídica mínima.
+
+## Política técnica de obrigatoriedade
+
+O backend é a fonte da verdade da política informada ao Flutter por `GET /legal/documents/pending` no campo `enforcementRequired`.
+
+- `REQUIRE_LEGAL_ACCEPTANCE=true`: pendências bloqueiam as rotas protegidas da API e a navegação do Flutter até o aceite de todas as versões exigidas.
+- `REQUIRE_LEGAL_ACCEPTANCE=false` ou variável ausente: documentos e versões podem continuar pendentes, mas não bloqueiam a API nem o Flutter e nenhum aceite é criado automaticamente.
+
+Essa flag controla somente a obrigatoriedade técnica. A necessidade de revisão e aprovação profissional dos textos permanece inalterada.

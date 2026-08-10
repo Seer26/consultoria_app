@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../domain/entities/legal_document.dart';
 
 abstract class LegalAcceptanceApi {
-  Future<List<LegalDocument>> getPendingDocuments();
+  Future<LegalAcceptanceStatusResult> getStatus();
 
   Future<void> acceptDocument(LegalDocument document);
 }
@@ -15,20 +15,25 @@ class LegalAcceptanceService implements LegalAcceptanceApi {
   final Dio _dio;
 
   @override
-  Future<List<LegalDocument>> getPendingDocuments() async {
+  Future<LegalAcceptanceStatusResult> getStatus() async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/legal/documents/pending',
       );
       final pending = response.data?['pending'];
-      if (pending is! List) {
+      final enforcementRequired = response.data?['enforcementRequired'];
+      if (pending is! List || enforcementRequired is! bool) {
         throw const FormatException('Resposta juridica invalida.');
       }
 
-      return pending
+      final documents = pending
           .whereType<Map>()
           .map((item) => LegalDocument.fromMap(Map<String, dynamic>.from(item)))
           .toList();
+      return LegalAcceptanceStatusResult(
+        enforcementRequired: enforcementRequired,
+        pendingDocuments: documents,
+      );
     } on DioException catch (error) {
       throw Exception(_friendlyMessage(error));
     } on FormatException catch (error) {

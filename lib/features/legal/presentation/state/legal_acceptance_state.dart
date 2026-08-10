@@ -12,11 +12,13 @@ enum LegalAcceptanceStatus {
 class LegalAcceptanceState {
   const LegalAcceptanceState({
     required this.status,
+    this.enforcementRequired = false,
     this.pendingDocuments = const [],
     this.error,
   });
 
   final LegalAcceptanceStatus status;
+  final bool enforcementRequired;
   final List<LegalDocument> pendingDocuments;
   final String? error;
 

@@ -45,9 +45,10 @@ const requiredLegal = LegalAcceptanceState(
 );
 
 class FakeLegalApi implements LegalAcceptanceApi {
-  FakeLegalApi({List<LegalDocument>? pending})
+  FakeLegalApi({this.enforcementRequired = true, List<LegalDocument>? pending})
     : pending = List.of(pending ?? const []);
 
+  bool enforcementRequired;
   List<LegalDocument> pending;
   bool failFetch = false;
   bool failAccept = false;
@@ -55,10 +56,13 @@ class FakeLegalApi implements LegalAcceptanceApi {
   int acceptCalls = 0;
 
   @override
-  Future<List<LegalDocument>> getPendingDocuments() async {
+  Future<LegalAcceptanceStatusResult> getStatus() async {
     fetchCalls += 1;
     if (failFetch) throw Exception('synthetic fetch failure');
-    return List.of(pending);
+    return LegalAcceptanceStatusResult(
+      enforcementRequired: enforcementRequired,
+      pendingDocuments: List.of(pending),
+    );
   }
 
   @override
@@ -144,6 +148,65 @@ void main() {
   });
 
   group('controller juridico', () {
+    test('flag true sem pendencia libera o dashboard', () async {
+      final controller = LegalAcceptanceController(FakeLegalApi());
+
+      await controller.checkPending();
+
+      expect(controller.state.status, LegalAcceptanceStatus.clear);
+      expect(controller.state.enforcementRequired, isTrue);
+    });
+
+    test('flag false libera mesmo com documentos pendentes', () async {
+      final controller = LegalAcceptanceController(
+        FakeLegalApi(enforcementRequired: false, pending: const [termsV1]),
+      );
+
+      await controller.checkPending();
+
+      expect(controller.state.status, LegalAcceptanceStatus.clear);
+      expect(controller.state.enforcementRequired, isFalse);
+      expect(controller.state.pendingDocuments, contains(termsV1));
+    });
+
+    test('flag false libera mesmo com nova versao existente', () async {
+      final controller = LegalAcceptanceController(
+        FakeLegalApi(
+          enforcementRequired: false,
+          pending: const [
+            LegalDocument(
+              documentType: 'TERMS_OF_USE',
+              version: 'v2',
+              title: 'Termos atualizados',
+              content: 'Nova versao sintetica.',
+            ),
+          ],
+        ),
+      );
+
+      await controller.checkPending();
+
+      expect(controller.state.status, LegalAcceptanceStatus.clear);
+      expect(controller.state.pendingDocuments.single.version, 'v2');
+    });
+
+    for (final required in [true, false]) {
+      test('restauracao de sessao obedece flag $required', () async {
+        final controller = LegalAcceptanceController(
+          FakeLegalApi(enforcementRequired: required, pending: const [termsV1]),
+        );
+
+        await controller.checkPending();
+        final redirect = resolveAppRedirect(
+          authState: authenticated('OWNER'),
+          legalState: controller.state,
+          location: '/owner',
+        );
+
+        expect(redirect, required ? '/legal-acceptance' : isNull);
+      });
+    }
+
     test('nova versao retornada pelo backend volta a ficar pendente', () async {
       final api = FakeLegalApi(
         pending: const [

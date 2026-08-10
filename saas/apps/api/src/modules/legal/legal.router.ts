@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { hashIp } from '../../shared/request-context';
 import { authenticate } from '../auth/auth.middleware';
+import { isLegalAcceptanceRequired } from './legal.policy';
 import { legalService } from './legal.service';
 
 export const legalRouter = Router();
@@ -10,6 +11,7 @@ legalRouter.use('/legal', authenticate);
 
 legalRouter.get('/legal/documents/pending', async (request, response) => {
   response.status(200).json({
+    enforcementRequired: isLegalAcceptanceRequired(),
     pending: await legalService.listPending(request.auth!),
   });
 });

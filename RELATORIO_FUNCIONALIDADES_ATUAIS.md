@@ -75,7 +75,7 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 | F06 | RBAC e isolamento de rota | Todos | `RoleGuard`, `RbacGuard`, `GoRouter` | `authenticate`, `authorize`, escopo nos services | todas as tabelas multiempresa | A | Defesa no Flutter e backend; E2E cobre isolamento central. | P0 |
 | F07 | Cadastro público | Público | Sem tela | `POST /auth/register` responde `PUBLIC_REGISTRATION_DISABLED` | `users` | G | Ausência intencional para beta assistido. | P3 |
 | F08 | Alterar senha estando logado | Todos | Sem tela | Sem endpoint específico | `users` | G | Usuário depende do fluxo “esqueci minha senha” ou alteração administrativa. | P1 |
-| F09 | Aceite de termos/políticas | Todos | `/legal-acceptance`, `LegalAcceptanceController` | `GET /legal/documents/pending`, `GET /legal/acceptances/current`, `POST /legal/acceptances` | `legal`; `LegalRepository` | B | Fluxo obrigatório, versionado e sem bypass para ADMIN/OWNER/EMPLOYEE; os textos canônicos permanecem rascunhos sujeitos à revisão jurídica. | P0 |
+| F09 | Aceite de termos/políticas | Todos | `/legal-acceptance`, `LegalAcceptanceController` | `GET /legal/documents/pending`, `GET /legal/acceptances/current`, `POST /legal/acceptances` | `legal`; `LegalRepository` | B | Com `REQUIRE_LEGAL_ACCEPTANCE=true`, fluxo obrigatório, versionado e sem bypass para ADMIN/OWNER/EMPLOYEE; com a flag falsa ou ausente, documentos continuam disponíveis sem bloquear o uso. O backend informa a política ao Flutter. Os textos canônicos permanecem rascunhos sujeitos à revisão jurídica. | P0 |
 | F10 | Health/readiness | Operação | Sem tela | `GET /health`, `GET /ready` | `dataSource`, migrations | E | Correto como capacidade operacional; não precisa de UI de usuário. | P0 |
 | F11 | Métricas internas | ADMIN/operação | Sem tela | `GET /operations/metrics` | métricas em memória | E | Desabilitada por padrão e sem observabilidade externa/tela. | P2 |
 | F12 | Notificações | Todos | Dependência e feature flag declaradas, sem uso | Sem módulo/endpoint | nenhuma | G | Sem lembretes de tarefa, push ou central de notificações. | P2 |
@@ -258,6 +258,8 @@ Todos possuem consumidor Flutter em Plano Atual ou Empresas ADMIN.
 - `POST /legal/acceptances`
 
 `LegalAcceptancePage` consome a consulta de pendências e o registro de aceite. A consulta de aceites atuais permanece disponível na API, sem consumo direto pela tela.
+
+`GET /legal/documents/pending` também retorna `enforcementRequired`. O backend é a fonte da verdade: `true` ativa o bloqueio por pendências na API e no Flutter; `false` ou flag ausente mantém os documentos disponíveis, mas libera o uso sem criar aceites automaticamente.
 
 ### 6.11 Health/readiness — 2 endpoints
 
