@@ -248,6 +248,63 @@ export class AuthService {
     return { message: 'Senha redefinida com sucesso. Entre novamente com a nova senha.' };
   }
 
+  async changePassword(input: {
+    auth: AuthTokenPayload;
+    currentPassword?: unknown;
+    newPassword?: unknown;
+    requestId?: string;
+    ip?: string;
+  }): Promise<{ message: string }> {
+    const user = await this.repository.findUserById(input.auth.userId);
+    if (!user) {
+      throw new Error('INVALID_TOKEN');
+    }
+    if (user.status !== 'ACTIVE') {
+      throw new Error('INACTIVE_USER');
+    }
+
+    const currentPassword = typeof input.currentPassword === 'string'
+      ? input.currentPassword
+      : '';
+    const newPassword = typeof input.newPassword === 'string'
+      ? input.newPassword
+      : '';
+    const currentPasswordValid = currentPassword.length > 0 &&
+      await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!currentPasswordValid) {
+      throw new Error('CURRENT_PASSWORD_INVALID');
+    }
+    if (newPassword === currentPassword) {
+      throw new Error('PASSWORD_UNCHANGED');
+    }
+
+    assertPasswordPolicy(newPassword, user.email);
+    const updatedAt = new Date().toISOString();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const changed = await this.repository.changePassword(
+      user.id,
+      user.passwordHash,
+      passwordHash,
+      updatedAt,
+    );
+    if (!changed) {
+      const currentUser = await this.repository.findUserById(user.id);
+      if (!currentUser || currentUser.status !== 'ACTIVE') {
+        throw new Error('INACTIVE_USER');
+      }
+      throw new Error('CURRENT_PASSWORD_INVALID');
+    }
+
+    audit('password_changed', {
+      requestId: input.requestId,
+      userId: user.id,
+      companyId: user.companyId,
+      ipHash: hashIp(input.ip),
+      result: 'SUCCESS',
+    });
+    return { message: 'Senha alterada com sucesso.' };
+  }
+
   private async buildAuthResponse(user: AuthUserRecord): Promise<AuthResponse> {
     const payload: AuthTokenPayload = {
       userId: user.id,

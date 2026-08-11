@@ -209,4 +209,20 @@ export class AuthRepository {
       `, [tokenId, tokenId, usedAt, userId]);
     });
   }
+
+  async changePassword(
+    userId: string,
+    currentPasswordHash: string,
+    passwordHash: string,
+    updatedAt: string,
+  ): Promise<boolean> {
+    return dataSource.transaction(async () => {
+      const result = await dataSource.execute(`
+        UPDATE users
+        SET password_hash = ?, updated_at = ?
+        WHERE id = ? AND status = 'ACTIVE' AND password_hash = ?
+      `, [passwordHash, updatedAt, userId, currentPasswordHash]);
+      return result.changes === 1;
+    });
+  }
 }

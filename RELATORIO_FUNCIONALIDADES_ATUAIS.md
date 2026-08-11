@@ -20,13 +20,13 @@ O levantamento encontrou **59 funcionalidades ou capacidades**, classificadas as
 
 | Classe | Significado | Quantidade |
 | --- | --- | ---: |
-| A | Funcional e aparentemente completa | 31 |
+| A | Funcional e aparentemente completa | 32 |
 | B | Funcional, mas precisa de melhoria | 9 |
 | C | Implementada parcialmente | 2 |
 | D | Somente interface/mock ou legado desativado | 5 |
 | E | Backend existe, mas o Flutter ativo não utiliza | 3 |
 | F | Flutter existe, mas o backend não suporta completamente | 1 |
-| G | Ausente | 8 |
+| G | Ausente | 7 |
 | **Total** |  | **59** |
 
 Não foi identificado um defeito confirmado que impeça o núcleo técnico de funcionar. Os bloqueios imediatos para primeiro uso real são operacionais: validar o fluxo completo com uma empresa autorizada, configurar entrega real de e-mail para recuperação de senha e submeter os textos jurídicos canônicos à revisão e aprovação profissional. O aceite obrigatório já está integrado ao primeiro login no Flutter. IA continua dependente de chave, crédito e disponibilidade externa.
@@ -74,7 +74,7 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 | F05 | Redefinir senha por token | Todos | `/reset-password` | `POST /auth/password/reset` | `users`, `reset_tokens` | A | Token de uso único, expiração e política de senha implementados. | P0 |
 | F06 | RBAC e isolamento de rota | Todos | `RoleGuard`, `RbacGuard`, `GoRouter` | `authenticate`, `authorize`, escopo nos services | todas as tabelas multiempresa | A | Defesa no Flutter e backend; E2E cobre isolamento central. | P0 |
 | F07 | Cadastro público | Público | Sem tela | `POST /auth/register` responde `PUBLIC_REGISTRATION_DISABLED` | `users` | G | Ausência intencional para beta assistido. | P3 |
-| F08 | Alterar senha estando logado | Todos | Sem tela | Sem endpoint específico | `users` | G | Usuário depende do fluxo “esqueci minha senha” ou alteração administrativa. | P1 |
+| F08 | Alterar senha estando logado | Todos | `/change-password` | `PUT /auth/password` | `users`; `AuthRepository` | A | Exige senha atual, aplica a política central, altera somente o próprio usuário e preserva a sessão atual. | P1 |
 | F09 | Aceite de termos/políticas | Todos | `/legal-acceptance`, `LegalAcceptanceController` | `GET /legal/documents/pending`, `GET /legal/acceptances/current`, `POST /legal/acceptances` | `legal`; `LegalRepository` | B | Com `REQUIRE_LEGAL_ACCEPTANCE=true`, fluxo obrigatório, versionado e sem bypass para ADMIN/OWNER/EMPLOYEE; com a flag falsa ou ausente, documentos continuam disponíveis sem bloquear o uso. O backend informa a política ao Flutter. Os textos canônicos permanecem rascunhos sujeitos à revisão jurídica. | P0 |
 | F10 | Health/readiness | Operação | Sem tela | `GET /health`, `GET /ready` | `dataSource`, migrations | E | Correto como capacidade operacional; não precisa de UI de usuário. | P0 |
 | F11 | Métricas internas | ADMIN/operação | Sem tela | `GET /operations/metrics` | métricas em memória | E | Desabilitada por padrão e sem observabilidade externa/tela. | P2 |
@@ -129,7 +129,7 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 
 ## 5. Telas Flutter
 
-Foram identificadas **27 superfícies de tela** (26 classes públicas terminadas em `Page` e a tela privada de indisponibilidade). `AdminDashboardPage`, `OwnerDashboardPage` e `EmployeeHomePage` são wrappers de rota sobre `DashboardPage`; foram contadas porque representam entradas distintas por perfil.
+Foram identificadas **28 superfícies de tela** (27 classes públicas terminadas em `Page` e a tela privada de indisponibilidade). `AdminDashboardPage`, `OwnerDashboardPage` e `EmployeeHomePage` são wrappers de rota sobre `DashboardPage`; foram contadas porque representam entradas distintas por perfil.
 
 | Tela | Rota/entrada | Perfil | Finalidade | Dados reais | Mock/hardcode, botão sem ação, TODO ou fluxo incompleto |
 | --- | --- | --- | --- | :---: | --- |
@@ -137,6 +137,7 @@ Foram identificadas **27 superfícies de tela** (26 classes públicas terminadas
 | `LoginPage` | `/login` | Público | Autenticar | Sim | Credenciais demo só aparecem por flag; fluxo atual é real |
 | `ForgotPasswordPage` | `/forgot-password` | Público | Solicitar recuperação | Sim | Depende do serviço de e-mail |
 | `ResetPasswordPage` | `/reset-password?token=...` | Público | Definir nova senha | Sim | Requer token recebido externamente |
+| `ChangePasswordPage` | `/change-password` | Todos autenticados | Alterar a própria senha informando a senha atual | Sim | Sessão atual permanece válida; outras sessões já emitidas não são revogadas |
 | `LegalAcceptancePage` | `/legal-acceptance` | Todos autenticados | Exibir e registrar aceite obrigatório dos documentos jurídicos pendentes | Sim | Textos canônicos ainda exigem revisão jurídica profissional |
 | `_UnavailableFeaturePage` | `/unavailable` | Autenticado | Informar recurso fora da versão | Não aplicável | Tela intencional, botão voltar funcional |
 | `AdminDashboardPage` | `/admin` | ADMIN | Entrada do dashboard global | Sim | Wrapper sem lógica própria |
@@ -166,9 +167,9 @@ Observação: `ResearchStartPage` e `DashboardPage` são superfícies funcionais
 
 ## 6. Endpoints da API
 
-A API declara **50 endpoints em 12 grupos de router/entrada**. O Flutter ativo consome diretamente **39**; **11** são operacionais, aliases, legados ou não possuem consumidor ativo.
+A API declara **51 endpoints em 12 grupos de router/entrada**. O Flutter ativo consome diretamente **40**; **11** são operacionais, aliases, legados ou não possuem consumidor ativo.
 
-### 6.1 Auth — 4 endpoints
+### 6.1 Auth — 5 endpoints
 
 | Método e rota | Finalidade | Tela Flutter |
 | --- | --- | --- |
@@ -176,6 +177,7 @@ A API declara **50 endpoints em 12 grupos de router/entrada**. O Flutter ativo c
 | `POST /auth/login` | Login JWT | `LoginPage` |
 | `POST /auth/password/forgot` | Solicitar reset | `ForgotPasswordPage` |
 | `POST /auth/password/reset` | Consumir token e trocar senha | `ResetPasswordPage` |
+| `PUT /auth/password` | Alterar a senha do próprio usuário autenticado | `ChangePasswordPage` |
 
 ### 6.2 Companies, users e settings — 12 endpoints
 
@@ -312,7 +314,7 @@ São endpoints operacionais, sem necessidade de tela de produto.
 | Starter/Growth | Assinatura interna, limites, uso, troca e histórico | Adequada para beta manual; sem cobrança |
 | Limites/permissões | Backend aplica assentos, pesquisas, PDFs, tarefas e IA | Adequada; formalizar permissão intraempresa do EMPLOYEE |
 | Onboarding | ADMIN cria empresa + OWNER | Parcial no pós-login |
-| Segurança | JWT, bcrypt, rate limits, headers, CORS configurável, auditoria, reset e aceite jurídico obrigatório | Boa base; faltam refresh/revogação e troca autenticada; textos jurídicos aguardam revisão profissional |
+| Segurança | JWT, bcrypt, rate limits, headers, CORS configurável, auditoria, reset, troca autenticada e aceite jurídico obrigatório | Boa base; faltam refresh e revogação das demais sessões após troca autenticada; textos jurídicos aguardam revisão profissional |
 | Recuperação de senha | API e Flutter completos | Depende da configuração real do e-mail |
 | Notificações | Apenas dependência/flag | Ausente |
 | Cobrança | Sem implementação | Fora do beta manual |
@@ -331,13 +333,12 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 
 ### P1 — necessário para MVP operacional
 
-1. Criar troca de senha autenticada para reduzir dependência do reset por e-mail.
-2. Decidir e implementar gestão de equipe pelo OWNER ou documentar o processo ADMIN-only.
-3. Criar onboarding guiado pós-login para completar empresa, equipe e primeira pesquisa.
-4. Formalizar e ajustar a permissão de EMPLOYEE sobre criação/edição de tarefas.
-5. Implementar convite/ativação por e-mail, evitando distribuição manual de senhas.
-6. Validar o detalhe de empresa por endpoint próprio ou remover o endpoint não utilizado.
-7. Documentar a matriz final de permissões e dados visíveis por perfil.
+1. Decidir e implementar gestão de equipe pelo OWNER ou documentar o processo ADMIN-only.
+2. Criar onboarding guiado pós-login para completar empresa, equipe e primeira pesquisa.
+3. Formalizar e ajustar a permissão de EMPLOYEE sobre criação/edição de tarefas.
+4. Implementar convite/ativação por e-mail, evitando distribuição manual de senhas.
+5. Validar o detalhe de empresa por endpoint próprio ou remover o endpoint não utilizado.
+6. Documentar a matriz final de permissões e dados visíveis por perfil.
 
 ### P2 — importante, mas pode vir depois
 
@@ -366,7 +367,7 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 - configurar e testar e-mail de recuperação;
 - aceite jurídico obrigatório no Flutter concluído, com versionamento, restauração de sessão e bloqueio de bypass;
 - submeter os textos canônicos à revisão jurídica profissional;
-- adicionar troca de senha autenticada;
+- troca de senha autenticada concluída para ADMIN, OWNER e EMPLOYEE, preservando o gate jurídico;
 - fechar checklist operacional de primeiro login.
 
 ### Sprint 3.14 — OWNER, equipe e onboarding

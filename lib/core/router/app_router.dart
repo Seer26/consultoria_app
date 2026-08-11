@@ -6,6 +6,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/auth_splash_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
+import '../../features/auth/presentation/pages/change_password_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/state/auth_state.dart';
 import '../../features/dashboard/presentation/pages/admin_dashboard_page.dart';
@@ -69,6 +70,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/legal-acceptance',
         name: 'legalAcceptance',
         builder: (context, state) => const LegalAcceptancePage(),
+      ),
+      GoRoute(
+        path: '/change-password',
+        name: 'changePassword',
+        builder: (context, state) => const ChangePasswordPage(),
       ),
       GoRoute(
         path: '/unavailable',

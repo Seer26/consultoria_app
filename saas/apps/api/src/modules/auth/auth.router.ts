@@ -5,7 +5,12 @@ import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
 import { createEmailService } from './email.service';
 import { env } from '../../config/env';
-import { createRateLimiter, ipRateLimitKey } from '../../shared/rate-limit';
+import {
+  authenticatedUserRateLimitKey,
+  createRateLimiter,
+  ipRateLimitKey,
+} from '../../shared/rate-limit';
+import { authenticate } from './auth.middleware';
 
 const repository = new AuthRepository();
 const service = new AuthService(repository, createEmailService());
@@ -27,8 +32,21 @@ const passwordForgotRateLimit = createRateLimiter({
   key: ipRateLimitKey,
   message: 'Muitas solicitacoes de recuperacao. Aguarde e tente novamente.',
 });
+const passwordChangeRateLimit = createRateLimiter({
+  action: 'password_change_rate_limit_blocked',
+  windowMs: env.loginRateLimitWindowMs,
+  max: env.loginRateLimitMax,
+  key: authenticatedUserRateLimitKey,
+  message: 'Muitas tentativas de alteracao. Aguarde e tente novamente.',
+});
 
 authRouter.post('/register', controller.register);
 authRouter.post('/login', loginRateLimit, controller.login);
 authRouter.post('/password/forgot', passwordForgotRateLimit, controller.forgotPassword);
 authRouter.post('/password/reset', controller.resetPassword);
+authRouter.put(
+  '/password',
+  authenticate,
+  passwordChangeRateLimit,
+  controller.changePassword,
+);

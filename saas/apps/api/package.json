@@ -29,6 +29,7 @@
     "test:runtime:isolation": "tsx src/tests/runtime-provider-isolation.e2e.ts",
     "test:admin:bootstrap": "tsx src/tests/admin-bootstrap.e2e.ts",
     "test:legal:postgres": "tsx src/tests/postgres-legal-acceptance.e2e.ts true && tsx src/tests/postgres-legal-acceptance.e2e.ts false && tsx src/tests/postgres-legal-acceptance.e2e.ts absent",
+    "test:change-password:postgres": "tsx src/tests/postgres-change-password.e2e.ts",
     "test:migrator:postgres": "tsx src/tests/sqlite-to-postgres-migration.e2e.ts",
     "test:smoke": "npm run test:e2e",
     "test:smoke:sqlite": "npm run test:smoke",

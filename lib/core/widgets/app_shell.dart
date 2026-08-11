@@ -138,6 +138,12 @@ class AppShell extends ConsumerWidget {
                               ),
                             ],
                             IconButton(
+                              key: const Key('change-password-navigation'),
+                              tooltip: 'Seguranca da conta',
+                              icon: const Icon(Icons.password_outlined),
+                              onPressed: () => context.push('/change-password'),
+                            ),
+                            IconButton(
                               tooltip: 'Sair',
                               icon: const Icon(Icons.logout_outlined),
                               onPressed: () => AuthService.logout(ref, context),
@@ -240,6 +246,12 @@ class AppShell extends ConsumerWidget {
           appBar: AppBar(
             title: const Text('Consultoria Pro'),
             actions: [
+              IconButton(
+                key: const Key('change-password-navigation'),
+                tooltip: 'Seguranca da conta',
+                icon: const Icon(Icons.password_outlined),
+                onPressed: () => context.push('/change-password'),
+              ),
               IconButton(
                 tooltip: 'Sair',
                 icon: const Icon(Icons.logout_outlined),

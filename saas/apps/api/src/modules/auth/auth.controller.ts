@@ -63,6 +63,21 @@ export class AuthController {
     }
   };
 
+  changePassword = async (request: Request, response: Response): Promise<void> => {
+    try {
+      const result = await this.service.changePassword({
+        auth: request.auth!,
+        currentPassword: request.body?.currentPassword,
+        newPassword: request.body?.newPassword,
+        requestId: request.requestId,
+        ip: request.ip,
+      });
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
   private handleError(error: unknown, response: Response): void {
     const code = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
 
@@ -71,6 +86,8 @@ export class AuthController {
         case 'INVALID_REGISTER_PAYLOAD':
         case 'PASSWORD_TOO_SHORT':
         case 'WEAK_PASSWORD':
+        case 'CURRENT_PASSWORD_INVALID':
+        case 'PASSWORD_UNCHANGED':
         case 'INVALID_ROLE':
         case 'COMPANY_ID_REQUIRED':
           return 400;
