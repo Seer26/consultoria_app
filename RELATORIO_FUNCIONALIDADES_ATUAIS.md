@@ -2,11 +2,11 @@
 
 Projeto: Plataforma de Consultoria Empresarial
 
-Branch auditada: `codex/release-baseline`
+Branch auditada: `codex/sprint-3-15-team-research-privacy`
 
-Checkpoint: `4b93220edf79b6d50037003eec088e033384d9af`
+Checkpoint de origem: `1d14b58f9af37796f6db9692100c3f369c186766`
 
-Data do levantamento: 08/08/2026
+Data da atualização: 12/08/2026
 
 Escopo: análise estática do Flutter, API Node/TypeScript, migrations, testes e documentação. Nenhum banco foi aberto ou alterado.
 
@@ -20,13 +20,13 @@ O levantamento encontrou **59 funcionalidades ou capacidades**, classificadas as
 
 | Classe | Significado | Quantidade |
 | --- | --- | ---: |
-| A | Funcional e aparentemente completa | 32 |
+| A | Funcional e aparentemente completa | 33 |
 | B | Funcional, mas precisa de melhoria | 9 |
 | C | Implementada parcialmente | 2 |
 | D | Somente interface/mock ou legado desativado | 5 |
 | E | Backend existe, mas o Flutter ativo não utiliza | 3 |
 | F | Flutter existe, mas o backend não suporta completamente | 1 |
-| G | Ausente | 7 |
+| G | Ausente | 6 |
 | **Total** |  | **59** |
 
 Não foi identificado um defeito confirmado que impeça o núcleo técnico de funcionar. Os bloqueios imediatos para primeiro uso real são operacionais: validar o fluxo completo com uma empresa autorizada, configurar entrega real de e-mail para recuperação de senha e submeter os textos jurídicos canônicos à revisão e aprovação profissional. O aceite obrigatório já está integrado ao primeiro login no Flutter. IA continua dependente de chave, crédito e disponibilidade externa.
@@ -51,13 +51,15 @@ Não existe uma área administrativa geral de configurações, consulta de audit
 
 ### 3.2 OWNER
 
-O OWNER possui dashboard da própria empresa, edição dos dados empresariais, pesquisa empresarial com retomada, perguntas assistidas por IA, conclusão e score, histórico, geração de plano de ação, tarefas, relatórios/PDF e consulta do plano/limites. O isolamento por `company_id` é aplicado nos services/repositories e coberto por E2E.
+O OWNER possui dashboard da própria empresa, edição dos dados empresariais, gestão dos EMPLOYEEs da própria equipe, pesquisa empresarial com retomada, perguntas assistidas por IA, conclusão e score, histórico, geração de plano de ação, tarefas, relatórios/PDF e consulta do plano/limites. O isolamento por `company_id` é aplicado nos services/repositories e coberto por E2E.
 
-O OWNER não administra a própria equipe pela interface; somente o ADMIN cria e mantém OWNERs/EMPLOYEEs. Não há onboarding guiado dentro do app após o primeiro login, notificações funcionais, troca autônoma de plano ou pagamento. A troca comercial permanece manual pelo ADMIN.
+O OWNER cadastra, edita e ativa/inativa somente EMPLOYEEs da própria empresa, atribuindo departamento e função profissional e respeitando a política de senha e o limite de assentos. Convite/ativação por e-mail continua como evolução futura. Não há onboarding guiado dentro do app após o primeiro login, notificações funcionais, troca autônoma de plano ou pagamento.
+
+**OWNER não possui acesso às respostas individuais dos funcionários.** Para pesquisas de EMPLOYEE, recebe somente status e resultados consolidados; detalhes, reports e PDF não entregam resposta bruta nem transcript.
 
 ### 3.3 EMPLOYEE
 
-O EMPLOYEE possui dashboard operacional, pesquisa empresarial, histórico próprio, detalhes, tarefas e filtros de prazo. O backend restringe pesquisas e relatórios ao usuário/empresa e impede acesso cruzado entre empresas.
+O EMPLOYEE possui dashboard operacional, pesquisa empresarial, histórico próprio, detalhes, tarefas e filtros de prazo. Departamento e função são atribuídos pelo OWNER, aparecem somente para leitura no início da pesquisa e são gravados como snapshot histórico. O backend restringe pesquisas e respostas ao próprio usuário e impede acesso cruzado entre pessoas e empresas.
 
 A tela de relatórios não é liberada para EMPLOYEE, embora a API seja capaz de retornar relatórios das próprias pesquisas. Na área de tarefas, o backend isola por empresa, mas permite ao EMPLOYEE criar/editar tarefas da empresa; essa política deve ser confirmada, pois pode ser mais ampla que “atualizar apenas tarefas atribuídas”. O resumo empresarial exibido no dashboard é deliberadamente reduzido.
 
@@ -100,21 +102,21 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 | F31 | Dashboard da empresa | OWNER | `/owner`, `OwnerDashboard` | `GET /dashboard/company` | company/submissions/tasks | A | KPIs, pilares, gargalos, oportunidades e tarefas reais. | P0 |
 | F32 | Configurações da própria empresa | OWNER | `/company-settings` | `GET/PUT /company/settings` | `companies` | A | Nome, setor, porte, telefone, responsável e observações. | P1 |
 | F33 | Iniciar e retomar pesquisa | OWNER | `/research`, `ResearchStartPage`, `ChatDiagnosisPage` | `POST/GET /research/submissions*` | submissions/answers | A | Banco e API reais; pesquisas em andamento podem ser retomadas. | P0 |
-| F34 | Pergunta dinâmica e análise consultiva por IA | OWNER | chat e detalhe da pesquisa | `POST /ai/next-question`, `POST /ai/research/:submissionId/analysis` | `diagnosis_submissions.ai_analysis`; usage/audit + provider configurado | A | Gemini é o provider ativo do beta (`gemini-3.5-flash-lite`), com pergunta adaptativa e análise final comprovadas em teste real; OpenAI permanece alternativa suportada. Structured Outputs, fallback, limites, repetição protegida e isolamento multiempresa preservados. | P1 |
+| F34 | Pergunta dinâmica e análise consultiva por IA | OWNER/EMPLOYEE | chat e detalhe da pesquisa | `POST /ai/next-question`, `POST /ai/research/:submissionId/analysis` | snapshots profissionais, `diagnosis_submissions.ai_analysis`, usage/audit | A | Backend aplica mínimo 5, cobertura mínima de 3 pilares e máximo 10. Abaixo do mínimo continua; após o mínimo a IA pode encerrar; no máximo encerra sem solicitar pergunta 11. Gemini segue principal e OpenAI alternativa, sem controle exclusivo do término. | P1 |
 | F35 | Concluir pesquisa, score e insights | OWNER | chat/detalhes | `POST /research/submissions/:id/complete` | submissions/answers | A | Regras determinísticas calculam score, pilares, resumo e recomendações. | P0 |
-| F36 | Histórico e detalhe de pesquisas | OWNER | `/research`, `/research/:id` | `GET /research/submissions`, `GET /research/submissions/:id` | submissions/answers | A | Escopo da própria empresa. | P1 |
+| F36 | Histórico e detalhe de pesquisas | OWNER | `/research`, `/research/:id` | `GET /research/submissions`, `GET /research/submissions/:id` | submissions/answers | A | Escopo da própria empresa; respostas brutas de EMPLOYEE são removidas no backend e somente o consolidado é entregue. | P1 |
 | F37 | Gerar plano de ação da pesquisa | OWNER | detalhe da pesquisa | `POST /research/submissions/:id/generate-action-plan` | submissions/tasks | A | Requer pesquisa concluída e gera tarefas persistidas. | P0 |
 | F38 | Listar, filtrar e abrir tarefas | OWNER | `/tasks` | `GET /action-plan/tasks`, `GET /action-plan/tasks/:id` | tasks; `ActionPlanRepository` | B | Lista/filtros são usados; a UI não consome o endpoint individual de detalhe. | P1 |
 | F39 | Criar, editar, atribuir e mudar status de tarefa | OWNER | `/tasks` | POST/PUT/PATCH `/action-plan/tasks*`, assignees | tasks/users/usage | A | Prioridade, prazo, pilar, responsável, status e limites integrados. | P0 |
-| F40 | Relatórios e PDF da empresa | OWNER | `/reports`, detalhes | endpoints `/reports/research*` | submissions/answers/tasks/usage | A | Relatório executivo e exportação multiplataforma. | P0 |
+| F40 | Relatórios e PDF da empresa | OWNER | `/reports`, detalhes | endpoints `/reports/research*` | submissions/tasks/usage | A | Relatório executivo e PDF usam apenas resultados consolidados; não expõem respostas individuais de EMPLOYEE. | P0 |
 | F41 | Plano atual e limites | OWNER | `/plan` | `GET /billing/current-plan` | plans/subscriptions/usage | A | Uso de usuários, pesquisas, PDFs, tarefas e IA. | P1 |
-| F42 | Gerenciar equipe da própria empresa | OWNER | Sem tela | Endpoints de usuários são ADMIN-only | `users` | G | OWNER depende do ADMIN para adicionar, editar ou inativar equipe. | P1 |
+| F42 | Gerenciar equipe da própria empresa | OWNER | `/team`, `TeamPage` | `GET/POST/PUT/PATCH /company/team*` | `users.department`, `users.job_function`, audit | A | OWNER gerencia somente EMPLOYEEs próprios, com senha inicial, perfil, status e limite de assentos; convite por e-mail permanece futuro. | P1 |
 | F43 | Onboarding guiado após primeiro login | OWNER | Sem wizard | Backend cria empresa/OWNER, docs externas existem | companies/users | C | Não há checklist dentro do produto para completar empresa, equipe e primeira pesquisa. | P1 |
 | F44 | Dashboard operacional | EMPLOYEE | `/employee`, `EmployeeDashboard` | `GET /dashboard/employee` | submissions/tasks/company | A | Pesquisas próprias, tarefas atribuídas, atrasos e resumo limitado. | P0 |
-| F45 | Responder e concluir pesquisa | EMPLOYEE | `/research`, chat | endpoints `/research/submissions*` e IA | submissions/answers/usage | A | Mesmo fluxo funcional do OWNER, no escopo da própria empresa/usuário. | P0 |
+| F45 | Responder e concluir pesquisa | EMPLOYEE | `/research`, chat | endpoints `/research/submissions*` e IA | submissions/answers/usage | A | Não escolhe função/área: backend exige perfil atribuído e grava `respondent_department`/`respondent_job_function`; acessa somente suas próprias respostas. | P0 |
 | F46 | Histórico e detalhe próprios | EMPLOYEE | `/research`, `/research/:id` | `GET /research/submissions*` | submissions/answers | A | Backend restringe ao respondente. | P1 |
 | F47 | Tarefas atribuídas e filtros | EMPLOYEE | `/tasks` | `GET /action-plan/tasks` | tasks | A | Filtros “minhas”, atrasadas, próximas e concluídas. | P0 |
-| F48 | Criar/editar tarefas como EMPLOYEE | EMPLOYEE | mesma tela de tarefas | mutações `/action-plan/tasks*` | tasks | B | Isolado por empresa, porém a política permite alterações amplas dentro dela; confirmar se deve limitar ao responsável/status. | P1 |
+| F48 | Criar/editar tarefas como EMPLOYEE | EMPLOYEE | mesma tela de tarefas | mutações `/action-plan/tasks*` | tasks | B | Política de tarefas permanece inalterada e isolada por empresa; a nova política de pesquisa restringe adicionalmente respostas ao próprio EMPLOYEE. | P1 |
 | F49 | Resumo da empresa no dashboard | EMPLOYEE | `EmployeeDashboard` | `GET /dashboard/employee` | company/submissions/tasks | B | Exposição é reduzida por desenho; política de quais indicadores o colaborador pode ver deve ser formalizada. | P2 |
 | F50 | Relatório da própria pesquisa | EMPLOYEE | Rota `/reports` bloqueada | Backend permite somente relatório do próprio respondente | submissions/answers/tasks | E | Há capacidade segura no backend, mas nenhuma navegação/tela para EMPLOYEE. Decidir se faz parte da oferta. | P2 |
 | F51 | Visualizar plano da empresa | EMPLOYEE | Rota `/plan` bloqueada | `GET /billing/current-plan` aceita autenticado com empresa | plans/subscriptions/usage | G | Ausência possivelmente intencional; definir transparência de limites para colaboradores. | P3 |
@@ -129,7 +131,7 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 
 ## 5. Telas Flutter
 
-Foram identificadas **28 superfícies de tela** (27 classes públicas terminadas em `Page` e a tela privada de indisponibilidade). `AdminDashboardPage`, `OwnerDashboardPage` e `EmployeeHomePage` são wrappers de rota sobre `DashboardPage`; foram contadas porque representam entradas distintas por perfil.
+Foram identificadas **29 superfícies de tela** (28 classes públicas terminadas em `Page` e a tela privada de indisponibilidade). `AdminDashboardPage`, `OwnerDashboardPage` e `EmployeeHomePage` são wrappers de rota sobre `DashboardPage`; foram contadas porque representam entradas distintas por perfil.
 
 | Tela | Rota/entrada | Perfil | Finalidade | Dados reais | Mock/hardcode, botão sem ação, TODO ou fluxo incompleto |
 | --- | --- | --- | --- | :---: | --- |
@@ -145,7 +147,7 @@ Foram identificadas **28 superfícies de tela** (27 classes públicas terminadas
 | `EmployeeHomePage` | `/employee` | EMPLOYEE | Entrada do dashboard operacional | Sim | Wrapper sem lógica própria |
 | `DashboardPage` | interna aos três wrappers | ADMIN/OWNER/EMPLOYEE | Carregar endpoint por role e renderizar painel | Sim | Estado de erro real, sem fallback demo |
 | `DiagnosisPage` | `/research` | Todos autenticados | Listar/iniciar/retomar pesquisas | Sim | ADMIN fica somente leitura |
-| `ResearchStartPage` | componente aberto por `DiagnosisPage` | OWNER/EMPLOYEE | Informar função/setor e iniciar submissão | Sim | Não possui rota independente |
+| `ResearchStartPage` | componente aberto por `DiagnosisPage` | OWNER/EMPLOYEE | OWNER informa contexto próprio; EMPLOYEE confere perfil atribuído somente leitura | Sim | Perfil incompleto bloqueia EMPLOYEE |
 | `ChatDiagnosisPage` | `/research/chat` | OWNER/EMPLOYEE; ADMIN só se `allowRespond` falso | Responder pesquisa e pedir próxima pergunta | Sim | IA externa pode ficar indisponível; resposta já salva é preservada |
 | `ResearchDetailsPage` | `/research/:submissionId` | Todos autenticados, com escopo | Resultado, score e geração de plano/PDF | Sim | Ações variam conforme role/status |
 | `CompaniesManagementPage` | `/companies` | ADMIN | Empresas, onboarding, plano e histórico | Sim | Tela extensa concentra múltiplas responsabilidades |
@@ -155,6 +157,7 @@ Foram identificadas **28 superfícies de tela** (27 classes públicas terminadas
 | `ActionPlanPage` | `/tasks` | ADMIN/OWNER/EMPLOYEE | Lista, filtros, criação e edição de tarefas | Sim | Política de escrita do EMPLOYEE merece revisão |
 | `CurrentPlanPage` | `/plan` | OWNER | Plano e consumo de limites | Sim | Sem upgrade/pagamento self-service |
 | `CompanySettingsPage` | `/company-settings` | OWNER | Editar dados empresariais | Sim | Sem configurações avançadas/integrações |
+| `TeamPage` | `/team` | OWNER | Criar, listar, editar e ativar/inativar EMPLOYEEs próprios | Sim | Convite/ativação por e-mail permanece futuro |
 | `WelcomePage` | sem rota ativa | Legado | Boas-vindas antiga | Não | Classe não utilizada pelo router |
 | `ClientsPage` | `/clients` redireciona para indisponível | Legado | Lista/gestão visual de clientes | Não | Data source TODO e mock |
 | `ClientDetailsPage` | `/clients/:id` redireciona | Legado | Detalhe visual de cliente | Não | Mock, sem API |
@@ -167,7 +170,7 @@ Observação: `ResearchStartPage` e `DashboardPage` são superfícies funcionais
 
 ## 6. Endpoints da API
 
-A API declara **51 endpoints em 12 grupos de router/entrada**. O Flutter ativo consome diretamente **40**; **11** são operacionais, aliases, legados ou não possuem consumidor ativo.
+A API declara **55 endpoints em 12 grupos de router/entrada**. O Flutter ativo consome diretamente **44**; **11** são operacionais, aliases, legados ou não possuem consumidor ativo.
 
 ### 6.1 Auth — 5 endpoints
 
@@ -179,7 +182,7 @@ A API declara **51 endpoints em 12 grupos de router/entrada**. O Flutter ativo c
 | `POST /auth/password/reset` | Consumir token e trocar senha | `ResetPasswordPage` |
 | `PUT /auth/password` | Alterar a senha do próprio usuário autenticado | `ChangePasswordPage` |
 
-### 6.2 Companies, users e settings — 12 endpoints
+### 6.2 Companies, users, team e settings — 16 endpoints
 
 | Método e rota | Finalidade | Tela Flutter |
 | --- | --- | --- |
@@ -195,6 +198,10 @@ A API declara **51 endpoints em 12 grupos de router/entrada**. O Flutter ativo c
 | `PATCH /users/:id/status` | Alterar status | Usuários ADMIN |
 | `GET /company/settings` | Ler empresa própria | Configurações OWNER |
 | `PUT /company/settings` | Editar empresa própria | Configurações OWNER |
+| `GET /company/team` | Listar EMPLOYEEs próprios | Equipe OWNER |
+| `POST /company/team` | Criar EMPLOYEE com perfil e senha inicial | Equipe OWNER |
+| `PUT /company/team/:id` | Editar EMPLOYEE próprio | Equipe OWNER |
+| `PATCH /company/team/:id/status` | Ativar/inativar EMPLOYEE próprio | Equipe OWNER |
 
 ### 6.3 Research — 6 endpoints
 
@@ -305,9 +312,9 @@ São endpoints operacionais, sem necessidade de tela de produto.
 | --- | --- | --- |
 | Gestão multiempresa | Escopo por `company_id`, ADMIN global, E2E de vazamento | Adequada para MVP |
 | ADMIN | Dashboard, empresas, usuários, planos, pesquisas e relatórios | Forte; faltam auditoria/configurações gerais |
-| OWNER | Dashboard, empresa, pesquisa, ação, relatório e plano | Forte; falta gestão de equipe e onboarding guiado |
+| OWNER | Dashboard, empresa, equipe, pesquisa, ação, relatório e plano | Forte; falta onboarding guiado e convite por e-mail |
 | EMPLOYEE | Dashboard, pesquisa e tarefas | Adequada; revisar política de edição de tarefas |
-| Diagnósticos/pesquisas | Fluxo `/research` completo, score e IA opcional | Adequada; legado deve ser removido depois |
+| Diagnósticos/pesquisas | Fluxo `/research` completo, perfil por snapshot, score, IA com MIN/MAX e privacidade por papel | Adequada; legado deve ser removido depois |
 | Planos de ação/tarefas | Geração, CRUD, responsáveis, filtros e status | Adequada |
 | Dashboards | Três perfis com dados reais | Adequada |
 | Relatórios/PDF | ADMIN/OWNER completos; backend suporta relatório próprio do EMPLOYEE | Adequada ao escopo atual |
@@ -334,12 +341,11 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 
 ### P1 — necessário para MVP operacional
 
-1. Decidir e implementar gestão de equipe pelo OWNER ou documentar o processo ADMIN-only.
-2. Criar onboarding guiado pós-login para completar empresa, equipe e primeira pesquisa.
-3. Formalizar e ajustar a permissão de EMPLOYEE sobre criação/edição de tarefas.
-4. Implementar convite/ativação por e-mail, evitando distribuição manual de senhas.
-5. Validar o detalhe de empresa por endpoint próprio ou remover o endpoint não utilizado.
-6. Documentar a matriz final de permissões e dados visíveis por perfil.
+1. Criar onboarding guiado pós-login para completar empresa, equipe e primeira pesquisa.
+2. Formalizar e ajustar a permissão de EMPLOYEE sobre criação/edição de tarefas.
+3. Implementar convite/ativação por e-mail, evitando distribuição manual de senhas iniciais.
+4. Validar o detalhe de empresa por endpoint próprio ou remover o endpoint não utilizado.
+5. Documentar a matriz final de permissões além da política de pesquisas já aplicada.
 
 ### P2 — importante, mas pode vir depois
 
@@ -371,19 +377,19 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 - troca de senha autenticada concluída para ADMIN, OWNER e EMPLOYEE, preservando o gate jurídico;
 - fechar checklist operacional de primeiro login.
 
-### Sprint 3.14 — OWNER, equipe e onboarding
+### Sprint 3.14 — IA consultiva
 
-- decidir gestão de equipe OWNER versus ADMIN-only;
-- implementar convite/ativação ou fluxo equivalente;
-- criar onboarding guiado pós-login;
-- revisar mensagens de plano/limite e empresa incompleta.
+- Gemini principal e OpenAI alternativo;
+- pergunta adaptativa e análise consultiva estruturadas;
+- fallback, limites de uso e isolamento multiempresa.
 
-### Sprint 3.15 — Permissões e acabamento multiempresa
+### Sprint 3.15 — Equipe, perfil e privacidade de pesquisa
 
-- formalizar matriz de permissões;
-- restringir ou confirmar mutações de tarefas por EMPLOYEE;
-- decidir acesso de EMPLOYEE ao próprio relatório;
-- ampliar testes de autorização para as decisões finais.
+- gestão de EMPLOYEE pelo OWNER concluída;
+- perfil profissional e snapshot histórico concluídos;
+- encerramento determinístico MIN 5/MAX 10 concluído;
+- respostas individuais protegidas de OWNER em detalhe/report/PDF;
+- ampliar em sprint futura a política de tarefas e decidir relatório próprio do EMPLOYEE.
 
 ### Sprint 3.16 — Higiene de produto e observabilidade
 
@@ -403,7 +409,7 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 - A seleção do provider ocorre por `DATABASE_URL`; com ela definida, `dataSource.provider` é `postgres`.
 - Repositories centrais usam o adaptador assíncrono compartilhado, que traduz parâmetros e algumas expressões SQLite para PostgreSQL.
 - O startup importa `database/init.ts` dinamicamente somente quando o provider é SQLite; PostgreSQL não carrega o módulo SQLite com efeito colateral.
-- Migrations PostgreSQL cobrem companies, users, submissions/answers, tarefas, planos, assinaturas, uso, reset de senha, aceite legal, auditoria e hardening.
+- Migrations PostgreSQL 001–007 cobrem companies, users, perfis profissionais, snapshots de pesquisa, submissions/answers, tarefas, planos, assinaturas, uso, reset de senha, aceite legal, auditoria, IA e hardening.
 
 ### 11.2 Código SQLite ainda presente
 
@@ -447,6 +453,6 @@ Essa remoção não deve ocorrer antes de preservar testes de isolamento, segura
 
 ## 12. Conclusão
 
-O aplicativo já é mais do que uma interface demonstrativa: o núcleo de consultoria está integrado e persistente em PostgreSQL, com três perfis, isolamento multiempresa, pesquisa, plano de ação, dashboards, relatórios, limites comerciais internos e aceite jurídico obrigatório no primeiro acesso. A principal diferença entre o estado atual e um MVP utilizável por cliente real está menos no domínio central e mais no acabamento operacional: recuperação de senha comprovada, revisão profissional dos textos jurídicos, onboarding dentro do produto, gestão de equipe, política final de permissões e remoção da ambiguidade causada por módulos legados/mock.
+O aplicativo já é mais do que uma interface demonstrativa: o núcleo de consultoria está integrado e persistente em PostgreSQL, com três perfis, gestão de equipe pelo OWNER, isolamento multiempresa, pesquisa com perfil histórico, encerramento determinístico, privacidade de respostas, plano de ação, dashboards, relatórios, limites comerciais internos e aceite jurídico obrigatório no primeiro acesso. As lacunas restantes concentram-se no acabamento operacional: e-mail real, revisão profissional dos textos jurídicos, onboarding dentro do produto, convite de colaboradores, política final de tarefas e remoção de módulos legados/mock.
 
 A **Sprint 3.13 — Aceite jurídico obrigatório e primeiro cliente real** já concluiu o gate técnico de aceite. Os próximos passos da sprint são a revisão profissional dos textos, a recuperação segura e a validação assistida do fluxo completo por uma empresa autorizada. Pagamentos e recursos futuros devem esperar essa validação.

@@ -22,6 +22,7 @@ class AppShell extends ConsumerWidget {
     SidebarItem.tarefas: 5,
     SidebarItem.plano: 6,
     SidebarItem.configuracoesEmpresa: 7,
+    SidebarItem.equipe: 8,
   };
 
   static const Map<int, SidebarItem> _itemByBranchIndex = {
@@ -33,6 +34,7 @@ class AppShell extends ConsumerWidget {
     5: SidebarItem.tarefas,
     6: SidebarItem.plano,
     7: SidebarItem.configuracoesEmpresa,
+    8: SidebarItem.equipe,
   };
 
   void _goBranch(int index) {

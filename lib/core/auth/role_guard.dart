@@ -33,6 +33,7 @@ class RoleGuard {
           SidebarItem.relatorios,
           SidebarItem.plano,
           SidebarItem.configuracoesEmpresa,
+          SidebarItem.equipe,
         ];
       case employee:
         return const [
@@ -118,6 +119,8 @@ class RoleGuard {
         return SidebarItem.plano;
       case '/company-settings':
         return SidebarItem.configuracoesEmpresa;
+      case '/team':
+        return SidebarItem.equipe;
       default:
         return null;
     }

@@ -154,6 +154,8 @@ async function main(): Promise<void> {
           email: `employee.postgres.${suffix}@example.invalid`,
           password,
           role: 'EMPLOYEE',
+          department: 'Operacoes',
+          jobFunction: 'Analista',
         },
       },
     );
@@ -275,15 +277,15 @@ async function main(): Promise<void> {
     );
     assert(submission.companyId === companyA.company.id, 'POSTGRES_E2E_TENANT_CREATION');
 
-    await request(baseUrl, 'POST', `/research/submissions/${submission.id}/answers`, {
-      token: ownerA.token,
-      expectedStatus: 201,
-      body: {
-        question: 'Como a empresa acompanha seus indicadores?',
-        answer: 'Acompanhamento semanal estruturado.',
-        pillar: 'Estrategia',
-      },
-    });
+    for (const [index, pillar] of ['Estrategia', 'Financeiro', 'Processos', 'Estrategia', 'Financeiro'].entries()) {
+      await request(baseUrl, 'POST', `/research/submissions/${submission.id}/answers`, {
+        token: ownerA.token, expectedStatus: 201,
+        body: {
+          question: `Como a empresa acompanha o indicador ${index + 1}?`,
+          answer: 'Acompanhamento semanal estruturado.', pillar,
+        },
+      });
+    }
     await request(baseUrl, 'POST', `/research/submissions/${submission.id}/complete`, {
       token: ownerA.token,
       body: {},

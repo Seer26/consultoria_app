@@ -85,3 +85,8 @@ companiesRouter.put(
   authorize('OWNER'),
   controller.updateOwnCompanySettings,
 );
+
+companiesRouter.get('/company/team', authenticate, authorize('OWNER'), controller.listOwnTeam);
+companiesRouter.post('/company/team', authenticate, authorize('OWNER'), controller.createOwnEmployee);
+companiesRouter.put('/company/team/:id', authenticate, authorize('OWNER'), controller.updateOwnEmployee);
+companiesRouter.patch('/company/team/:id/status', authenticate, authorize('OWNER'), controller.updateOwnEmployeeStatus);

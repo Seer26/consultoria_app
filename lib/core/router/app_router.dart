@@ -14,6 +14,7 @@ import '../../features/dashboard/presentation/pages/owner_dashboard_page.dart';
 import '../../features/dashboard/presentation/pages/employee_home_page.dart';
 import '../../features/billing/presentation/pages/current_plan_page.dart';
 import '../../features/company_settings/presentation/pages/company_settings_page.dart';
+import '../../features/team/presentation/pages/team_page.dart';
 import '../../features/action_plan/presentation/pages/action_plan_page.dart';
 import '../../features/action_plan/domain/entities/action_plan_task.dart';
 import '../../features/admin_management/presentation/pages/companies_management_page.dart';
@@ -292,6 +293,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => RbacGuard(
                   allowedRoles: const [RoleGuard.owner],
                   child: const CompanySettingsPage(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/team',
+                name: 'team',
+                builder: (context, state) => RbacGuard(
+                  allowedRoles: const [RoleGuard.owner],
+                  child: const TeamPage(),
                 ),
               ),
             ],

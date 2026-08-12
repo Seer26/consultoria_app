@@ -182,6 +182,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
       isLoading = true;
     });
     _scrollToBottom();
+    var finishAfterAnswer = false;
 
     try {
       await ref
@@ -203,9 +204,18 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
         }
 
         setState(() {
-          messages.add(Message(text: nextQuestion.question, isUser: false));
-          _lastAssistantQuestion = nextQuestion.question;
-          _lastAssistantPillar = nextQuestion.pillar;
+          if (nextQuestion.shouldContinue) {
+            messages.add(Message(text: nextQuestion.question, isUser: false));
+            _lastAssistantQuestion = nextQuestion.question;
+            _lastAssistantPillar = nextQuestion.pillar;
+          } else {
+            messages.add(const Message(
+              text: 'O diagnostico possui cobertura suficiente e sera finalizado.',
+              isUser: false,
+            ));
+            _lastAssistantQuestion = null;
+            finishAfterAnswer = true;
+          }
         });
       } catch (error) {
         if (!mounted) {
@@ -245,6 +255,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
         _scrollToBottom();
       }
     }
+    if (finishAfterAnswer && mounted) await _completeResearch();
   }
 
   Future<void> _completeResearch() async {

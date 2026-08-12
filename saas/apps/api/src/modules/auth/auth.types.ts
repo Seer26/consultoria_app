@@ -8,6 +8,8 @@ export interface AuthUserRecord {
   role: UserRole;
   companyId: string | null;
   status: 'ACTIVE' | 'INACTIVE';
+  department: string | null;
+  jobFunction: string | null;
   createdAt: string;
   updatedAt: string;
   authVersion: number;
@@ -65,6 +67,8 @@ export interface AuthResponse {
     role: UserRole;
     companyId: string | null;
     status: 'ACTIVE' | 'INACTIVE';
+    department: string | null;
+    jobFunction: string | null;
   };
   company: {
     id: string;

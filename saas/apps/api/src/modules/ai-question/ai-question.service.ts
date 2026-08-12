@@ -87,6 +87,9 @@ export class AiQuestionService {
 
   async generateNextQuestion(auth: AuthTokenPayload, submissionId: string): Promise<AdaptiveQuestionResult> {
     const context = await this.authorizedContext(auth, submissionId, 'IN_PROGRESS');
+    if (context.answers.length >= env.aiMaxQuestions) {
+      return this.terminalResult('Limite seguro de perguntas atingido.');
+    }
     const fallback = this.fallbackQuestion(context.answers);
     if (!env.aiEnabled || !env.aiProviderKey) return fallback;
 
@@ -104,7 +107,11 @@ export class AiQuestionService {
         if (!parsed) throw new Error('AI_INVALID_RESPONSE');
         await this.entitlementsService.recordUsage(context.submission.companyId, 'AI_QUESTIONS_MONTHLY');
         audit('ai_request_succeeded', { operation: 'adaptive_question', companyId: context.submission.companyId, durationMs: Date.now() - started });
-        return { ...parsed, source: provider.name };
+        return {
+          ...parsed,
+          shouldContinue: this.shouldContinue(context.answers, parsed.shouldContinue),
+          source: provider.name,
+        };
       } catch (error) {
         audit('ai_error', { operation: 'adaptive_question', companyId: context.submission.companyId, durationMs: Date.now() - started, category: this.errorCategory(error) });
         return fallback;
@@ -171,7 +178,30 @@ export class AiQuestionService {
     ];
     const previous = new Set(answers.map((item) => normalizeQuestion(item.question)));
     const selected = candidates.find(([, question]) => !previous.has(normalizeQuestion(question))) ?? candidates[candidates.length - 1];
-    return { question: selected[1], pillar: selected[0], reason: 'Pergunta segura do roteiro consultivo.', shouldContinue: answers.length < 12, source: 'fallback' };
+    return {
+      question: selected[1], pillar: selected[0],
+      reason: 'Pergunta segura do roteiro consultivo.',
+      shouldContinue: answers.length < env.aiMaxQuestions,
+      source: 'fallback',
+    };
+  }
+
+  private shouldContinue(answers: ResearchAnswerRecord[], providerDecision: boolean): boolean {
+    const count = answers.length;
+    if (count >= env.aiMaxQuestions) return false;
+    if (count < env.aiMinQuestions) return true;
+    const coveredPillars = new Set(
+      answers.map((answer) => answer.pillar?.trim().toLowerCase()).filter(Boolean),
+    ).size;
+    if (coveredPillars < env.aiMinPillars) return true;
+    return providerDecision;
+  }
+
+  private terminalResult(reason: string): AdaptiveQuestionResult {
+    return {
+      question: 'A pesquisa possui contexto suficiente para ser finalizada.',
+      pillar: 'Encerramento', reason, shouldContinue: false, source: 'fallback',
+    };
   }
 
   private errorCategory(error: unknown): string {

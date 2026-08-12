@@ -44,6 +44,8 @@ export interface ResearchSubmissionRecord extends ResearchResultSnapshot {
   submissionType: 'RESEARCH';
   respondentRole: string;
   department: string;
+  respondentDepartment: string;
+  respondentJobFunction: string;
   status: ResearchSubmissionStatus;
   createdAt: string;
   updatedAt: string;
@@ -66,8 +68,8 @@ export interface ResearchAnswerRecord {
 export interface CreateResearchSubmissionInput {
   companyId?: string;
   userId?: string;
-  respondentRole: string;
-  department: string;
+  respondentRole?: string;
+  department?: string;
 }
 
 export interface CreateResearchAnswerInput {
@@ -88,6 +90,8 @@ export interface AuthenticatedUserRecord {
   role: UserRole;
   companyId: string | null;
   status: 'ACTIVE' | 'INACTIVE';
+  department: string | null;
+  jobFunction: string | null;
 }
 
 export interface CompanyRecord {
@@ -111,6 +115,8 @@ export interface ResearchSubmissionDetails {
   pillarScores: ResearchPillarScore[];
   respondentRole: string;
   department: string;
+  respondentDepartment: string;
+  respondentJobFunction: string;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -132,6 +138,8 @@ export interface ResearchListItem extends ResearchResultSnapshot {
   userName: string;
   respondentRole: string;
   department: string;
+  respondentDepartment: string;
+  respondentJobFunction: string;
   status: ResearchSubmissionStatus;
   answersCount: number;
   createdAt: string;

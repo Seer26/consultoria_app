@@ -129,8 +129,8 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
       final result = await context.push(
         '/research/chat',
         extra: {
-          'role': role,
-          'sector': sector,
+          'role': submission.respondentRole,
+          'sector': submission.department,
           'respondEnabled': respondEnabled,
           'submissionId': submission.id,
           'companyId': effectiveCompanyId,
@@ -187,6 +187,9 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
       allowStart: normalizedRole != RoleGuard.admin,
       requireCompanySelection: false,
       companyOptions: companyOptions,
+      lockAssignedProfile: normalizedRole == RoleGuard.employee,
+      assignedRole: user?.jobFunction,
+      assignedSector: user?.department,
       historySection: _HistorySection(
         isLoading: _isLoadingHistory,
         error: _historyError,

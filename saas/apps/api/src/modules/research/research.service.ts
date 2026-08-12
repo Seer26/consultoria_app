@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { env } from '../../config/env';
 import { ActionPlanService } from '../action-plan/action-plan.service';
 import type { AuthTokenPayload } from '../auth/auth.types';
 import { EntitlementsRepository } from '../entitlements/entitlements.repository';
@@ -97,13 +98,6 @@ export class ResearchService {
     this.ensureActiveUser(context);
     this.ensureRespondent(context);
 
-    const respondentRole = input.respondentRole?.trim();
-    const department = input.department?.trim();
-
-    if (!respondentRole || !department) {
-      throw new Error('INVALID_RESEARCH_SUBMISSION_PAYLOAD');
-    }
-
     const companyId = this.resolveCompanyId(context, input.companyId);
     const userId = this.resolveTargetUserId(context, input.userId);
     const targetUser = await this.repository.findUserById(userId);
@@ -114,6 +108,19 @@ export class ResearchService {
 
     if (targetUser.status !== 'ACTIVE') {
       throw new Error('INACTIVE_USER');
+    }
+
+    const useAssignedProfile = context.actor.role === 'EMPLOYEE';
+    const respondentRole = useAssignedProfile
+      ? targetUser.jobFunction?.trim()
+      : input.respondentRole?.trim();
+    const department = useAssignedProfile
+      ? targetUser.department?.trim()
+      : input.department?.trim();
+    if (!respondentRole || !department) {
+      throw new Error(useAssignedProfile
+        ? 'EMPLOYEE_PROFILE_INCOMPLETE'
+        : 'INVALID_RESEARCH_SUBMISSION_PAYLOAD');
     }
 
     if (
@@ -143,6 +150,8 @@ export class ResearchService {
       submissionType: 'RESEARCH',
       respondentRole,
       department,
+      respondentDepartment: department,
+      respondentJobFunction: respondentRole,
       status: 'IN_PROGRESS',
       overallScore: null,
       summary: null,
@@ -177,6 +186,9 @@ export class ResearchService {
 
     const now = new Date().toISOString();
     const sequence = await this.repository.getNextAnswerSequence(submission.id);
+    if (sequence > env.aiMaxQuestions) {
+      throw new Error('RESEARCH_MAX_QUESTIONS_REACHED');
+    }
     const normalizedScore =
       typeof input.score === 'number' && Number.isFinite(input.score) ? input.score : null;
 
@@ -213,8 +225,12 @@ export class ResearchService {
     const submission = await this.getAuthorizedSubmission(context, submissionId, true);
     const answers = await this.repository.listAnswersBySubmissionId(submission.id);
 
-    if (answers.length === 0) {
-      throw new Error('RESEARCH_ANSWERS_REQUIRED');
+    if (answers.length < env.aiMinQuestions) throw new Error('RESEARCH_MIN_QUESTIONS_REQUIRED');
+    const coveredPillars = new Set(
+      answers.map((answer) => answer.pillar?.trim().toLowerCase()).filter(Boolean),
+    ).size;
+    if (answers.length < env.aiMaxQuestions && coveredPillars < env.aiMinPillars) {
+      throw new Error('RESEARCH_COVERAGE_REQUIRED');
     }
 
     const analysis = this.buildInitialResult(submission, answers);
@@ -275,8 +291,10 @@ export class ResearchService {
     this.ensureActiveUser(context);
     const submission = await this.getAuthorizedSubmission(context, submissionId, false);
     const answers = await this.repository.listAnswersBySubmissionId(submission.id);
+    const canReadRawAnswers = context.actor.role === 'ADMIN' ||
+      context.actor.role === 'EMPLOYEE' || submission.userId === context.actor.id;
 
-    return this.buildSubmissionDetails(submission, answers);
+    return this.buildSubmissionDetails(submission, canReadRawAnswers ? answers : []);
   }
 
   async generateActionPlan(auth: AuthTokenPayload, submissionId: string) {
@@ -319,6 +337,8 @@ export class ResearchService {
       pillarScores: submission.pillarScores,
       respondentRole: submission.respondentRole,
       department: submission.department,
+      respondentDepartment: submission.respondentDepartment,
+      respondentJobFunction: submission.respondentJobFunction,
       createdAt: submission.createdAt,
       updatedAt: submission.updatedAt,
       completedAt: submission.completedAt,

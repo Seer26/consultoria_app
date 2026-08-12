@@ -26,6 +26,8 @@ function sanitizeUser(user: AuthUserRecord): AuthResponse['user'] {
     role: user.role,
     companyId: user.companyId,
     status: user.status,
+    department: user.department,
+    jobFunction: user.jobFunction,
   };
 }
 

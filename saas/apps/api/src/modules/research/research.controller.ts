@@ -95,10 +95,14 @@ export class ResearchController {
     const statusCode = (() => {
       switch (code) {
         case 'INVALID_RESEARCH_SUBMISSION_PAYLOAD':
+        case 'EMPLOYEE_PROFILE_INCOMPLETE':
         case 'INVALID_RESEARCH_ANSWER_PAYLOAD':
         case 'COMPANY_ID_REQUIRED':
         case 'RESEARCH_ALREADY_COMPLETED':
+        case 'RESEARCH_MAX_QUESTIONS_REACHED':
         case 'RESEARCH_ANSWERS_REQUIRED':
+        case 'RESEARCH_MIN_QUESTIONS_REQUIRED':
+        case 'RESEARCH_COVERAGE_REQUIRED':
         case 'USER_COMPANY_MISMATCH':
         case 'ACTION_PLAN_SUBMISSION_NOT_COMPLETED':
           return 400;

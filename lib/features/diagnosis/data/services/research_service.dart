@@ -484,6 +484,12 @@ class ResearchService {
           return 'Esta pesquisa ja foi finalizada.';
         case 'RESEARCH_ANSWERS_REQUIRED':
           return 'Responda ao menos uma pergunta antes de finalizar.';
+        case 'RESEARCH_MIN_QUESTIONS_REQUIRED':
+          return 'Continue a pesquisa ate atingir a quantidade minima de perguntas.';
+        case 'RESEARCH_COVERAGE_REQUIRED':
+          return 'Continue a pesquisa para cobrir os pilares relevantes.';
+        case 'EMPLOYEE_PROFILE_INCOMPLETE':
+          return 'Seu perfil profissional esta incompleto. Solicite ao OWNER o preenchimento do departamento e da funcao.';
         case 'INACTIVE_USER':
           return 'Seu usuario esta inativo.';
         case 'FORBIDDEN':

@@ -23,6 +23,8 @@ export interface ManagedUserRecord {
   role: ManagedUserRole;
   companyId: string | null;
   status: EntityStatus;
+  department: string | null;
+  jobFunction: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,12 +79,32 @@ export interface CreateCompanyUserInput {
   email: string;
   password: string;
   role: ManagedUserRole;
+  department?: string | null;
+  jobFunction?: string | null;
 }
 
 export interface UpdateUserInput {
   name: string;
   email: string;
   role: ManagedUserRole;
+  password?: string;
+  department?: string | null;
+  jobFunction?: string | null;
+}
+
+export interface CreateEmployeeInput {
+  name: string;
+  email: string;
+  password: string;
+  department: string;
+  jobFunction: string;
+}
+
+export interface UpdateEmployeeInput {
+  name: string;
+  email: string;
+  department: string;
+  jobFunction: string;
   password?: string;
 }
 

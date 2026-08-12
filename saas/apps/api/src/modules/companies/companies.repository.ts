@@ -29,6 +29,8 @@ interface UserRow {
   role: ManagedUserRole;
   company_id: string | null;
   status: EntityStatus;
+  department: string | null;
+  job_function: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +60,8 @@ function mapUser(row: UserRow): ManagedUserRecord {
     role: row.role,
     companyId: row.company_id,
     status: row.status,
+    department: row.department,
+    jobFunction: row.job_function,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -214,7 +218,7 @@ export class CompaniesRepository {
 
   async listUsersByCompany(companyId: string): Promise<ManagedUserRecord[]> {
     const rows = await dataSource.many<UserRow>(`
-      SELECT id, name, email, password_hash, role, company_id, status, created_at, updated_at
+      SELECT id, name, email, password_hash, role, company_id, status, department, job_function, created_at, updated_at
       FROM users
       WHERE company_id = ?
       ORDER BY created_at DESC
@@ -225,7 +229,7 @@ export class CompaniesRepository {
 
   async findUserById(id: string): Promise<ManagedUserRecord | null> {
     const row = await dataSource.one<UserRow>(`
-      SELECT id, name, email, password_hash, role, company_id, status, created_at, updated_at
+      SELECT id, name, email, password_hash, role, company_id, status, department, job_function, created_at, updated_at
       FROM users
       WHERE id = ?
     `, [id]);
@@ -235,7 +239,7 @@ export class CompaniesRepository {
 
   async findUserByEmail(email: string): Promise<ManagedUserRecord | null> {
     const row = await dataSource.one<UserRow>(`
-      SELECT id, name, email, password_hash, role, company_id, status, created_at, updated_at
+      SELECT id, name, email, password_hash, role, company_id, status, department, job_function, created_at, updated_at
       FROM users
       WHERE email = ?
     `, [email]);
@@ -253,6 +257,8 @@ export class CompaniesRepository {
         role,
         company_id,
         status,
+        department,
+        job_function,
         created_at,
         updated_at
       )
@@ -264,6 +270,8 @@ export class CompaniesRepository {
         @role,
         @companyId,
         @status,
+        @department,
+        @jobFunction,
         @createdAt,
         @updatedAt
       )
@@ -281,6 +289,8 @@ export class CompaniesRepository {
           role = @role,
           company_id = @companyId,
           status = @status,
+          department = @department,
+          job_function = @jobFunction,
           updated_at = @updatedAt
       WHERE id = @id
     `, input);

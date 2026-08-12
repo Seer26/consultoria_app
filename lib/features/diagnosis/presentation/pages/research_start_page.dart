@@ -19,6 +19,9 @@ class ResearchStartPage extends StatefulWidget {
     this.historySection,
     this.requireCompanySelection = false,
     this.companyOptions = const [],
+    this.lockAssignedProfile = false,
+    this.assignedRole,
+    this.assignedSector,
   });
 
   final Future<void> Function({
@@ -32,6 +35,9 @@ class ResearchStartPage extends StatefulWidget {
   final Widget? historySection;
   final bool requireCompanySelection;
   final List<ResearchCompanyOption> companyOptions;
+  final bool lockAssignedProfile;
+  final String? assignedRole;
+  final String? assignedSector;
 
   @override
   State<ResearchStartPage> createState() => _ResearchStartPageState();
@@ -62,8 +68,8 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
   String? _selectedCompanyId;
 
   Future<void> _handleStart() async {
-    final role = _selectedRole?.trim();
-    final sector = _selectedSector?.trim();
+    final role = (widget.lockAssignedProfile ? widget.assignedRole : _selectedRole)?.trim();
+    final sector = (widget.lockAssignedProfile ? widget.assignedSector : _selectedSector)?.trim();
     final companyId = _selectedCompanyId?.trim();
 
     if (role == null || role.isEmpty || sector == null || sector.isEmpty) {
@@ -93,7 +99,9 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
     return AppPageScaffold(
       title: 'Pesquisa Empresarial',
       subtitle: widget.allowStart
-          ? 'Antes de comecar, informe sua funcao e o setor em que atua.'
+          ? widget.lockAssignedProfile
+            ? 'Seu perfil profissional atribuido sera usado nesta pesquisa.'
+            : 'Antes de comecar, informe sua funcao e o setor em que atua.'
           : 'Acompanhe as pesquisas das empresas. O perfil ADMIN possui acesso somente para consulta.',
       child: ListView(
         children: [
@@ -132,6 +140,16 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    if (widget.lockAssignedProfile) ...[
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.badge_outlined),
+                        title: Text(widget.assignedRole?.trim().isNotEmpty == true
+                            ? widget.assignedRole! : 'Perfil profissional incompleto'),
+                        subtitle: Text(widget.assignedSector?.trim().isNotEmpty == true
+                            ? widget.assignedSector! : 'Solicite ao OWNER o preenchimento do departamento e da funcao.'),
+                      ),
+                    ] else ...[
                     _FieldLabel(text: 'Funcao (cargo)'),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
@@ -169,11 +187,16 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
                       onChanged: (value) =>
                           setState(() => _selectedSector = value),
                     ),
+                    ],
                     const SizedBox(height: 24),
                     Align(
                       alignment: Alignment.centerRight,
                       child: FilledButton.icon(
-                        onPressed: widget.isStarting ? null : _handleStart,
+                        onPressed: widget.isStarting ||
+                            (widget.lockAssignedProfile &&
+                              ((widget.assignedRole?.trim().isEmpty ?? true) ||
+                               (widget.assignedSector?.trim().isEmpty ?? true)))
+                          ? null : _handleStart,
                         icon: widget.isStarting
                             ? const SizedBox(
                                 width: 16,

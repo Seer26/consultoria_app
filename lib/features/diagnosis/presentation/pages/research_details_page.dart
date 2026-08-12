@@ -251,6 +251,8 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
     );
     return ResearchDetailsContent(
       details: details,
+      rawAnswersRestricted: role == RoleGuard.owner &&
+          details.userId != ref.read(authControllerProvider).user?.id,
       canGenerateAi: role != RoleGuard.admin,
       isGeneratingAi: _isGeneratingAi,
       onGenerateAi: _generateAiAnalysis,
@@ -265,12 +267,14 @@ class ResearchDetailsContent extends StatelessWidget {
     this.canGenerateAi = false,
     this.isGeneratingAi = false,
     this.onGenerateAi,
+    this.rawAnswersRestricted = false,
   });
 
   final ResearchSubmissionDetails details;
   final bool canGenerateAi;
   final bool isGeneratingAi;
   final VoidCallback? onGenerateAi;
+  final bool rawAnswersRestricted;
 
   @override
   Widget build(BuildContext context) {
@@ -331,10 +335,16 @@ class ResearchDetailsContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (grouped.isEmpty)
-          const AppEmptyState(
-            title: 'Nenhuma resposta registrada',
-            message: 'As respostas salvas serão exibidas aqui.',
-            icon: Icons.question_answer_outlined,
+          AppEmptyState(
+            title: rawAnswersRestricted
+                ? 'Respostas individuais protegidas'
+                : 'Nenhuma resposta registrada',
+            message: rawAnswersRestricted
+                ? 'O OWNER acessa apenas resultados consolidados das pesquisas de colaboradores.'
+                : 'As respostas salvas serão exibidas aqui.',
+            icon: rawAnswersRestricted
+                ? Icons.privacy_tip_outlined
+                : Icons.question_answer_outlined,
           )
         else
           for (final entry in grouped.entries) ...[

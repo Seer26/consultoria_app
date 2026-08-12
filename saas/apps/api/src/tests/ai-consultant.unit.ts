@@ -15,6 +15,7 @@ const auth = { userId: 'owner-a', role: 'OWNER' as const, companyId: 'company-a'
 const baseSubmission = {
   id: 'submission-a', companyId: 'company-a', userId: 'owner-a', questionnaireId: 'chat-research',
   submissionType: 'RESEARCH' as const, respondentRole: 'Diretor', department: 'Financeiro',
+  respondentDepartment: 'Financeiro', respondentJobFunction: 'Diretor',
   status: 'IN_PROGRESS' as const, overallScore: null, summary: null, criticalPoints: [],
   opportunities: [], recommendations: [], nextSteps: [], pillarScores: [],
   createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), completedAt: null,
@@ -28,18 +29,19 @@ const answers = [{
 
 class FakeRepository {
   submission = { ...baseSubmission };
+  answers = [...answers];
   saved: unknown = null;
   async findUserById(id: string) {
     if (id === 'missing') return null;
     const role = id.startsWith('admin') ? 'ADMIN' as const
       : id.startsWith('employee') ? 'EMPLOYEE' as const : 'OWNER' as const;
-    return { id, name: 'Usuario', email: 'safe@example.test', role, companyId: role === 'ADMIN' ? null : id.endsWith('-b') ? 'company-b' : 'company-a', status: 'ACTIVE' as const };
+    return { id, name: 'Usuario', email: 'safe@example.test', role, companyId: role === 'ADMIN' ? null : id.endsWith('-b') ? 'company-b' : 'company-a', status: 'ACTIVE' as const, department: 'Financeiro', jobFunction: 'Analista' };
   }
   async findCompanyById(id: string) {
     return { id, name: 'Empresa', slug: 'empresa', status: 'ACTIVE' as const, sector: 'Servicos', size: 'SMALL' };
   }
   async findSubmissionById(id: string) { return id === this.submission.id ? this.submission : null; }
-  async listAnswersBySubmissionId() { return answers; }
+  async listAnswersBySubmissionId() { return this.answers; }
   async saveAiAnalysis(_id: string, analysis: unknown) { this.saved = analysis; }
 }
 
@@ -82,6 +84,34 @@ function setup() {
   assert.equal(result.pillar, 'Financeiro');
   assert.equal(entitlements.used, 1);
   assert(!provider.lastInput.includes('company-b'));
+}
+
+{
+  const { service, provider } = setup();
+  provider.result = { question: 'Qual processo operacional merece maior atencao agora?', pillar: 'Processos', reason: 'Ampliar cobertura.', shouldContinue: false };
+  assert.equal((await service.generateNextQuestion(auth, 'submission-a')).shouldContinue, true);
+}
+
+{
+  const { service, provider, repository } = setup();
+  repository.answers = Array.from({ length: 5 }, (_, index) => ({
+    ...answers[0], id: `answer-${index}`, questionId: `q-${index}`,
+    question: `Como funciona o processo numero ${index}?`,
+    pillar: ['Financeiro', 'Processos', 'Pessoas/RH'][index % 3],
+  }));
+  provider.result = { question: 'Qual melhoria deve ser priorizada no proximo ciclo?', pillar: 'Estrategia', reason: 'Cobertura suficiente.', shouldContinue: false };
+  assert.equal((await service.generateNextQuestion(auth, 'submission-a')).shouldContinue, false);
+}
+
+{
+  const { service, provider, repository } = setup();
+  repository.answers = Array.from({ length: 10 }, (_, index) => ({
+    ...answers[0], id: `answer-${index}`, questionId: `q-${index}`,
+    question: `Pergunta de limite ${index}?`, pillar: 'Processos',
+  }));
+  const result = await service.generateNextQuestion(auth, 'submission-a');
+  assert.equal(result.shouldContinue, false);
+  assert.equal(provider.calls, 0);
 }
 
 for (const invalid of [

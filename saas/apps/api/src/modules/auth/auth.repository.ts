@@ -9,6 +9,8 @@ interface UserRow {
   role: string;
   company_id: string | null;
   status: 'ACTIVE' | 'INACTIVE';
+  department: string | null;
+  job_function: string | null;
   created_at: string;
   updated_at: string;
   auth_version: number;
@@ -46,6 +48,8 @@ function mapUser(row: UserRow): AuthUserRecord {
     role: row.role as AuthUserRecord['role'],
     companyId: row.company_id,
     status: row.status,
+    department: row.department,
+    jobFunction: row.job_function,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     authVersion: Number(row.auth_version ?? 0),
@@ -69,7 +73,7 @@ export class AuthRepository {
   async findUserByEmail(email: string): Promise<AuthUserRecord | null> {
     const row = await dataSource.one<UserRow>(`
       SELECT id, name, email, password_hash, role, company_id, created_at
-           , status, updated_at, auth_version
+           , status, department, job_function, updated_at, auth_version
       FROM users
       WHERE email = ?
     `, [email]);
@@ -79,7 +83,7 @@ export class AuthRepository {
   async findUserById(id: string): Promise<AuthUserRecord | null> {
     const row = await dataSource.one<UserRow>(`
       SELECT id, name, email, password_hash, role, company_id, created_at
-           , status, updated_at, auth_version
+           , status, department, job_function, updated_at, auth_version
       FROM users
       WHERE id = ?
     `, [id]);
@@ -130,6 +134,8 @@ export class AuthRepository {
       role: input.role,
       companyId: input.companyId ?? null,
       status: 'ACTIVE',
+      department: null,
+      jobFunction: null,
       createdAt,
       updatedAt: createdAt,
     });
@@ -142,6 +148,8 @@ export class AuthRepository {
       role: input.role,
       companyId: input.companyId ?? null,
       status: 'ACTIVE',
+      department: null,
+      jobFunction: null,
       createdAt,
       updatedAt: createdAt,
       authVersion: 0,

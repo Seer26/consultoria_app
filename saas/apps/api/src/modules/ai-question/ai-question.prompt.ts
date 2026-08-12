@@ -24,8 +24,8 @@ export function buildAdaptiveQuestionInput(input: {
   return [
     `Setor da empresa: ${bounded(input.company.sector, 100)}`,
     `Porte: ${bounded(input.company.size, 60)}`,
-    `Funcao do respondente: ${bounded(input.submission.respondentRole, 100)}`,
-    `Area inicial: ${bounded(input.submission.department, 100)}`,
+    `Funcao profissional atribuida: ${bounded(input.submission.respondentJobFunction, 100)}`,
+    `Departamento atribuido: ${bounded(input.submission.respondentDepartment, 100)}`,
     `Estagio: ${input.submission.status}`,
     `Pilares abordados: ${pillars.join(', ') || 'nenhum'}`,
     `Quantidade de respostas: ${input.answers.length}`,
@@ -42,7 +42,8 @@ export function buildConsultingAnalysisInput(input: {
   return [
     `Setor: ${bounded(input.company.sector, 100)}`,
     `Porte: ${bounded(input.company.size, 60)}`,
-    `Funcao do respondente: ${bounded(input.submission.respondentRole, 100)}`,
+    `Funcao profissional atribuida: ${bounded(input.submission.respondentJobFunction, 100)}`,
+    `Departamento atribuido: ${bounded(input.submission.respondentDepartment, 100)}`,
     `Score oficial (nao recalcular): ${input.submission.overallScore ?? 'indisponivel'}`,
     `Scores oficiais por pilar: ${JSON.stringify(input.submission.pillarScores)}`,
     `Gargalos calculados: ${JSON.stringify(input.submission.criticalPoints)}`,

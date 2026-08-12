@@ -11,6 +11,7 @@ enum SidebarItem {
   tarefas,
   plano,
   configuracoesEmpresa,
+  equipe,
 }
 
 enum SidebarGroup { workspace, management }
@@ -25,6 +26,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.tarefas => 'Plano de Ação',
     SidebarItem.plano => 'Plano atual',
     SidebarItem.configuracoesEmpresa => 'Configurações',
+    SidebarItem.equipe => 'Equipe',
   };
 
   String get helper => switch (this) {
@@ -36,6 +38,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.tarefas => 'Tarefas e acompanhamento',
     SidebarItem.plano => 'Limites e uso do SaaS',
     SidebarItem.configuracoesEmpresa => 'Dados da empresa',
+    SidebarItem.equipe => 'Perfis dos colaboradores',
   };
 
   IconData get icon => switch (this) {
@@ -47,6 +50,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.tarefas => Icons.task_alt_outlined,
     SidebarItem.plano => Icons.workspace_premium_outlined,
     SidebarItem.configuracoesEmpresa => Icons.settings_outlined,
+    SidebarItem.equipe => Icons.groups_outlined,
   };
 
   SidebarGroup get group => switch (this) {
@@ -58,6 +62,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.usuarios ||
     SidebarItem.plano ||
     SidebarItem.configuracoesEmpresa => SidebarGroup.management,
+    SidebarItem.equipe => SidebarGroup.management,
   };
 }
 

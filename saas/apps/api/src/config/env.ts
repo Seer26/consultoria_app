@@ -111,6 +111,9 @@ const envConfig = {
   aiModel: process.env.AI_MODEL?.trim() ||
     (aiProvider === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-4.1-mini'),
   aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS ?? 20000),
+  aiMinQuestions: parsePositiveInteger('AI_MIN_QUESTIONS', process.env.AI_MIN_QUESTIONS, 5),
+  aiMaxQuestions: parsePositiveInteger('AI_MAX_QUESTIONS', process.env.AI_MAX_QUESTIONS, 10),
+  aiMinPillars: parsePositiveInteger('AI_MIN_PILLARS', process.env.AI_MIN_PILLARS, 3),
   jwtSecret: resolveJwtSecret(),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
@@ -321,6 +324,13 @@ export function validateLocalOperationalProfile(
       throw new Error('LOCAL_OPERATIONAL_DATABASE_PATH_REJECTED');
     }
   }
+}
+
+if (envConfig.aiMinQuestions > envConfig.aiMaxQuestions) {
+  throw new Error('AI_MIN_QUESTIONS_MUST_NOT_EXCEED_AI_MAX_QUESTIONS');
+}
+if (envConfig.aiMinPillars > envConfig.aiMaxQuestions) {
+  throw new Error('AI_MIN_PILLARS_MUST_NOT_EXCEED_AI_MAX_QUESTIONS');
 }
 
 validateLocalOperationalProfile();

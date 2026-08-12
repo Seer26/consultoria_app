@@ -146,6 +146,26 @@ export class CompaniesController {
     }
   };
 
+  listOwnTeam = async (request: Request, response: Response): Promise<void> => {
+    try { response.status(200).json(await this.service.listOwnTeam(request.auth!)); }
+    catch (error) { this.handleError(error, response); }
+  };
+
+  createOwnEmployee = async (request: Request, response: Response): Promise<void> => {
+    try { response.status(201).json(await this.service.createOwnEmployee(request.auth!, request.body)); }
+    catch (error) { this.handleError(error, response); }
+  };
+
+  updateOwnEmployee = async (request: Request, response: Response): Promise<void> => {
+    try { response.status(200).json(await this.service.updateOwnEmployee(request.auth!, this.getParam(request, 'id'), request.body)); }
+    catch (error) { this.handleError(error, response); }
+  };
+
+  updateOwnEmployeeStatus = async (request: Request, response: Response): Promise<void> => {
+    try { response.status(200).json(await this.service.updateOwnEmployeeStatus(request.auth!, this.getParam(request, 'id'), request.body)); }
+    catch (error) { this.handleError(error, response); }
+  };
+
   private handleError(error: unknown, response: Response): void {
     if (writePlanLimitResponse(error, response)) {
       return;
@@ -167,6 +187,7 @@ export class CompaniesController {
         case 'WEAK_PASSWORD':
         case 'COMPANY_ID_REQUIRED':
         case 'INVALID_COMPANY_USER_ROLE':
+        case 'EMPLOYEE_PROFILE_REQUIRED':
           return 400;
         case 'COMPANY_NOT_FOUND':
         case 'USER_NOT_FOUND':

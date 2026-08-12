@@ -16,6 +16,8 @@ const EXPECTED_MIGRATIONS = [
   '003_security_beta',
   '004_legal_acceptances',
   '005_postgres_runtime_hardening',
+  '006_ai_consulting_analysis',
+  '007_employee_profiles_research_privacy',
 ] as const;
 const REQUIRED_TABLES = [
   'schema_migrations', 'users', 'companies', 'plans',
@@ -24,6 +26,7 @@ const REQUIRED_TABLES = [
 const REQUIRED_USER_COLUMNS = [
   'id', 'name', 'email', 'password_hash', 'role', 'company_id',
   'created_at', 'updated_at', 'status', 'auth_version',
+  'department', 'job_function',
 ] as const;
 
 class AdminBootstrapError extends Error {

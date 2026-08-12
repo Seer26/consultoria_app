@@ -16,6 +16,8 @@ interface UserRow {
   role: 'ADMIN' | 'OWNER' | 'EMPLOYEE';
   company_id: string | null;
   status: 'ACTIVE' | 'INACTIVE';
+  department: string | null;
+  job_function: string | null;
 }
 
 interface CompanyRow {
@@ -35,6 +37,8 @@ interface SubmissionRow {
   submission_type: 'RESEARCH';
   respondent_role: string;
   department: string;
+  respondent_department: string | null;
+  respondent_job_function: string | null;
   status: 'IN_PROGRESS' | 'COMPLETED';
   overall_score: number | null;
   summary: string | null;
@@ -137,6 +141,8 @@ function mapUser(row: UserRow): AuthenticatedUserRecord {
     role: row.role,
     companyId: row.company_id,
     status: row.status,
+    department: row.department,
+    jobFunction: row.job_function,
   };
 }
 
@@ -160,6 +166,8 @@ function mapSubmission(row: SubmissionRow): ResearchSubmissionRecord {
     submissionType: row.submission_type,
     respondentRole: row.respondent_role,
     department: row.department,
+    respondentDepartment: row.respondent_department ?? row.department,
+    respondentJobFunction: row.respondent_job_function ?? row.respondent_role,
     status: row.status,
     overallScore: row.overall_score,
     summary: row.summary,
@@ -192,7 +200,7 @@ function mapAnswer(row: AnswerRow): ResearchAnswerRecord {
 export class ResearchRepository {
   async findUserById(id: string): Promise<AuthenticatedUserRecord | null> {
     const row = await dataSource.one<UserRow>(`
-      SELECT id, name, email, role, company_id, status
+      SELECT id, name, email, role, company_id, status, department, job_function
       FROM users
       WHERE id = ?
     `, [id]);
@@ -222,6 +230,8 @@ export class ResearchRepository {
         submission_type,
         respondent_role,
         department,
+        respondent_department,
+        respondent_job_function,
         status,
         overall_score,
         summary,
@@ -242,6 +252,8 @@ export class ResearchRepository {
         @submissionType,
         @respondentRole,
         @department,
+        @respondentDepartment,
+        @respondentJobFunction,
         @status,
         @overallScore,
         @summary,
@@ -276,6 +288,8 @@ export class ResearchRepository {
         submission_type,
         respondent_role,
         department,
+        respondent_department,
+        respondent_job_function,
         status,
         overall_score,
         summary,
@@ -302,6 +316,8 @@ export class ResearchRepository {
       UPDATE diagnosis_submissions
       SET respondent_role = @respondentRole,
           department = @department,
+          respondent_department = @respondentDepartment,
+          respondent_job_function = @respondentJobFunction,
           status = @status,
           overall_score = @overallScore,
           summary = @summary,
@@ -419,6 +435,8 @@ export class ResearchRepository {
         ds.submission_type,
         ds.respondent_role,
         ds.department,
+        ds.respondent_department,
+        ds.respondent_job_function,
         ds.status,
         ds.overall_score,
         ds.summary,
@@ -447,6 +465,8 @@ export class ResearchRepository {
         ds.submission_type,
         ds.respondent_role,
         ds.department,
+        ds.respondent_department,
+        ds.respondent_job_function,
         ds.status,
         ds.overall_score,
         ds.summary,
@@ -474,6 +494,8 @@ export class ResearchRepository {
         userName: row.user_name,
         respondentRole: row.respondent_role,
         department: row.department,
+        respondentDepartment: mapped.respondentDepartment,
+        respondentJobFunction: mapped.respondentJobFunction,
         status: row.status,
         overallScore: row.overall_score,
         summary: row.summary,
