@@ -282,7 +282,6 @@ async function main(): Promise<void> {
         question: 'Como a empresa acompanha seus indicadores?',
         answer: 'Acompanhamento semanal estruturado.',
         pillar: 'Estrategia',
-        score: 80,
       },
     });
     await request(baseUrl, 'POST', `/research/submissions/${submission.id}/complete`, {

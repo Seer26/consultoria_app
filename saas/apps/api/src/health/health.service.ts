@@ -93,8 +93,13 @@ export async function getReadiness() {
   const restricted = env.isStaging || env.nodeEnv === 'production';
   const appUrlSecure = !restricted || env.appPublicUrl.startsWith('https://');
   const apiUrlSecure = !restricted || env.apiPublicUrl.startsWith('https://');
-  const aiStatus = env.aiApiKey ? 'configured' : 'not_configured';
-  const aiReady = !env.requireAiInReadiness || Boolean(env.aiApiKey);
+  const aiStatus = !env.aiEnabled
+    ? 'disabled'
+    : env.aiApiKey
+      ? 'configured'
+      : 'not_configured';
+  const aiReady =
+    !env.requireAiInReadiness || (env.aiEnabled && Boolean(env.aiApiKey));
   const criticalReady =
     databaseStatus.status === 'ready' &&
     emailStatus.status === 'ready' &&
@@ -103,7 +108,7 @@ export async function getReadiness() {
     aiReady;
   const status = !criticalReady
     ? 'not_ready'
-    : aiStatus === 'not_configured'
+    : env.aiEnabled && aiStatus !== 'configured'
       ? 'degraded'
       : 'ready';
 

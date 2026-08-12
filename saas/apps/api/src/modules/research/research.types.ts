@@ -9,6 +9,23 @@ export interface ResearchPillarScore {
   maturity: 'critical' | 'attention' | 'intermediate' | 'good';
 }
 
+export type AiRecommendationPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface AiConsultingRecommendation {
+  title: string;
+  description: string;
+  priority: AiRecommendationPriority;
+  pillar: string;
+}
+
+export interface AiConsultingAnalysis {
+  executiveSummary: string;
+  strengths: string[];
+  attentionPoints: string[];
+  recommendations: AiConsultingRecommendation[];
+  generatedAt: string;
+}
+
 export interface ResearchResultSnapshot {
   overallScore: number | null;
   summary: string | null;
@@ -31,6 +48,7 @@ export interface ResearchSubmissionRecord extends ResearchResultSnapshot {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  aiAnalysis: AiConsultingAnalysis | null;
 }
 
 export interface ResearchAnswerRecord {
@@ -77,6 +95,8 @@ export interface CompanyRecord {
   name: string;
   slug: string;
   status: 'ACTIVE' | 'INACTIVE';
+  sector: string | null;
+  size: string | null;
 }
 
 export interface ResearchSubmissionDetails {
@@ -97,6 +117,7 @@ export interface ResearchSubmissionDetails {
   company: CompanyRecord | null;
   user: Pick<AuthenticatedUserRecord, 'id' | 'name' | 'email' | 'role' | 'companyId' | 'status'> | null;
   answers: ResearchAnswerRecord[];
+  aiAnalysis: AiConsultingAnalysis | null;
 }
 
 export interface ResearchListFilters {

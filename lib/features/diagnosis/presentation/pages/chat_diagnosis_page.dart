@@ -50,6 +50,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
   bool isCompleted = false;
   bool isGeneratingActionPlan = false;
   String? _lastAssistantQuestion;
+  String? _lastAssistantPillar;
 
   @override
   void initState() {
@@ -133,6 +134,9 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
           ..addAll(restoredMessages);
         isRestoring = false;
         _lastAssistantQuestion = nextQuestion;
+        _lastAssistantPillar = details.answers.isEmpty
+            ? widget.sector
+            : details.answers.last.pillar;
       });
       _scrollToBottom();
     } catch (_) {
@@ -186,19 +190,22 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
             submissionId: widget.submissionId,
             question: question,
             answer: answer,
-            pillar: widget.sector,
+            pillar: _lastAssistantPillar ?? widget.sector,
           );
 
       try {
-        final nextQuestion = await _aiQuestionService.getNextQuestion(answer);
+        final nextQuestion = await _aiQuestionService.getNextQuestion(
+          widget.submissionId,
+        );
 
         if (!mounted) {
           return;
         }
 
         setState(() {
-          messages.add(Message(text: nextQuestion, isUser: false));
-          _lastAssistantQuestion = nextQuestion;
+          messages.add(Message(text: nextQuestion.question, isUser: false));
+          _lastAssistantQuestion = nextQuestion.question;
+          _lastAssistantPillar = nextQuestion.pillar;
         });
       } catch (error) {
         if (!mounted) {
@@ -252,9 +259,20 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
     setState(() => isFinishing = true);
 
     try {
-      final result = await ref
+      final calculatedResult = await ref
           .read(researchServiceProvider)
           .completeSubmission(widget.submissionId);
+
+      AiConsultingAnalysis? aiAnalysis;
+      String? aiError;
+      try {
+        aiAnalysis = await ref
+            .read(researchServiceProvider)
+            .generateAiAnalysis(widget.submissionId);
+      } catch (_) {
+        aiError =
+            'Nao foi possivel gerar a analise inteligente agora. Os resultados calculados continuam disponiveis.';
+      }
 
       if (!mounted) {
         return;
@@ -265,7 +283,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
         messages.add(
           Message(
             text:
-                'Pesquisa finalizada com sucesso. ${result.answersCount} respostas registradas e resultado inicial gerado.',
+                'Pesquisa finalizada com sucesso. ${calculatedResult.answersCount} respostas registradas e resultado calculado gerado.',
             isUser: false,
           ),
         );
@@ -274,7 +292,11 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
       _showMessage('Pesquisa finalizada com sucesso.');
       _scrollToBottom();
 
-      await _showResultSheet(result);
+      await _showResultSheet(
+        calculatedResult,
+        aiAnalysis: aiAnalysis,
+        aiError: aiError,
+      );
       if (mounted) context.pop(true);
     } catch (error) {
       if (!mounted) {
@@ -315,7 +337,11 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
     );
   }
 
-  Future<void> _showResultSheet(ResearchCompletionResult result) {
+  Future<void> _showResultSheet(
+    ResearchCompletionResult result, {
+    AiConsultingAnalysis? aiAnalysis,
+    String? aiError,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -330,7 +356,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Resultado Inicial',
+                    'Resultado calculado',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -398,6 +424,38 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                         ? const ['Nenhum proximo passo sugerido ate o momento.']
                         : submission.nextSteps,
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Analise da IA',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (aiAnalysis != null) ...[
+                    Text(aiAnalysis.executiveSummary),
+                    _ResultSection(
+                      title: 'Pontos fortes',
+                      items: aiAnalysis.strengths,
+                    ),
+                    _ResultSection(
+                      title: 'Pontos de atencao',
+                      items: aiAnalysis.attentionPoints,
+                    ),
+                    _ResultSection(
+                      title: 'Recomendacoes consultivas',
+                      items: aiAnalysis.recommendations
+                          .map(
+                            (item) =>
+                                '${item.title} (${item.pillar}) - ${item.description}',
+                          )
+                          .toList(),
+                    ),
+                  ] else
+                    Text(
+                      aiError ?? 'Analise inteligente ainda nao gerada.',
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
                   if (submission.pillarScores.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(

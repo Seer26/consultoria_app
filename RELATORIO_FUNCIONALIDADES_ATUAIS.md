@@ -100,7 +100,7 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 | F31 | Dashboard da empresa | OWNER | `/owner`, `OwnerDashboard` | `GET /dashboard/company` | company/submissions/tasks | A | KPIs, pilares, gargalos, oportunidades e tarefas reais. | P0 |
 | F32 | Configurações da própria empresa | OWNER | `/company-settings` | `GET/PUT /company/settings` | `companies` | A | Nome, setor, porte, telefone, responsável e observações. | P1 |
 | F33 | Iniciar e retomar pesquisa | OWNER | `/research`, `ResearchStartPage`, `ChatDiagnosisPage` | `POST/GET /research/submissions*` | submissions/answers | A | Banco e API reais; pesquisas em andamento podem ser retomadas. | P0 |
-| F34 | Pergunta dinâmica por IA | OWNER | chat de pesquisa | `POST /ai/next-question` | usage/audit + OpenAI | B | Possui fallback de erro, quotas e limites, mas depende de serviço externo. | P1 |
+| F34 | Pergunta dinâmica e análise consultiva por IA | OWNER | chat e detalhe da pesquisa | `POST /ai/next-question`, `POST /ai/research/:submissionId/analysis` | `diagnosis_submissions.ai_analysis`; usage/audit + OpenAI | B | Fluxo estruturado, multi-tenant, com fallback, repetição protegida e testes mockados aprovado; teste real alcançou a OpenAI, mas a conta configurada retornou indisponibilidade de cota antes de uma resposta válida. | P1 |
 | F35 | Concluir pesquisa, score e insights | OWNER | chat/detalhes | `POST /research/submissions/:id/complete` | submissions/answers | A | Regras determinísticas calculam score, pilares, resumo e recomendações. | P0 |
 | F36 | Histórico e detalhe de pesquisas | OWNER | `/research`, `/research/:id` | `GET /research/submissions`, `GET /research/submissions/:id` | submissions/answers | A | Escopo da própria empresa. | P1 |
 | F37 | Gerar plano de ação da pesquisa | OWNER | detalhe da pesquisa | `POST /research/submissions/:id/generate-action-plan` | submissions/tasks | A | Requer pesquisa concluída e gera tarefas persistidas. | P0 |
@@ -242,10 +242,11 @@ Todos possuem consumidor Flutter em Plano Atual ou Empresas ADMIN.
 - `GET /dashboard/company` → dashboard OWNER.
 - `GET /dashboard/employee` → dashboard EMPLOYEE.
 
-### 6.8 AI — 3 endpoints
+### 6.8 AI — 4 endpoints
 
 - `POST /ai/next-question` → consumido pelo chat de pesquisa.
 - `POST /ai/question/next` → alias sem consumidor Flutter identificado.
+- `POST /ai/research/:submissionId/analysis` → gera e persiste a análise consultiva estruturada após o resultado determinístico.
 - `POST /ai-diagnosis` → legado desativado, retorna HTTP 410.
 
 ### 6.9 Diagnosis legado — 2 endpoints

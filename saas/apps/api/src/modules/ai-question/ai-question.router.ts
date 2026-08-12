@@ -1,7 +1,6 @@
 import { Router } from 'express';
 
 import { authenticate } from '../auth/auth.middleware';
-import { requireCompanyEntitlement } from '../entitlements/entitlements.middleware';
 import { AiQuestionController } from './ai-question.controller';
 import { AiQuestionService } from './ai-question.service';
 import { env } from '../../config/env';
@@ -23,9 +22,9 @@ const aiRateLimit = createRateLimiter({
 const nextQuestionHandlers = [
   authenticate,
   aiRateLimit,
-  requireCompanyEntitlement('AI_QUESTIONS_MONTHLY'),
-  controller.create,
+  controller.nextQuestion,
 ] as const;
 
 aiQuestionRouter.post('/next-question', ...nextQuestionHandlers);
 aiQuestionRouter.post('/question/next', ...nextQuestionHandlers);
+aiQuestionRouter.post('/research/:submissionId/analysis', authenticate, aiRateLimit, controller.analysis);

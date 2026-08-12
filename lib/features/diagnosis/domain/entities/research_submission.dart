@@ -1,5 +1,35 @@
 enum ResearchSubmissionStatus { inProgress, completed }
 
+enum AiRecommendationPriority { high, medium, low }
+
+class AiConsultingRecommendation {
+  const AiConsultingRecommendation({
+    required this.title,
+    required this.description,
+    required this.priority,
+    required this.pillar,
+  });
+  final String title;
+  final String description;
+  final AiRecommendationPriority priority;
+  final String pillar;
+}
+
+class AiConsultingAnalysis {
+  const AiConsultingAnalysis({
+    required this.executiveSummary,
+    required this.strengths,
+    required this.attentionPoints,
+    required this.recommendations,
+    required this.generatedAt,
+  });
+  final String executiveSummary;
+  final List<String> strengths;
+  final List<String> attentionPoints;
+  final List<AiConsultingRecommendation> recommendations;
+  final DateTime generatedAt;
+}
+
 class ResearchPillarScore {
   const ResearchPillarScore({
     required this.pillar,
@@ -35,6 +65,7 @@ class ResearchSubmission {
     this.recommendations = const [],
     this.nextSteps = const [],
     this.pillarScores = const [],
+    this.aiAnalysis,
   });
 
   final String id;
@@ -56,6 +87,7 @@ class ResearchSubmission {
   final List<String> recommendations;
   final List<String> nextSteps;
   final List<ResearchPillarScore> pillarScores;
+  final AiConsultingAnalysis? aiAnalysis;
 }
 
 class ResearchAnswer {
@@ -98,6 +130,7 @@ class ResearchSubmissionDetails {
     this.nextSteps = const [],
     this.pillarScores = const [],
     this.answers = const [],
+    this.aiAnalysis,
   });
 
   final String id;
@@ -120,4 +153,5 @@ class ResearchSubmissionDetails {
   final List<String> nextSteps;
   final List<ResearchPillarScore> pillarScores;
   final List<ResearchAnswer> answers;
+  final AiConsultingAnalysis? aiAnalysis;
 }

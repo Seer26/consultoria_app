@@ -78,8 +78,12 @@ const envConfig = {
   ),
   aiApiKey: process.env.OPENAI_API_KEY ?? process.env.AI_API_KEY ?? '',
   aiApiUrl: process.env.AI_API_URL ?? 'https://api.openai.com/v1/responses',
-  aiModel: process.env.AI_MODEL ?? 'gpt-4o-mini',
-  aiQuestionModel: process.env.AI_QUESTION_MODEL ?? 'gpt-4.1-mini',
+  aiEnabled: parseBoolean(process.env.AI_ENABLED, false),
+  aiModel:
+    process.env.OPENAI_MODEL ??
+    process.env.AI_QUESTION_MODEL ??
+    process.env.AI_MODEL ??
+    'gpt-4.1-mini',
   aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS ?? 20000),
   jwtSecret: resolveJwtSecret(),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
@@ -258,7 +262,7 @@ export function validateStagingProfile(
   if (config.logFormat !== 'json') {
     throw new Error('STAGING_LOG_FORMAT_MUST_BE_JSON');
   }
-  if (config.requireAiInReadiness && !config.aiApiKey) {
+  if (config.requireAiInReadiness && (!config.aiEnabled || !config.aiApiKey)) {
     throw new Error('STAGING_OPENAI_CONFIGURATION_REQUIRED_BY_POLICY');
   }
   if (

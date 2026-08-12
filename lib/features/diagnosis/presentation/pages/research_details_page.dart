@@ -29,6 +29,7 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
   bool _isLoading = true;
   bool _isGenerating = false;
   bool _isExportingPdf = false;
+  bool _isGeneratingAi = false;
   bool _actionPlanExists = false;
   String? _error;
 
@@ -118,6 +119,26 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
       );
     } finally {
       if (mounted) setState(() => _isExportingPdf = false);
+    }
+  }
+
+  Future<void> _generateAiAnalysis() async {
+    setState(() => _isGeneratingAi = true);
+    try {
+      await ref
+          .read(researchServiceProvider)
+          .generateAiAnalysis(widget.submissionId, retry: true);
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.danger,
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGeneratingAi = false);
     }
   }
 
@@ -225,14 +246,31 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
         icon: Icons.search_off,
       );
     }
-    return ResearchDetailsContent(details: details);
+    final role = RoleGuard.normalizeRole(
+      ref.read(authControllerProvider).user?.role,
+    );
+    return ResearchDetailsContent(
+      details: details,
+      canGenerateAi: role != RoleGuard.admin,
+      isGeneratingAi: _isGeneratingAi,
+      onGenerateAi: _generateAiAnalysis,
+    );
   }
 }
 
 class ResearchDetailsContent extends StatelessWidget {
-  const ResearchDetailsContent({super.key, required this.details});
+  const ResearchDetailsContent({
+    super.key,
+    required this.details,
+    this.canGenerateAi = false,
+    this.isGeneratingAi = false,
+    this.onGenerateAi,
+  });
 
   final ResearchSubmissionDetails details;
+  final bool canGenerateAi;
+  final bool isGeneratingAi;
+  final VoidCallback? onGenerateAi;
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +314,13 @@ class ResearchDetailsContent extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _NarrativeGrid(details: details),
+          const SizedBox(height: 16),
+          _AiAnalysisCard(
+            analysis: details.aiAnalysis,
+            canGenerate: canGenerateAi,
+            isGenerating: isGeneratingAi,
+            onGenerate: onGenerateAi,
+          ),
         ],
         const SizedBox(height: 16),
         Text(
@@ -297,6 +342,111 @@ class ResearchDetailsContent extends StatelessWidget {
             const SizedBox(height: 12),
           ],
       ],
+    );
+  }
+}
+
+class _AiAnalysisCard extends StatelessWidget {
+  const _AiAnalysisCard({
+    required this.analysis,
+    required this.canGenerate,
+    required this.isGenerating,
+    required this.onGenerate,
+  });
+
+  final AiConsultingAnalysis? analysis;
+  final bool canGenerate;
+  final bool isGenerating;
+  final VoidCallback? onGenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: AppColors.indigo),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Analise da IA',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (canGenerate)
+                  OutlinedButton.icon(
+                    onPressed: isGenerating ? null : onGenerate,
+                    icon: isGenerating
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label: Text(
+                      analysis == null ? 'Gerar' : 'Tentar novamente',
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (analysis == null)
+              const Text(
+                'Nao foi possivel gerar a analise inteligente agora. Os resultados calculados continuam disponiveis.',
+                style: TextStyle(color: AppColors.textSecondary),
+              )
+            else ...[
+              Text(analysis!.executiveSummary),
+              const SizedBox(height: 16),
+              _InlineAiList(title: 'Pontos fortes', items: analysis!.strengths),
+              _InlineAiList(
+                title: 'Pontos de atencao',
+                items: analysis!.attentionPoints,
+              ),
+              _InlineAiList(
+                title: 'Recomendacoes consultivas',
+                items: analysis!.recommendations
+                    .map(
+                      (item) =>
+                          '${item.title} (${item.pillar}) - ${item.description}',
+                    )
+                    .toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineAiList extends StatelessWidget {
+  const _InlineAiList({required this.title, required this.items});
+  final String title;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text('• $item'),
+            ),
+        ],
+      ),
     );
   }
 }

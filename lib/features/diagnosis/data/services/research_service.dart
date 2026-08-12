@@ -22,6 +22,7 @@ class ResearchSubmissionSession {
     this.recommendations = const [],
     this.nextSteps = const [],
     this.pillarScores = const [],
+    this.aiAnalysis,
   });
 
   final String id;
@@ -40,6 +41,7 @@ class ResearchSubmissionSession {
   final List<String> recommendations;
   final List<String> nextSteps;
   final List<ResearchPillarScore> pillarScores;
+  final AiConsultingAnalysis? aiAnalysis;
 }
 
 class ResearchCompletionResult {
@@ -125,6 +127,25 @@ class ResearchService {
     } on DioException catch (error) {
       throw Exception(
         _extractError(error, fallback: 'Falha ao finalizar a pesquisa.'),
+      );
+    }
+  }
+
+  Future<AiConsultingAnalysis> generateAiAnalysis(
+    String submissionId, {
+    bool retry = false,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/ai/research/$submissionId/analysis',
+        data: {'retry': retry},
+      );
+      return _aiAnalysisFromMap(response.data ?? const {});
+    } on DioException catch (error) {
+      final planLimit = planLimitMessageFromResponseData(error.response?.data);
+      throw Exception(
+        planLimit ??
+            'Nao foi possivel gerar a analise inteligente agora. Os resultados calculados continuam disponiveis.',
       );
     }
   }
@@ -268,6 +289,7 @@ class ResearchService {
             ),
           )
           .toList(),
+      aiAnalysis: _readAiAnalysis(map['aiAnalysis']),
     );
   }
 
@@ -303,6 +325,7 @@ class ResearchService {
       recommendations: _readStringList(map['recommendations']),
       nextSteps: _readStringList(map['nextSteps']),
       pillarScores: _readPillarScores(map['pillarScores']),
+      aiAnalysis: _readAiAnalysis(map['aiAnalysis']),
     );
   }
 
@@ -362,6 +385,36 @@ class ResearchService {
         )
         .where((item) => item.pillar.isNotEmpty)
         .toList();
+  }
+
+  AiConsultingAnalysis? _readAiAnalysis(dynamic value) {
+    if (value is! Map) return null;
+    return _aiAnalysisFromMap(Map<String, dynamic>.from(value));
+  }
+
+  AiConsultingAnalysis _aiAnalysisFromMap(Map<String, dynamic> map) {
+    final recommendations = (map['recommendations'] as List?) ?? const [];
+    return AiConsultingAnalysis(
+      executiveSummary: map['executiveSummary']?.toString() ?? '',
+      strengths: _readStringList(map['strengths']),
+      attentionPoints: _readStringList(map['attentionPoints']),
+      recommendations: recommendations.whereType<Map>().map((item) {
+        final priority = item['priority']?.toString();
+        return AiConsultingRecommendation(
+          title: item['title']?.toString() ?? '',
+          description: item['description']?.toString() ?? '',
+          pillar: item['pillar']?.toString() ?? '',
+          priority: priority == 'HIGH'
+              ? AiRecommendationPriority.high
+              : priority == 'LOW'
+              ? AiRecommendationPriority.low
+              : AiRecommendationPriority.medium,
+        );
+      }).toList(),
+      generatedAt:
+          DateTime.tryParse(map['generatedAt']?.toString() ?? '') ??
+          DateTime.now(),
+    );
   }
 
   DateTime? _parseDate(dynamic value) {

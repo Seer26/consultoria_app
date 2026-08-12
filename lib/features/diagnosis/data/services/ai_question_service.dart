@@ -4,6 +4,19 @@ import '../../../../core/http/dio_client.dart';
 import '../../../../core/http/plan_limit_error_mapper.dart';
 import '../../../../core/http/token_storage.dart';
 
+class AdaptiveQuestion {
+  const AdaptiveQuestion({
+    required this.question,
+    required this.pillar,
+    required this.reason,
+    required this.shouldContinue,
+  });
+  final String question;
+  final String pillar;
+  final String reason;
+  final bool shouldContinue;
+}
+
 class AiQuestionService {
   AiQuestionService({Dio? dio, TokenStorage? tokenStorage})
     : _dio =
@@ -11,47 +24,33 @@ class AiQuestionService {
 
   final Dio _dio;
 
-  Future<String> getNextQuestion(String answer) async {
+  Future<AdaptiveQuestion> getNextQuestion(String submissionId) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/ai/next-question',
-        data: {'answer': answer},
+        data: {'submissionId': submissionId},
       );
-
-      final nextQuestion = response.data?['nextQuestion']?.toString();
-
-      if (nextQuestion == null || nextQuestion.isEmpty) {
+      final data = response.data ?? const {};
+      final question = data['question']?.toString().trim();
+      final pillar = data['pillar']?.toString().trim();
+      if (question == null ||
+          question.isEmpty ||
+          pillar == null ||
+          pillar.isEmpty) {
         throw Exception('Resposta invalida da IA.');
       }
-
-      return nextQuestion;
+      return AdaptiveQuestion(
+        question: question,
+        pillar: pillar,
+        reason: data['reason']?.toString() ?? '',
+        shouldContinue: data['shouldContinue'] != false,
+      );
     } on DioException catch (error) {
-      final data = error.response?.data;
-      final planLimitMessage = planLimitMessageFromResponseData(data);
-      if (planLimitMessage != null) {
-        throw Exception(
-          'A resposta foi salva, mas sua empresa atingiu o limite de IA do plano atual. Entre em contato com o administrador para liberar um plano maior.',
-        );
-      }
-
-      final code = data is Map ? data['error']?.toString() : null;
-      switch (code) {
-        case 'AI_QUOTA_UNAVAILABLE':
-          throw Exception(
-            'A resposta foi salva, mas os creditos da IA estao indisponiveis. Voce pode finalizar a pesquisa agora.',
-          );
-        case 'AI_API_KEY_NOT_CONFIGURED':
-        case 'AI_INVALID_API_KEY':
-          throw Exception(
-            'A resposta foi salva, mas a IA nao esta configurada. Avise o administrador ou finalize a pesquisa.',
-          );
-        default:
-          throw Exception(
+      final planLimit = planLimitMessageFromResponseData(error.response?.data);
+      throw Exception(
+        planLimit ??
             'A resposta foi salva, mas a IA nao conseguiu gerar a proxima pergunta. Tente novamente ou finalize a pesquisa.',
-          );
-      }
-    } catch (error) {
-      throw Exception('Nao foi possivel gerar a proxima pergunta: $error');
+      );
     }
   }
 }

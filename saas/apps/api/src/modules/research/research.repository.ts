@@ -3,6 +3,7 @@ import type {
   AuthenticatedUserRecord,
   CompanyRecord,
   ResearchAnswerRecord,
+  AiConsultingAnalysis,
   ResearchListItem,
   ResearchPillarScore,
   ResearchSubmissionRecord,
@@ -22,6 +23,8 @@ interface CompanyRow {
   name: string;
   slug: string;
   status: 'ACTIVE' | 'INACTIVE';
+  sector: string | null;
+  size: string | null;
 }
 
 interface SubmissionRow {
@@ -43,6 +46,7 @@ interface SubmissionRow {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  ai_analysis: AiConsultingAnalysis | string | null;
 }
 
 interface AnswerRow {
@@ -107,6 +111,16 @@ function parsePillarScores(value: string | unknown[] | null): ResearchPillarScor
   }
 }
 
+function parseAiAnalysis(value: AiConsultingAnalysis | string | null): AiConsultingAnalysis | null {
+  if (!value) return null;
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return parsed && typeof parsed === 'object' ? parsed as AiConsultingAnalysis : null;
+  } catch {
+    return null;
+  }
+}
+
 function stringifyStringArray(value: string[]): string {
   return JSON.stringify(value);
 }
@@ -132,6 +146,8 @@ function mapCompany(row: CompanyRow): CompanyRecord {
     name: row.name,
     slug: row.slug,
     status: row.status,
+    sector: row.sector,
+    size: row.size,
   };
 }
 
@@ -155,6 +171,7 @@ function mapSubmission(row: SubmissionRow): ResearchSubmissionRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
+    aiAnalysis: parseAiAnalysis(row.ai_analysis),
   };
 }
 
@@ -185,7 +202,7 @@ export class ResearchRepository {
 
   async findCompanyById(id: string): Promise<CompanyRecord | null> {
     const row = await dataSource.one<CompanyRow>(`
-      SELECT id, name, slug, status
+      SELECT id, name, slug, status, sector, size
       FROM companies
       WHERE id = ?
     `, [id]);
@@ -269,7 +286,8 @@ export class ResearchRepository {
         pillar_scores,
         created_at,
         updated_at,
-        completed_at
+        completed_at,
+        ai_analysis
       FROM diagnosis_submissions
       WHERE id = ? AND submission_type = 'RESEARCH'
     `, [id]);
@@ -305,6 +323,22 @@ export class ResearchRepository {
     });
 
     return input;
+  }
+
+  async saveAiAnalysis(
+    submissionId: string,
+    analysis: AiConsultingAnalysis,
+  ): Promise<void> {
+    await dataSource.execute(`
+      UPDATE diagnosis_submissions
+      SET ai_analysis = @analysis,
+          updated_at = @updatedAt
+      WHERE id = @submissionId AND submission_type = 'RESEARCH'
+    `, {
+      submissionId,
+      analysis: JSON.stringify(analysis),
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   async createAnswer(input: ResearchAnswerRecord): Promise<ResearchAnswerRecord> {
@@ -396,6 +430,7 @@ export class ResearchRepository {
         ds.created_at,
         ds.updated_at,
         ds.completed_at,
+        ds.ai_analysis,
         c.name as company_name,
         u.name as user_name,
         COUNT(da.id) as answers_count
@@ -423,6 +458,7 @@ export class ResearchRepository {
         ds.created_at,
         ds.updated_at,
         ds.completed_at,
+        ds.ai_analysis,
         c.name,
         u.name
       ORDER BY ds.created_at DESC

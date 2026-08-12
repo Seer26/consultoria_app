@@ -154,6 +154,7 @@ export class ResearchService {
       createdAt: now,
       updatedAt: now,
       completedAt: null,
+      aiAnalysis: null,
     });
   }
 
@@ -186,7 +187,9 @@ export class ResearchService {
       question,
       answer,
       pillar: input.pillar?.trim() || submission.department,
-      value: normalizedScore,
+      // The PostgreSQL column is NOT NULL. Keep the optional score nullable so
+      // deterministic scoring still derives it from the answer text.
+      value: normalizedScore ?? 0,
       score: normalizedScore,
       createdAt: now,
     });
@@ -331,6 +334,7 @@ export class ResearchService {
           }
         : null,
       answers,
+      aiAnalysis: submission.aiAnalysis,
     };
   }
 
