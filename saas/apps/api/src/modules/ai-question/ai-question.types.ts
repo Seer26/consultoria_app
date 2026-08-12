@@ -1,4 +1,5 @@
 import type { AiConsultingAnalysis } from '../research/research.types';
+import type { AiProviderName } from '../../config/env';
 
 export const CONSULTING_PILLARS = [
   'Financeiro', 'Processos', 'Pessoas/RH', 'Marketing',
@@ -10,17 +11,18 @@ export interface AdaptiveQuestionResult {
   pillar: string;
   reason: string;
   shouldContinue: boolean;
-  source: 'openai' | 'fallback';
+  source: AiProviderName | 'fallback';
 }
 
-export interface StructuredAiProvider {
-  generate(input: {
-    operation: 'adaptive_question' | 'consulting_analysis';
-    schemaName: string;
-    schema: Record<string, unknown>;
-    instructions: string;
-    input: string;
-  }): Promise<unknown>;
+export interface AiProviderInput {
+  instructions: string;
+  input: string;
+}
+
+export interface AiProvider {
+  readonly name: AiProviderName;
+  generateNextQuestion(input: AiProviderInput): Promise<unknown>;
+  generateConsultingAnalysis(input: AiProviderInput): Promise<unknown>;
 }
 
 export type ConsultingAnalysisResult = AiConsultingAnalysis;

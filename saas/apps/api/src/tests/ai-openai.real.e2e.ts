@@ -35,12 +35,19 @@ try {
   await administrator.query(`CREATE DATABASE "${databaseName}"`);
   process.env.DATABASE_URL = withDatabase(databaseName);
   process.env.AI_ENABLED = 'true';
+  process.env.AI_PROVIDER = 'openai';
+  process.env.AI_MODEL = process.env.OPENAI_REAL_TEST_MODEL?.trim() || 'gpt-4.1-mini';
   process.env.NODE_ENV = 'test';
   process.env.APP_ENV = 'ai-real-test';
 
   const { env } = await import('../config/env');
-  (env as { databaseUrl: string; aiEnabled: boolean }).databaseUrl = withDatabase(databaseName);
-  (env as { databaseUrl: string; aiEnabled: boolean }).aiEnabled = true;
+  Object.assign(env, {
+    databaseUrl: withDatabase(databaseName),
+    aiEnabled: true,
+    aiProvider: 'openai',
+    aiModel: process.env.AI_MODEL,
+    aiProviderKey: process.env.OPENAI_API_KEY,
+  });
   const { runPostgresMigrations } = await import('../database/migrate');
   await runPostgresMigrations();
 

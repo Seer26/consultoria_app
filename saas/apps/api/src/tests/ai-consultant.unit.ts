@@ -5,6 +5,8 @@ process.env.APP_ENV = 'test';
 process.env.DATABASE_URL = 'postgres://unused:unused@127.0.0.1:1/unused';
 process.env.OPENAI_API_KEY = 'test-key-never-sent';
 process.env.AI_ENABLED = 'true';
+process.env.AI_PROVIDER = 'openai';
+process.env.AI_MODEL = 'gpt-test-model';
 
 const { env } = await import('../config/env');
 const { AiQuestionService } = await import('../modules/ai-question/ai-question.service');
@@ -49,15 +51,19 @@ class FakeEntitlements {
 }
 
 class FakeProvider {
+  readonly name = 'openai' as const;
   calls = 0;
   result: unknown = { question: 'Qual indicador financeiro orienta as decisoes mensais?', pillar: 'Financeiro', reason: 'Aprofundar governanca.', shouldContinue: true };
   error: Error | null = null;
   lastInput = '';
-  async generate(input: { input: string }) {
+  async generateNextQuestion(input: { input: string }) {
     this.calls += 1;
     this.lastInput = input.input;
     if (this.error) throw this.error;
     return this.result;
+  }
+  async generateConsultingAnalysis(input: { input: string }) {
+    return this.generateNextQuestion(input);
   }
 }
 
@@ -104,11 +110,32 @@ for (const code of ['AI_TIMEOUT', 'AI_RATE_LIMITED', 'AI_PROVIDER_UNAVAILABLE'])
   assert.equal((await service.generateNextQuestion(auth, 'submission-a')).source, 'fallback');
   assert.equal(provider.calls, 0);
   (env as { aiEnabled: boolean }).aiEnabled = true;
-  const originalKey = env.aiApiKey;
-  (env as { aiApiKey: string }).aiApiKey = '';
+  const originalKey = env.aiProviderKey;
+  (env as { aiProviderKey: string }).aiProviderKey = '';
   assert.equal((await service.generateNextQuestion(auth, 'submission-a')).source, 'fallback');
   assert.equal(provider.calls, 0);
-  (env as { aiApiKey: string }).aiApiKey = originalKey;
+  (env as { aiProviderKey: string }).aiProviderKey = originalKey;
+}
+
+for (const selectedProvider of ['gemini', 'openai'] as const) {
+  const { service, provider } = setup();
+  const originalProvider = env.aiProvider;
+  const originalKey = env.aiProviderKey;
+  Object.assign(env, { aiProvider: selectedProvider, aiProviderKey: '' });
+  assert.equal((await service.generateNextQuestion(auth, 'submission-a')).source, 'fallback');
+  assert.equal(provider.calls, 0);
+  Object.assign(env, { aiProvider: originalProvider, aiProviderKey: originalKey });
+}
+
+{
+  const { service, provider, entitlements } = setup();
+  const [first, second] = await Promise.all([
+    service.generateNextQuestion(auth, 'submission-a'),
+    service.generateNextQuestion(auth, 'submission-a'),
+  ]);
+  assert.deepEqual(first, second);
+  assert.equal(provider.calls, 1);
+  assert.equal(entitlements.used, 1);
 }
 
 {
@@ -175,10 +202,12 @@ console.log(JSON.stringify({
   invalidAndRepeatedFallback: true,
   timeout429And500: true,
   missingKeyAndFlag: true,
+  providerSpecificKeys: true,
+  duplicateProtection: true,
   planLimit: true,
   tenantIsolation: true,
   deterministicScorePreserved: true,
   finalAnalysisAndRetry: true,
   sanitizedLogs: true,
-  realOpenAiCalls: 0,
+  realProviderCalls: 0,
 }));

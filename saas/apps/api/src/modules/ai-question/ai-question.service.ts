@@ -11,15 +11,14 @@ import type {
   ResearchAnswerRecord,
   ResearchSubmissionRecord,
 } from '../research/research.types';
-import { OpenAiStructuredProvider } from './ai-question.client';
+import { createAiProvider } from './ai-question.client';
 import {
   adaptiveQuestionInstructions,
   buildAdaptiveQuestionInput,
   buildConsultingAnalysisInput,
   consultingAnalysisInstructions,
 } from './ai-question.prompt';
-import { adaptiveQuestionSchema, consultingAnalysisSchema } from './ai-question.schemas';
-import type { AdaptiveQuestionResult, StructuredAiProvider } from './ai-question.types';
+import type { AdaptiveQuestionResult, AiProvider } from './ai-question.types';
 
 type ResearchReader = Pick<ResearchRepository,
   'findUserById' | 'findCompanyById' | 'findSubmissionById' |
@@ -81,7 +80,7 @@ function validateAnalysis(value: unknown): Omit<AiConsultingAnalysis, 'generated
 
 export class AiQuestionService {
   constructor(
-    private readonly provider: StructuredAiProvider = new OpenAiStructuredProvider(),
+    private readonly provider: AiProvider | null = null,
     private readonly repository: ResearchReader = new ResearchRepository(),
     private readonly entitlementsService = new EntitlementsService(new EntitlementsRepository()),
   ) {}
@@ -89,15 +88,15 @@ export class AiQuestionService {
   async generateNextQuestion(auth: AuthTokenPayload, submissionId: string): Promise<AdaptiveQuestionResult> {
     const context = await this.authorizedContext(auth, submissionId, 'IN_PROGRESS');
     const fallback = this.fallbackQuestion(context.answers);
-    if (!env.aiEnabled || !env.aiApiKey) return fallback;
+    if (!env.aiEnabled || !env.aiProviderKey) return fallback;
 
     return this.singleFlight(`question:${submissionId}`, async () => {
       await this.entitlementsService.assertCanUseFeature(context.submission.companyId, 'AI_QUESTIONS_MONTHLY');
       const started = Date.now();
       audit('ai_request_started', { operation: 'adaptive_question', companyId: context.submission.companyId, userId: auth.userId });
       try {
-        const raw = await this.provider.generate({
-          operation: 'adaptive_question', schemaName: 'adaptive_question', schema: adaptiveQuestionSchema,
+        const provider = this.provider ?? createAiProvider();
+        const raw = await provider.generateNextQuestion({
           instructions: adaptiveQuestionInstructions,
           input: buildAdaptiveQuestionInput(context),
         });
@@ -105,7 +104,7 @@ export class AiQuestionService {
         if (!parsed) throw new Error('AI_INVALID_RESPONSE');
         await this.entitlementsService.recordUsage(context.submission.companyId, 'AI_QUESTIONS_MONTHLY');
         audit('ai_request_succeeded', { operation: 'adaptive_question', companyId: context.submission.companyId, durationMs: Date.now() - started });
-        return { ...parsed, source: 'openai' };
+        return { ...parsed, source: provider.name };
       } catch (error) {
         audit('ai_error', { operation: 'adaptive_question', companyId: context.submission.companyId, durationMs: Date.now() - started, category: this.errorCategory(error) });
         return fallback;
@@ -117,7 +116,7 @@ export class AiQuestionService {
     const context = await this.authorizedContext(auth, submissionId, 'COMPLETED');
     if (context.submission.aiAnalysis && !retry) return context.submission.aiAnalysis;
     if (!env.aiEnabled) throw new Error('AI_DISABLED');
-    if (!env.aiApiKey) throw new Error('AI_API_KEY_NOT_CONFIGURED');
+    if (!env.aiProviderKey) throw new Error('AI_API_KEY_NOT_CONFIGURED');
 
     return this.singleFlight(`analysis:${submissionId}`, async () => {
       await this.entitlementsService.assertCanUseFeature(context.submission.companyId, 'AI_QUESTIONS_MONTHLY');
@@ -125,8 +124,8 @@ export class AiQuestionService {
       const started = Date.now();
       audit('ai_request_started', { operation: 'consulting_analysis', companyId: context.submission.companyId, userId: auth.userId });
       try {
-        const raw = await this.provider.generate({
-          operation: 'consulting_analysis', schemaName: 'consulting_analysis', schema: consultingAnalysisSchema,
+        const provider = this.provider ?? createAiProvider();
+        const raw = await provider.generateConsultingAnalysis({
           instructions: consultingAnalysisInstructions,
           input: buildConsultingAnalysisInput(context),
         });

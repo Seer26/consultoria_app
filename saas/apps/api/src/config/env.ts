@@ -17,6 +17,23 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
 }
 
+export type AiProviderName = 'gemini' | 'openai';
+
+export function parseAiProvider(value: string | undefined): AiProviderName {
+  const provider = value?.trim().toLowerCase() || 'gemini';
+  if (provider !== 'gemini' && provider !== 'openai') {
+    throw new Error('AI_PROVIDER_INVALID');
+  }
+  return provider;
+}
+
+export function resolveAiProviderKey(
+  provider: AiProviderName,
+  keys: { gemini: string; openai: string },
+): string {
+  return provider === 'gemini' ? keys.gemini : keys.openai;
+}
+
 function parseCorsOrigins(value: string | undefined): string[] | '*' {
   if (!value?.trim()) {
     if (isRestrictedEnvironment) {
@@ -53,6 +70,10 @@ function resolveJwtSecret(): string {
   return 'consultoria-local-dev-secret';
 }
 
+const aiProvider = parseAiProvider(process.env.AI_PROVIDER);
+const openAiApiKey = process.env.OPENAI_API_KEY?.trim() || '';
+const geminiApiKey = process.env.GEMINI_API_KEY?.trim() || '';
+
 const envConfig = {
   nodeEnv,
   appEnv,
@@ -76,14 +97,19 @@ const envConfig = {
     process.env.API_REPLICA_COUNT,
     1,
   ),
-  aiApiKey: process.env.OPENAI_API_KEY ?? process.env.AI_API_KEY ?? '',
+  aiProvider,
+  openAiApiKey,
+  geminiApiKey,
+  aiProviderKey: resolveAiProviderKey(aiProvider, {
+    gemini: geminiApiKey,
+    openai: openAiApiKey,
+  }),
+  // Kept only for the disabled legacy diagnosis client.
+  aiApiKey: openAiApiKey,
   aiApiUrl: process.env.AI_API_URL ?? 'https://api.openai.com/v1/responses',
   aiEnabled: parseBoolean(process.env.AI_ENABLED, false),
-  aiModel:
-    process.env.OPENAI_MODEL ??
-    process.env.AI_QUESTION_MODEL ??
-    process.env.AI_MODEL ??
-    'gpt-4.1-mini',
+  aiModel: process.env.AI_MODEL?.trim() ||
+    (aiProvider === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-4.1-mini'),
   aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS ?? 20000),
   jwtSecret: resolveJwtSecret(),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
@@ -262,8 +288,8 @@ export function validateStagingProfile(
   if (config.logFormat !== 'json') {
     throw new Error('STAGING_LOG_FORMAT_MUST_BE_JSON');
   }
-  if (config.requireAiInReadiness && (!config.aiEnabled || !config.aiApiKey)) {
-    throw new Error('STAGING_OPENAI_CONFIGURATION_REQUIRED_BY_POLICY');
+  if (config.requireAiInReadiness && (!config.aiEnabled || !config.aiProviderKey)) {
+    throw new Error('STAGING_AI_CONFIGURATION_REQUIRED_BY_POLICY');
   }
   if (
     config.enableExternalAlerts &&

@@ -95,11 +95,11 @@ export async function getReadiness() {
   const apiUrlSecure = !restricted || env.apiPublicUrl.startsWith('https://');
   const aiStatus = !env.aiEnabled
     ? 'disabled'
-    : env.aiApiKey
+    : env.aiProviderKey
       ? 'configured'
       : 'not_configured';
   const aiReady =
-    !env.requireAiInReadiness || (env.aiEnabled && Boolean(env.aiApiKey));
+    !env.requireAiInReadiness || (env.aiEnabled && Boolean(env.aiProviderKey));
   const criticalReady =
     databaseStatus.status === 'ready' &&
     emailStatus.status === 'ready' &&
@@ -129,7 +129,11 @@ export async function getReadiness() {
       email: emailStatus,
       publicUrl: { status: appUrlSecure ? 'ready' : 'not_ready' },
       apiPublicUrl: { status: apiUrlSecure ? 'ready' : 'not_ready' },
-      openai: { status: aiStatus, required: env.requireAiInReadiness },
+      ai: {
+        status: aiStatus,
+        provider: env.aiProvider,
+        required: env.requireAiInReadiness,
+      },
     },
     timestamp: new Date().toISOString(),
   };
