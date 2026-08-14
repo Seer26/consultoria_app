@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/section_header.dart';
+import '../../../action_plan/presentation/action_plan_labels.dart';
 import 'dashboard_banner.dart';
 import 'kpi_card.dart';
 
@@ -302,8 +303,8 @@ class _TaskCard extends StatelessWidget {
         title: Text(task['title']?.toString() ?? 'Tarefa'),
         subtitle: Text(
           [
-            task['priority']?.toString() ?? '',
-            task['status']?.toString() ?? '',
+            actionPlanPriorityLabel(task['priority']),
+            actionPlanStatusLabel(task['status']),
             if (dueDate != null)
               'Prazo ${DateFormatter.formatDate(dueDate.toLocal())}',
           ].where((item) => item.trim().isNotEmpty).join(' | '),

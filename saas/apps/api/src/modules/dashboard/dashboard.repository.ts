@@ -3,6 +3,7 @@ import type {
   DashboardCompanyScoreItem,
   DashboardCompanySummary,
   DashboardMetrics,
+  DashboardOnboardingProgress,
   DashboardPillarScore,
   DashboardResearchItem,
   DashboardTaskItem,
@@ -77,6 +78,15 @@ interface CompanyScoreRow {
   average_score: number | null;
   completed_research_total: number | null;
   users_total: number | null;
+}
+
+interface OnboardingRow {
+  company_profile_complete: number;
+  employee_total: number;
+  incomplete_profile_total: number;
+  research_total: number;
+  completed_research_total: number;
+  action_plan_total: number;
 }
 
 function roundScore(value: number | null | undefined): number | null {
@@ -229,6 +239,74 @@ export class DashboardRepository {
     );
 
     return row ?? null;
+  }
+
+  async getCompanyOnboarding(companyId: string): Promise<DashboardOnboardingProgress> {
+    const row = await dataSource.one<OnboardingRow>(
+      `
+      SELECT
+        CASE
+          WHEN TRIM(COALESCE(c.name, '')) <> ''
+            AND TRIM(COALESCE(c.sector, '')) <> ''
+            AND TRIM(COALESCE(c.size, '')) <> ''
+            AND TRIM(COALESCE(c.phone, '')) <> ''
+            AND TRIM(COALESCE(c.responsible_name, '')) <> ''
+          THEN 1 ELSE 0
+        END AS company_profile_complete,
+        (
+          SELECT COUNT(*) FROM users u
+          WHERE u.company_id = c.id AND u.role = 'EMPLOYEE' AND u.status = 'ACTIVE'
+        ) AS employee_total,
+        (
+          SELECT COUNT(*) FROM users u
+          WHERE u.company_id = c.id
+            AND u.role = 'EMPLOYEE'
+            AND u.status = 'ACTIVE'
+            AND (
+              TRIM(COALESCE(u.department, '')) = ''
+              OR TRIM(COALESCE(u.job_function, '')) = ''
+            )
+        ) AS incomplete_profile_total,
+        (
+          SELECT COUNT(*) FROM diagnosis_submissions ds
+          WHERE ds.company_id = c.id AND ds.submission_type = 'RESEARCH'
+        ) AS research_total,
+        (
+          SELECT COUNT(*) FROM diagnosis_submissions ds
+          WHERE ds.company_id = c.id
+            AND ds.submission_type = 'RESEARCH'
+            AND ds.status = 'COMPLETED'
+        ) AS completed_research_total,
+        (
+          SELECT COUNT(*) FROM action_plan_tasks apt
+          WHERE apt.company_id = c.id AND apt.submission_id IS NOT NULL
+        ) AS action_plan_total
+      FROM companies c
+      WHERE c.id = ?
+      `,
+      [companyId],
+    );
+
+    const employeeTotal = Number(row?.employee_total ?? 0);
+    const items = {
+      companyProfile: Number(row?.company_profile_complete ?? 0) === 1,
+      team: employeeTotal > 0,
+      professionalProfiles:
+        employeeTotal > 0 && Number(row?.incomplete_profile_total ?? 0) === 0,
+      firstResearch: Number(row?.research_total ?? 0) > 0,
+      firstResult: Number(row?.completed_research_total ?? 0) > 0,
+      firstActionPlan: Number(row?.action_plan_total ?? 0) > 0,
+    };
+    const completedCount = Object.values(items).filter(Boolean).length;
+    const totalCount = Object.keys(items).length;
+
+    return {
+      completedCount,
+      totalCount,
+      progress: Math.round((completedCount / totalCount) * 100),
+      isComplete: completedCount === totalCount,
+      items,
+    };
   }
 
   async getAdminMetrics(): Promise<DashboardMetrics> {

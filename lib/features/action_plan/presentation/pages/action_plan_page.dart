@@ -12,6 +12,7 @@ import '../../../admin_management/domain/entities/company_account.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/services/action_plan_service.dart';
 import '../../domain/entities/action_plan_task.dart';
+import '../action_plan_labels.dart';
 import '../providers/action_plan_providers.dart';
 
 class ActionPlanPage extends ConsumerStatefulWidget {
@@ -86,7 +87,7 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
         scope: _scope,
         search: _searchController.text,
       );
-      final assignees = companyId == null
+      final assignees = companyId == null || role == RoleGuard.employee
           ? const <ActionPlanAssignee>[]
           : await service.listAssignees(companyId: companyId);
 
@@ -297,8 +298,9 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
 
     return AppPageScaffold(
       title: 'Plano de Ação',
-      subtitle:
-          'Acompanhe as tarefas geradas pela Pesquisa Empresarial e crie ações manuais quando necessário.',
+      subtitle: role == RoleGuard.employee
+          ? 'Acompanhe suas tarefas atribuídas e avance cada etapa até a conclusão.'
+          : 'Acompanhe as tarefas geradas pela Pesquisa Empresarial e crie ações manuais quando necessário.',
       actions: [
         if (role == RoleGuard.admin && _companies.isNotEmpty)
           SizedBox(
@@ -336,11 +338,12 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
           icon: const Icon(Icons.refresh),
           label: const Text('Atualizar'),
         ),
-        FilledButton.icon(
-          onPressed: _isSaving ? null : () => _openTaskDialog(),
-          icon: const Icon(Icons.add_task),
-          label: const Text('Nova tarefa'),
-        ),
+        if (role != RoleGuard.employee)
+          FilledButton.icon(
+            onPressed: _isSaving ? null : () => _openTaskDialog(),
+            icon: const Icon(Icons.add_task),
+            label: const Text('Nova tarefa'),
+          ),
       ],
       child: Column(
         children: [
@@ -476,18 +479,22 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppColors.border),
         ),
-        child: const Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.task_alt_outlined, size: 48, color: AppColors.textMuted),
             SizedBox(height: 12),
             Text(
-              'Nenhuma tarefa encontrada no Plano de Ação.',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              role == RoleGuard.employee
+                  ? 'Você não possui tarefas atribuídas no momento.'
+                  : 'Nenhuma tarefa encontrada no Plano de Ação.',
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             SizedBox(height: 8),
             Text(
-              'Gere um plano a partir da Pesquisa Empresarial ou crie uma tarefa manual.',
+              role == RoleGuard.employee
+                  ? 'Quando uma tarefa for atribuída a você, ela aparecerá aqui.'
+                  : 'Gere um plano a partir da Pesquisa Empresarial ou crie uma tarefa manual.',
               textAlign: TextAlign.center,
             ),
           ],
@@ -504,6 +511,7 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
           task: task,
           showCompany: role == RoleGuard.admin,
           isSaving: _isSaving,
+          isEmployee: role == RoleGuard.employee,
           onStatusChanged: (status) => _updateStatus(task, status),
           onEdit: () => _openTaskDialog(task: task),
         );
@@ -517,6 +525,7 @@ class _TaskCard extends StatelessWidget {
     required this.task,
     required this.showCompany,
     required this.isSaving,
+    required this.isEmployee,
     required this.onStatusChanged,
     required this.onEdit,
   });
@@ -524,6 +533,7 @@ class _TaskCard extends StatelessWidget {
   final ActionPlanTask task;
   final bool showCompany;
   final bool isSaving;
+  final bool isEmployee;
   final ValueChanged<ActionPlanTaskStatus> onStatusChanged;
   final VoidCallback onEdit;
 
@@ -591,12 +601,13 @@ class _TaskCard extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
-                key: ValueKey('edit-task-${task.id}'),
-                tooltip: 'Editar tarefa',
-                onPressed: isSaving ? null : onEdit,
-                icon: const Icon(Icons.edit_outlined),
-              ),
+              if (!isEmployee)
+                IconButton(
+                  key: ValueKey('edit-task-${task.id}'),
+                  tooltip: 'Editar tarefa',
+                  onPressed: isSaving ? null : onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -639,35 +650,43 @@ class _TaskCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<ActionPlanTaskStatus>(
-                  initialValue: task.status,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+          if (!isEmployee || _employeeNextStatus(task.status) != null)
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<ActionPlanTaskStatus>(
+                    initialValue: task.status,
+                    decoration: const InputDecoration(
+                      labelText: 'Status',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items:
+                        (isEmployee
+                                ? [
+                                    task.status,
+                                    _employeeNextStatus(task.status)!,
+                                  ]
+                                : ActionPlanTaskStatus.values)
+                            .map(
+                              (status) =>
+                                  DropdownMenuItem<ActionPlanTaskStatus>(
+                                    value: status,
+                                    child: Text(_statusStyle(status).$1),
+                                  ),
+                            )
+                            .toList(),
+                    onChanged: isSaving
+                        ? null
+                        : (value) {
+                            if (value != null && value != task.status) {
+                              onStatusChanged(value);
+                            }
+                          },
                   ),
-                  items: ActionPlanTaskStatus.values
-                      .map(
-                        (status) => DropdownMenuItem<ActionPlanTaskStatus>(
-                          value: status,
-                          child: Text(_statusStyle(status).$1),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: isSaving
-                      ? null
-                      : (value) {
-                          if (value != null && value != task.status) {
-                            onStatusChanged(value);
-                          }
-                        },
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -969,38 +988,43 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
 (String, Color) _priorityStyle(ActionPlanTaskPriority priority) {
   switch (priority) {
     case ActionPlanTaskPriority.low:
-      return ('Baixa', AppColors.teal);
+      return (actionPlanPriorityLabel(priority), AppColors.teal);
     case ActionPlanTaskPriority.medium:
-      return ('Media', AppColors.amber);
+      return (actionPlanPriorityLabel(priority), AppColors.amber);
     case ActionPlanTaskPriority.high:
-      return ('Alta', AppColors.danger);
+      return (actionPlanPriorityLabel(priority), AppColors.danger);
     case ActionPlanTaskPriority.critical:
-      return ('Critica', const Color(0xFF7A1828));
+      return (actionPlanPriorityLabel(priority), const Color(0xFF7A1828));
   }
 }
 
 (String, Color) _statusStyle(ActionPlanTaskStatus status) {
   switch (status) {
     case ActionPlanTaskStatus.todo:
-      return ('A fazer', AppColors.textMuted);
+      return (actionPlanStatusLabel(status), AppColors.textMuted);
     case ActionPlanTaskStatus.inProgress:
-      return ('Em andamento', AppColors.indigo);
+      return (actionPlanStatusLabel(status), AppColors.indigo);
     case ActionPlanTaskStatus.done:
-      return ('Concluida', AppColors.success);
+      return (actionPlanStatusLabel(status), AppColors.success);
     case ActionPlanTaskStatus.canceled:
-      return ('Cancelada', AppColors.danger);
+      return (actionPlanStatusLabel(status), AppColors.danger);
+  }
+}
+
+ActionPlanTaskStatus? _employeeNextStatus(ActionPlanTaskStatus status) {
+  switch (status) {
+    case ActionPlanTaskStatus.todo:
+      return ActionPlanTaskStatus.inProgress;
+    case ActionPlanTaskStatus.inProgress:
+      return ActionPlanTaskStatus.done;
+    case ActionPlanTaskStatus.done:
+    case ActionPlanTaskStatus.canceled:
+      return null;
   }
 }
 
 String _sourceLabel(ActionPlanTaskSource source) {
-  switch (source) {
-    case ActionPlanTaskSource.researchRecommendation:
-      return 'Pesquisa';
-    case ActionPlanTaskSource.manual:
-      return 'Manual';
-    case ActionPlanTaskSource.ai:
-      return 'IA';
-  }
+  return actionPlanSourceLabel(source);
 }
 
 String _scopeLabel(ActionPlanTaskScope scope) {

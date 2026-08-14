@@ -366,6 +366,12 @@ class ActionPlanService {
           return 'Responsavel nao encontrado.';
         case 'RESPONSIBLE_USER_INACTIVE':
           return 'O responsável selecionado está inativo.';
+        case 'RESPONSIBLE_USER_ROLE_NOT_ALLOWED':
+          return 'Selecione um colaborador ativo da empresa como responsável.';
+        case 'EMPLOYEE_TASK_FIELDS_FORBIDDEN':
+          return 'Como colaborador, você pode atualizar somente o andamento das tarefas atribuídas a você.';
+        case 'EMPLOYEE_TASK_STATUS_TRANSITION_FORBIDDEN':
+          return 'Avance a tarefa na ordem: Pendente, Em andamento e Concluída.';
         case 'RESEARCH_SUBMISSION_NOT_FOUND':
           return 'Pesquisa nao encontrada.';
         case 'ACTION_PLAN_SUBMISSION_NOT_COMPLETED':

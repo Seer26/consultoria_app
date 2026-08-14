@@ -50,10 +50,18 @@ export class ActionPlanService {
       throw new Error('FORBIDDEN');
     }
 
-    return this.applyListFilters(auth, filters, await this.repository.listTasks({
+    const tasks = await this.repository.listTasks({
       companyId,
       submissionId: filters.submissionId?.trim() || undefined,
-    }));
+    });
+
+    return this.applyListFilters(
+      auth,
+      filters,
+      context.actor.role === 'EMPLOYEE'
+        ? tasks.filter((task) => task.responsibleUserId === context.actor.id)
+        : tasks,
+    );
   }
 
   async listAssignees(
@@ -63,6 +71,11 @@ export class ActionPlanService {
     const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
     const companyId = await this.resolveCompanyId(context, requestedCompanyId);
+    if (context.actor.role === 'EMPLOYEE') {
+      return [
+        ...(await this.repository.listActiveAssignees(companyId)),
+      ].filter((assignee) => assignee.id === context.actor.id);
+    }
     return this.repository.listActiveAssignees(companyId);
   }
 
@@ -78,7 +91,7 @@ export class ActionPlanService {
       throw new Error('ACTION_PLAN_TASK_NOT_FOUND');
     }
 
-    this.ensureTaskAccess(context, task.companyId);
+    this.ensureTaskAccess(context, task);
     return this.decorateTask(task);
   }
 
@@ -88,6 +101,7 @@ export class ActionPlanService {
   ): Promise<ActionPlanTaskDetails> {
     const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
+    this.ensureAdministrativeTaskMutation(context);
 
     const companyId = await this.resolveCompanyId(context, input.companyId);
     const title = input.title?.trim();
@@ -143,8 +157,9 @@ export class ActionPlanService {
   ): Promise<ActionPlanTaskDetails> {
     const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
+    this.ensureAdministrativeTaskMutation(context);
     const existing = await this.getTaskRecordOrThrow(taskId);
-    this.ensureTaskAccess(context, existing.companyId);
+    this.ensureTaskAccess(context, existing);
 
     const nextTitle = input.title === undefined ? existing.title : input.title.trim();
     if (!nextTitle) {
@@ -191,9 +206,12 @@ export class ActionPlanService {
     const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
     const existing = await this.getTaskRecordOrThrow(taskId);
-    this.ensureTaskAccess(context, existing.companyId);
+    this.ensureTaskAccess(context, existing);
 
     const status = this.validateStatus(input.status);
+    if (context.actor.role === 'EMPLOYEE') {
+      this.ensureEmployeeStatusTransition(existing.status, status);
+    }
     const updatedAt = new Date().toISOString();
 
     if (!this.isActiveTaskStatus(existing.status) && this.isActiveTaskStatus(status)) {
@@ -228,7 +246,8 @@ export class ActionPlanService {
   ): Promise<ActionPlanGenerationResult> {
     const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
-    this.ensureTaskAccess(context, input.companyId);
+    this.ensureAdministrativeTaskMutation(context);
+    this.ensureTaskCompanyAccess(context, input.companyId);
 
     if (input.status !== 'COMPLETED') {
       throw new Error('ACTION_PLAN_SUBMISSION_NOT_COMPLETED');
@@ -467,6 +486,10 @@ export class ActionPlanService {
       throw new Error('RESPONSIBLE_USER_INACTIVE');
     }
 
+    if (user.role !== 'EMPLOYEE') {
+      throw new Error('RESPONSIBLE_USER_ROLE_NOT_ALLOWED');
+    }
+
     return normalized;
   }
 
@@ -602,13 +625,44 @@ export class ActionPlanService {
     return actorCompanyId;
   }
 
-  private ensureTaskAccess(context: ActionPlanAccessContext, companyId: string): void {
+  private ensureTaskAccess(
+    context: ActionPlanAccessContext,
+    task: Pick<ActionPlanTaskRecord, 'companyId' | 'responsibleUserId'>,
+  ): void {
+    this.ensureTaskCompanyAccess(context, task.companyId);
+    if (
+      context.actor.role === 'EMPLOYEE' &&
+      task.responsibleUserId !== context.actor.id
+    ) {
+      throw new Error('FORBIDDEN');
+    }
+  }
+
+  private ensureTaskCompanyAccess(context: ActionPlanAccessContext, companyId: string): void {
     if (context.actor.role === 'ADMIN') {
       return;
     }
 
     if (!context.actor.companyId || context.actor.companyId !== companyId) {
       throw new Error('FORBIDDEN');
+    }
+  }
+
+  private ensureAdministrativeTaskMutation(context: ActionPlanAccessContext): void {
+    if (context.actor.role === 'EMPLOYEE') {
+      throw new Error('EMPLOYEE_TASK_FIELDS_FORBIDDEN');
+    }
+  }
+
+  private ensureEmployeeStatusTransition(
+    current: ActionPlanTaskStatus,
+    next: ActionPlanTaskStatus,
+  ): void {
+    const allowed =
+      (current === 'TODO' && next === 'IN_PROGRESS') ||
+      (current === 'IN_PROGRESS' && next === 'DONE');
+    if (!allowed) {
+      throw new Error('EMPLOYEE_TASK_STATUS_TRANSITION_FORBIDDEN');
     }
   }
 

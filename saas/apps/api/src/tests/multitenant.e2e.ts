@@ -228,8 +228,8 @@ async function createEmployee(
   adminToken: string,
   companyId: string,
   slug: string,
-): Promise<void> {
-  await request(baseUrl, 'POST', `/companies/${companyId}/users`, {
+): Promise<{ id: string }> {
+  return request<{ id: string }>(baseUrl, 'POST', `/companies/${companyId}/users`, {
     token: adminToken,
     expectedStatus: 201,
     body: {
@@ -329,7 +329,12 @@ async function main(): Promise<void> {
 
     const companyA = await onboardCompany(baseUrl, admin.token, 'empresa-a');
     const companyB = await onboardCompany(baseUrl, admin.token, 'empresa-b');
-    await createEmployee(baseUrl, admin.token, companyA.company.id, 'empresa-a');
+    const createdEmployeeA = await createEmployee(
+      baseUrl,
+      admin.token,
+      companyA.company.id,
+      'empresa-a',
+    );
     await createEmployee(baseUrl, admin.token, companyB.company.id, 'empresa-b');
 
     const ownerA = await login(baseUrl, 'owner.empresa-a@teste.com');
@@ -339,6 +344,18 @@ async function main(): Promise<void> {
     assert(ownerA.user.companyId === companyA.company.id, 'Owner A company mismatch');
     assert(ownerB.user.companyId === companyB.company.id, 'Owner B company mismatch');
     assert(employeeA.user.companyId === companyA.company.id, 'Employee A company mismatch');
+    assert(employeeA.user.id === createdEmployeeA.id, 'Employee A id mismatch');
+
+    const initialOwnerDashboard = await request<{
+      onboarding: { completedCount: number; items: Record<string, boolean> };
+    }>(baseUrl, 'GET', '/dashboard/company', { token: ownerA.token });
+    assert(
+      initialOwnerDashboard.onboarding.completedCount === 1 &&
+        initialOwnerDashboard.onboarding.items.team === true &&
+        initialOwnerDashboard.onboarding.items.companyProfile === false &&
+        initialOwnerDashboard.onboarding.items.firstResearch === false,
+      'Owner onboarding should expose the real initial state',
+    );
 
     const updatedSettingsA = await request<CompanySettingsResponse>(
       baseUrl,
@@ -440,9 +457,27 @@ async function main(): Promise<void> {
       { token: ownerA.token },
     );
     assert(
-      assigneesA.length === 2 &&
+      assigneesA.length === 1 &&
         assigneesA.every((assignee) => assignee.companyId === companyA.company.id),
-      'Owner A should list only active assignees from Company A',
+      'Owner A should list only active EMPLOYEE assignees from Company A',
+    );
+    const employeeAssigneesA = await request<ActionPlanAssigneeResponse[]>(
+      baseUrl,
+      'GET',
+      '/action-plan/assignees',
+      { token: employeeA.token },
+    );
+    assert(
+      employeeAssigneesA.length === 1 &&
+        employeeAssigneesA[0].id === employeeA.user.id,
+      'Employee should never receive other assignees',
+    );
+    await expectStatus(
+      baseUrl,
+      'GET',
+      `/action-plan/assignees?companyId=${companyB.company.id}`,
+      403,
+      { token: employeeA.token },
     );
     const inactivePasswordHash = await bcrypt.hash('Inactive!User2026', 10);
     database
@@ -484,6 +519,14 @@ async function main(): Promise<void> {
     );
 
     const taskA = researchA.actionPlan.tasks[0];
+    const anotherTaskA = researchA.actionPlan.tasks[1];
+    await expectStatus(baseUrl, 'POST', '/action-plan/tasks', 403, {
+      token: employeeA.token,
+      body: { title: 'Colaborador não pode criar tarefa' },
+    });
+    await expectStatus(baseUrl, 'GET', `/action-plan/tasks/${anotherTaskA.id}`, 403, {
+      token: employeeA.token,
+    });
     await expectStatus(baseUrl, 'PUT', `/action-plan/tasks/${taskA.id}`, 400, {
       token: ownerA.token,
       body: {
@@ -496,6 +539,13 @@ async function main(): Promise<void> {
       body: {
         title: 'Tentativa com usuário inativo',
         responsibleUserId: 'inactive-assignee-a',
+      },
+    });
+    await expectStatus(baseUrl, 'PUT', `/action-plan/tasks/${taskA.id}`, 400, {
+      token: ownerA.token,
+      body: {
+        title: 'Tentativa com OWNER como responsável',
+        responsibleUserId: ownerA.user.id,
       },
     });
     const overdueDate = new Date(Date.now() - 3 * 86_400_000).toISOString();
@@ -544,6 +594,72 @@ async function main(): Promise<void> {
     assert(
       mineTasksA.some((task) => task.id === taskA.id),
       'Mine filter should include task assigned to Employee A',
+    );
+    const employeeTasksA = await request<ActionPlanTaskResponse[]>(
+      baseUrl,
+      'GET',
+      '/action-plan/tasks',
+      { token: employeeA.token },
+    );
+    assert(
+      employeeTasksA.length === 1 && employeeTasksA[0].id === taskA.id,
+      'Employee A should list only tasks assigned to them',
+    );
+    await request<ActionPlanTaskResponse>(
+      baseUrl,
+      'GET',
+      `/action-plan/tasks/${taskA.id}`,
+      { token: employeeA.token },
+    );
+    await expectStatus(baseUrl, 'PUT', `/action-plan/tasks/${taskA.id}`, 403, {
+      token: employeeA.token,
+      body: { title: 'Alteração administrativa indevida' },
+    });
+    await expectStatus(baseUrl, 'PATCH', `/action-plan/tasks/${taskA.id}/status`, 403, {
+      token: employeeA.token,
+      body: { status: 'CANCELED' },
+    });
+    const completedByEmployee = await request<ActionPlanTaskResponse>(
+      baseUrl,
+      'PATCH',
+      `/action-plan/tasks/${taskA.id}/status`,
+      { token: employeeA.token, body: { status: 'DONE' } },
+    );
+    assert(completedByEmployee.status === 'DONE', 'Employee should complete assigned task');
+    await expectStatus(baseUrl, 'PATCH', `/action-plan/tasks/${taskA.id}/status`, 403, {
+      token: employeeA.token,
+      body: { status: 'TODO' },
+    });
+    await request<ActionPlanTaskResponse>(
+      baseUrl,
+      'PUT',
+      `/action-plan/tasks/${taskA.id}`,
+      {
+        token: ownerA.token,
+        body: { status: 'IN_PROGRESS' },
+      },
+    );
+    await request<ActionPlanTaskResponse>(
+      baseUrl,
+      'PUT',
+      `/action-plan/tasks/${anotherTaskA.id}`,
+      {
+        token: ownerA.token,
+        body: {
+          status: 'TODO',
+          responsibleUserId: employeeA.user.id,
+        },
+      },
+    );
+    const startedByEmployee = await request<ActionPlanTaskResponse>(
+      baseUrl,
+      'PATCH',
+      `/action-plan/tasks/${anotherTaskA.id}/status`,
+      { token: employeeA.token, body: { status: 'IN_PROGRESS' } },
+    );
+    assert(
+      startedByEmployee.status === 'IN_PROGRESS',
+      'Employee should start an assigned pending task',
     );
 
     await expectStatus(
@@ -618,6 +734,13 @@ async function main(): Promise<void> {
         dueSoonTasks: number;
       };
       overdueTasks: ActionPlanTaskResponse[];
+      onboarding: {
+        completedCount: number;
+        totalCount: number;
+        progress: number;
+        isComplete: boolean;
+        items: Record<string, boolean>;
+      };
     }>(
       baseUrl,
       'GET',
@@ -625,6 +748,38 @@ async function main(): Promise<void> {
       { token: ownerA.token },
     );
     assert(ownerDashboard.company.id === companyA.company.id, 'Owner dashboard company mismatch');
+    assert(
+      ownerDashboard.onboarding.items.companyProfile === true &&
+        ownerDashboard.onboarding.items.firstResearch === true &&
+        ownerDashboard.onboarding.items.firstResult === true &&
+        ownerDashboard.onboarding.items.firstActionPlan === true &&
+        ownerDashboard.onboarding.items.professionalProfiles === false,
+      'Owner onboarding should reflect the real partial company state',
+    );
+    await request(baseUrl, 'PUT', `/company/team/${employeeA.user.id}`, {
+      token: ownerA.token,
+      body: {
+        name: 'Employee EMPRESA-A',
+        email: 'employee.empresa-a@teste.com',
+        department: 'Operações',
+        jobFunction: 'Analista de operações',
+      },
+    });
+    const completedOnboardingDashboard = await request<{
+      onboarding: {
+        completedCount: number;
+        totalCount: number;
+        progress: number;
+        isComplete: boolean;
+      };
+    }>(baseUrl, 'GET', '/dashboard/company', { token: ownerA.token });
+    assert(
+      completedOnboardingDashboard.onboarding.isComplete &&
+        completedOnboardingDashboard.onboarding.completedCount ===
+          completedOnboardingDashboard.onboarding.totalCount &&
+        completedOnboardingDashboard.onboarding.progress === 100,
+      'Owner onboarding should become complete from persisted company data',
+    );
     assert(
       ownerDashboard.metrics.overdueTasks >= 1 &&
         ownerDashboard.metrics.criticalOverdueTasks >= 1,

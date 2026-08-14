@@ -71,3 +71,18 @@ export interface DashboardCompanySummary {
   openTasks: number;
   overdueTasks: number;
 }
+
+export interface DashboardOnboardingProgress {
+  completedCount: number;
+  totalCount: number;
+  progress: number;
+  isComplete: boolean;
+  items: {
+    companyProfile: boolean;
+    team: boolean;
+    professionalProfiles: boolean;
+    firstResearch: boolean;
+    firstResult: boolean;
+    firstActionPlan: boolean;
+  };
+}

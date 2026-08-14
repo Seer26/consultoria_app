@@ -10,6 +10,67 @@ Data da atualização: 14/08/2026
 
 Escopo: análise do Flutter, API Node/TypeScript, migrations, testes e documentação. Somente bancos sintéticos e descartáveis das suítes automatizadas foram usados; nenhum dado real de cliente foi aberto ou alterado.
 
+## Atualização da Sprint 3.17
+
+### Resultado entregue
+
+A Sprint 3.17 adicionou onboarding contextual ao dashboard do OWNER e concluiu a política operacional de tarefas do EMPLOYEE sem criar tabela, migration ou flag local de progresso. O estado do checklist é calculado no backend a partir dos dados reais da própria empresa. As regras de PostgreSQL/Railway, compatibilidade SQLite local, autenticação, planos, pesquisas, IA, score determinístico, relatórios, privacidade de respostas individuais e isolamento por `company_id` foram preservadas.
+
+### Regras do onboarding
+
+O dashboard do OWNER agora recebe e apresenta seis etapas:
+
+1. dados da empresa completos: nome, setor, porte, telefone e responsável preenchidos;
+2. equipe cadastrada: ao menos um EMPLOYEE ativo;
+3. perfis profissionais completos: todos os EMPLOYEEs ativos possuem área e função;
+4. primeira pesquisa realizada: existe uma submissão de pesquisa da empresa;
+5. primeiro resultado disponível: existe uma pesquisa concluída;
+6. primeiro plano de ação criado: existem tarefas vinculadas a uma pesquisa.
+
+O componente informa quantidade e percentual concluídos, explica cada etapa e oferece atalhos para configurações, equipe, pesquisas ou tarefas. Ele permanece expandido enquanto houver pendências e fica recolhido em estado concluído, sem popup recorrente. O layout foi exercitado em 320, 390, 768 e 1280 px.
+
+### Política de tarefas
+
+| Perfil | Leitura | Criação/edição administrativa | Atualização operacional | Atribuição |
+| --- | --- | --- | --- | --- |
+| ADMIN | Global, preservada | Preservada | Preservada | Somente EMPLOYEE ativo da empresa escolhida |
+| OWNER | Somente a própria empresa | Pode criar e editar conforme regras existentes | Pode definir qualquer status válido | Somente EMPLOYEE ativo da própria empresa |
+| EMPLOYEE | Somente tarefas atribuídas ao próprio usuário | Bloqueada, inclusive criação, responsável, prazo, prioridade, descrição e demais campos administrativos | Somente `TODO → IN_PROGRESS → DONE` na própria tarefa | Não pode atribuir |
+
+Valores internos permanecem `TODO`, `IN_PROGRESS`, `DONE` e `CANCELED` para compatibilidade. A apresentação foi centralizada em português como **Pendente**, **Em andamento**, **Concluída** e **Cancelada**. Prioridades e origens também usam rótulos centralizados. Na tela do EMPLOYEE, os controles de criação e edição não aparecem, tarefas concluídas/canceladas ficam somente para leitura e o estado vazio informa: “Você não possui tarefas atribuídas no momento.”
+
+A autorização é garantida na API: filtros manipulados não ampliam o escopo; leitura individual exige que o EMPLOYEE seja o responsável; atribuição valida empresa, situação ativa e role `EMPLOYEE`; mutação administrativa ou salto/reabertura de status pelo EMPLOYEE retorna bloqueio. A interface apenas reflete essa política.
+
+### Arquivos modificados
+
+- `saas/apps/api/src/modules/dashboard/dashboard.repository.ts`, `dashboard.service.ts` e `dashboard.types.ts`: cálculo e contrato do onboarding real.
+- `saas/apps/api/src/modules/action-plan/action-plan.repository.ts`, `action-plan.service.ts` e `action-plan.controller.ts`: lista de responsáveis, escopo do EMPLOYEE, regras de mutação e respostas HTTP.
+- `saas/apps/api/src/tests/multitenant.e2e.ts`: cenários inicial, parcial e completo do onboarding; atribuição; transições; campos proibidos; isolamento entre empresas e IDs manipulados.
+- `lib/features/dashboard/presentation/widgets/owner_onboarding_checklist.dart` e `owner_dashboard.dart`: checklist, progresso, estado concluído e atalhos.
+- `lib/features/dashboard/presentation/widgets/employee_dashboard.dart`: rótulos operacionais em português.
+- `lib/features/action_plan/presentation/action_plan_labels.dart`, `pages/action_plan_page.dart` e `data/services/action_plan_service.dart`: apresentação central, UX por role e mensagens amigáveis.
+- `lib/core/errors/api_error_presenter.dart`: tradução segura dos novos códigos de autorização.
+- `test/sprint_317_onboarding_test.dart`: progresso, navegação, estado completo e responsividade.
+
+### Testes e regressões verificadas
+
+| Verificação | Resultado |
+| --- | --- |
+| `flutter analyze` | Sucesso, sem issues |
+| `flutter test` | 73 testes aprovados |
+| `flutter build web --release` | Sucesso; somente avisos preventivos já conhecidos do dry-run Wasm em dependências |
+| `npm --workspace @consultoria/api test` | Sucesso: unitários, operações, integração/E2E, segurança, isolamento e readiness |
+| `npm run build` no monorepo | Sucesso: domain, API TypeScript e web React/Vite |
+| Lint backend | Não existe script de lint configurado; o typecheck estrito foi exercitado pelo build TypeScript |
+
+Os testes específicos confirmam: estado inicial, progresso parcial e conclusão do onboarding; ações de navegação; OWNER atribuindo EMPLOYEE próprio; rejeição de OWNER ou usuário de outra empresa como responsável; EMPLOYEE vendo somente a própria tarefa; bloqueio de criação e edição administrativa; transições permitidas e proibidas; acesso cruzado negado; e preservação das permissões globais do ADMIN. Nenhuma regressão foi observada nas suítes existentes de autenticação, aceite jurídico, recuperação/troca de senha, pesquisa, privacidade, IA, planos, relatórios, operações ou multiempresa.
+
+### Pendências e recomendação para a Sprint 3.18
+
+Não ficou pendência funcional dentro do escopo da Sprint 3.17. Permanecem gates externos já conhecidos: revisão visual manual em dispositivos/navegadores reais, validação assistida no ambiente publicado, entrega real de e-mail e revisão jurídica dos textos.
+
+Recomendação para a Sprint 3.18: implementar convite e ativação segura de colaboradores por e-mail, eliminando a distribuição manual de senha inicial, e validar esse fluxo no deploy com dados sintéticos/autorizados. Cobrança self-service e notificações amplas devem continuar separadas até esse gate operacional estar comprovado.
+
 ## Atualização da Sprint 3.16
 
 ### Resultado da auditoria desta branch
@@ -76,9 +137,9 @@ O levantamento encontrou **59 funcionalidades ou capacidades**, classificadas as
 
 | Classe | Significado | Quantidade |
 | --- | --- | ---: |
-| A | Funcional e aparentemente completa | 33 |
-| B | Funcional, mas precisa de melhoria | 9 |
-| C | Implementada parcialmente | 2 |
+| A | Funcional e aparentemente completa | 35 |
+| B | Funcional, mas precisa de melhoria | 8 |
+| C | Implementada parcialmente | 1 |
 | D | Somente interface/mock ou legado desativado | 5 |
 | E | Backend existe, mas o Flutter ativo não utiliza | 3 |
 | F | Flutter existe, mas o backend não suporta completamente | 1 |
@@ -109,7 +170,7 @@ Não existe uma área administrativa geral de configurações, consulta de audit
 
 O OWNER possui dashboard da própria empresa, edição dos dados empresariais, gestão dos EMPLOYEEs da própria equipe, pesquisa empresarial com retomada, perguntas assistidas por IA, conclusão e score, histórico, geração de plano de ação, tarefas, relatórios/PDF e consulta do plano/limites. O isolamento por `company_id` é aplicado nos services/repositories e coberto por E2E.
 
-O OWNER cadastra, edita e ativa/inativa somente EMPLOYEEs da própria empresa, atribuindo departamento e função profissional e respeitando a política de senha e o limite de assentos. Convite/ativação por e-mail continua como evolução futura. Não há onboarding guiado dentro do app após o primeiro login, notificações funcionais, troca autônoma de plano ou pagamento.
+O OWNER cadastra, edita e ativa/inativa somente EMPLOYEEs da própria empresa, atribuindo departamento e função profissional e respeitando a política de senha e o limite de assentos. O dashboard contém checklist contextual calculado pelos dados reais da empresa, com progresso e atalhos. Convite/ativação por e-mail continua como evolução futura; também não existem notificações funcionais, troca autônoma de plano ou pagamento.
 
 **OWNER não possui acesso às respostas individuais dos funcionários.** Para pesquisas de EMPLOYEE, recebe somente status e resultados consolidados; detalhes, reports e PDF não entregam resposta bruta nem transcript.
 
@@ -117,7 +178,7 @@ O OWNER cadastra, edita e ativa/inativa somente EMPLOYEEs da própria empresa, a
 
 O EMPLOYEE possui dashboard operacional, pesquisa empresarial, histórico próprio, detalhes, tarefas e filtros de prazo. Departamento e função são atribuídos pelo OWNER, aparecem somente para leitura no início da pesquisa e são gravados como snapshot histórico. O backend restringe pesquisas e respostas ao próprio usuário e impede acesso cruzado entre pessoas e empresas.
 
-A tela de relatórios não é liberada para EMPLOYEE, embora a API seja capaz de retornar relatórios das próprias pesquisas. Na área de tarefas, o backend isola por empresa, mas permite ao EMPLOYEE criar/editar tarefas da empresa; essa política deve ser confirmada, pois pode ser mais ampla que “atualizar apenas tarefas atribuídas”. O resumo empresarial exibido no dashboard é deliberadamente reduzido.
+A tela de relatórios não é liberada para EMPLOYEE, embora a API seja capaz de retornar relatórios das próprias pesquisas. Na área de tarefas, o backend entrega somente itens atribuídos ao próprio usuário e permite apenas as transições operacionais `Pendente → Em andamento → Concluída`; criação e edição administrativa são bloqueadas. O resumo empresarial exibido no dashboard é deliberadamente reduzido.
 
 ## 4. Tabela completa de funcionalidades
 
@@ -167,12 +228,12 @@ Abreviações de persistência: `companies`, `users`, `diagnosis_submissions` (`
 | F40 | Relatórios e PDF da empresa | OWNER | `/reports`, detalhes | endpoints `/reports/research*` | submissions/tasks/usage | A | Relatório executivo e PDF usam apenas resultados consolidados; não expõem respostas individuais de EMPLOYEE. | P0 |
 | F41 | Plano atual e limites | OWNER | `/plan` | `GET /billing/current-plan` | plans/subscriptions/usage | A | Uso de usuários, pesquisas, PDFs, tarefas e IA. | P1 |
 | F42 | Gerenciar equipe da própria empresa | OWNER | `/team`, `TeamPage` | `GET/POST/PUT/PATCH /company/team*` | `users.department`, `users.job_function`, audit | A | OWNER gerencia somente EMPLOYEEs próprios, com senha inicial, perfil, status e limite de assentos; convite por e-mail permanece futuro. | P1 |
-| F43 | Onboarding guiado após primeiro login | OWNER | Sem wizard | Backend cria empresa/OWNER, docs externas existem | companies/users | C | Não há checklist dentro do produto para completar empresa, equipe e primeira pesquisa. | P1 |
+| F43 | Onboarding contextual de configuração inicial | OWNER | Checklist no dashboard | `GET /dashboard/company` calcula progresso | companies/users/submissions/tasks | A | Seis etapas reais, progresso, explicações, atalhos e estado concluído recolhido. | P1 |
 | F44 | Dashboard operacional | EMPLOYEE | `/employee`, `EmployeeDashboard` | `GET /dashboard/employee` | submissions/tasks/company | A | Pesquisas próprias, tarefas atribuídas, atrasos e resumo limitado. | P0 |
 | F45 | Responder e concluir pesquisa | EMPLOYEE | `/research`, chat | endpoints `/research/submissions*` e IA | submissions/answers/usage | A | Não escolhe função/área: backend exige perfil atribuído e grava `respondent_department`/`respondent_job_function`; acessa somente suas próprias respostas. | P0 |
 | F46 | Histórico e detalhe próprios | EMPLOYEE | `/research`, `/research/:id` | `GET /research/submissions*` | submissions/answers | A | Backend restringe ao respondente. | P1 |
 | F47 | Tarefas atribuídas e filtros | EMPLOYEE | `/tasks` | `GET /action-plan/tasks` | tasks | A | Filtros “minhas”, atrasadas, próximas e concluídas. | P0 |
-| F48 | Criar/editar tarefas como EMPLOYEE | EMPLOYEE | mesma tela de tarefas | mutações `/action-plan/tasks*` | tasks | B | Política de tarefas permanece inalterada e isolada por empresa; a nova política de pesquisa restringe adicionalmente respostas ao próprio EMPLOYEE. | P1 |
+| F48 | Executar tarefas atribuídas como EMPLOYEE | EMPLOYEE | mesma tela de tarefas, modo operacional | GET próprio e PATCH de status | tasks/users | A | Somente tarefas próprias; sequência `TODO → IN_PROGRESS → DONE`; campos administrativos e criação bloqueados no backend. | P1 |
 | F49 | Resumo da empresa no dashboard | EMPLOYEE | `EmployeeDashboard` | `GET /dashboard/employee` | company/submissions/tasks | B | Exposição é reduzida por desenho; política de quais indicadores o colaborador pode ver deve ser formalizada. | P2 |
 | F50 | Relatório da própria pesquisa | EMPLOYEE | Rota `/reports` bloqueada | Backend permite somente relatório do próprio respondente | submissions/answers/tasks | E | Há capacidade segura no backend, mas nenhuma navegação/tela para EMPLOYEE. Decidir se faz parte da oferta. | P2 |
 | F51 | Visualizar plano da empresa | EMPLOYEE | Rota `/plan` bloqueada | `GET /billing/current-plan` aceita autenticado com empresa | plans/subscriptions/usage | G | Ausência possivelmente intencional; definir transparência de limites para colaboradores. | P3 |
@@ -210,7 +271,7 @@ Foram identificadas **29 superfícies de tela** (28 classes públicas terminadas
 | `CompaniesManagementPage` | `/users` com `initialUsersView` | ADMIN | Usuários por empresa | Sim | Reuso da mesma classe, não tela independente |
 | `ReportsPage` | `/reports` | ADMIN/OWNER | Lista de relatórios | Sim | EMPLOYEE não tem rota |
 | `ReportDetailsPage` | `/reports/:submissionId` | ADMIN/OWNER | Relatório executivo e PDF | Sim | Sem mock |
-| `ActionPlanPage` | `/tasks` | ADMIN/OWNER/EMPLOYEE | Lista, filtros, criação e edição de tarefas | Sim | Política de escrita do EMPLOYEE merece revisão |
+| `ActionPlanPage` | `/tasks` | ADMIN/OWNER/EMPLOYEE | Administração por ADMIN/OWNER e execução das tarefas próprias pelo EMPLOYEE | Sim | EMPLOYEE não recebe controles administrativos e só avança status permitido |
 | `CurrentPlanPage` | `/plan` | OWNER | Plano e consumo de limites | Sim | Sem upgrade/pagamento self-service |
 | `CompanySettingsPage` | `/company-settings` | OWNER | Editar dados empresariais | Sim | Sem configurações avançadas/integrações |
 | `TeamPage` | `/team` | OWNER | Criar, listar, editar e ativar/inativar EMPLOYEEs próprios | Sim | Convite/ativação por e-mail permanece futuro |
@@ -359,7 +420,7 @@ São endpoints operacionais, sem necessidade de tela de produto.
 - Flutter declara `flutter_local_notifications` e `enablePushNotifications`, mas não inicializa nem usa notificações.
 - O aceite jurídico está integrado ao Flutter e à persistência; os textos canônicos são rascunhos e ainda precisam de revisão jurídica profissional.
 - `GET /companies/:id`, `GET /action-plan/tasks/:id` e o alias `/ai/question/next` não possuem consumo ativo identificado.
-- EMPLOYEE pode ter escopo de mutação de tarefas mais amplo que o esperado pelo discurso do produto.
+- Não há exclusão de tarefa na API; cancelamento permanece como estado administrativo e o EMPLOYEE não pode acioná-lo.
 - A URL padrão Flutter é local (`http://127.0.0.1:3000`); Android físico exige `API_BASE_URL` com IP da máquina.
 
 ## 8. Cobertura da proposta do produto
@@ -368,8 +429,8 @@ São endpoints operacionais, sem necessidade de tela de produto.
 | --- | --- | --- |
 | Gestão multiempresa | Escopo por `company_id`, ADMIN global, E2E de vazamento | Adequada para MVP |
 | ADMIN | Dashboard, empresas, usuários, planos, pesquisas e relatórios | Forte; faltam auditoria/configurações gerais |
-| OWNER | Dashboard, empresa, equipe, pesquisa, ação, relatório e plano | Forte; falta onboarding guiado e convite por e-mail |
-| EMPLOYEE | Dashboard, pesquisa e tarefas | Adequada; revisar política de edição de tarefas |
+| OWNER | Dashboard, onboarding, empresa, equipe, pesquisa, ação, relatório e plano | Forte; falta convite/ativação por e-mail |
+| EMPLOYEE | Dashboard, pesquisa e execução das próprias tarefas | Adequada e com política operacional restrita no backend |
 | Diagnósticos/pesquisas | Fluxo `/research` completo, perfil por snapshot, score, IA com MIN/MAX e privacidade por papel | Adequada; legado deve ser removido depois |
 | Planos de ação/tarefas | Geração, CRUD, responsáveis, filtros e status | Adequada |
 | Dashboards | Três perfis com dados reais | Adequada |
@@ -397,11 +458,9 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 
 ### P1 — necessário para MVP operacional
 
-1. Criar onboarding guiado pós-login para completar empresa, equipe e primeira pesquisa.
-2. Formalizar e ajustar a permissão de EMPLOYEE sobre criação/edição de tarefas.
-3. Implementar convite/ativação por e-mail, evitando distribuição manual de senhas iniciais.
-4. Validar o detalhe de empresa por endpoint próprio ou remover o endpoint não utilizado.
-5. Documentar a matriz final de permissões além da política de pesquisas já aplicada.
+1. Implementar convite/ativação por e-mail, evitando distribuição manual de senhas iniciais.
+2. Validar o detalhe de empresa por endpoint próprio ou remover o endpoint não utilizado.
+3. Manter a matriz de permissões sincronizada a cada nova operação administrativa.
 
 ### P2 — importante, mas pode vir depois
 
@@ -445,7 +504,7 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 - perfil profissional e snapshot histórico concluídos;
 - encerramento determinístico MIN 5/MAX 10 concluído;
 - respostas individuais protegidas de OWNER em detalhe/report/PDF;
-- ampliar em sprint futura a política de tarefas e decidir relatório próprio do EMPLOYEE.
+- decidir em sprint futura a oferta de relatório próprio do EMPLOYEE.
 
 ### Sprint 3.16 — Higiene de produto e observabilidade
 
@@ -454,7 +513,14 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 - criar consulta administrativa de auditoria;
 - decidir estratégia de notificações.
 
-### Sprint 3.17 — Comercialização
+### Sprint 3.17 — Onboarding e fluxo operacional do EMPLOYEE
+
+- checklist contextual do OWNER concluído com estado inferido do banco;
+- tarefas do EMPLOYEE restritas às próprias atribuições e transições operacionais;
+- atribuição limitada a EMPLOYEEs ativos da mesma empresa;
+- responsividade e mensagens em português cobertas por testes.
+
+### Sprint 3.18 — Convite e ativação de colaboradores
 
 - somente após validar o beta: pricing, trial, checkout, cobrança, webhooks e estados de assinatura.
 
@@ -509,6 +575,6 @@ Essa remoção não deve ocorrer antes de preservar testes de isolamento, segura
 
 ## 12. Conclusão
 
-O aplicativo já é mais do que uma interface demonstrativa: o núcleo de consultoria está integrado e persistente em PostgreSQL, com três perfis, gestão de equipe pelo OWNER, isolamento multiempresa, pesquisa com perfil histórico, encerramento determinístico, privacidade de respostas, plano de ação, dashboards, relatórios, limites comerciais internos e aceite jurídico obrigatório no primeiro acesso. As lacunas restantes concentram-se no acabamento operacional: e-mail real, revisão profissional dos textos jurídicos, onboarding dentro do produto, convite de colaboradores, política final de tarefas e remoção de módulos legados/mock.
+O aplicativo já é mais do que uma interface demonstrativa: o núcleo de consultoria está integrado e persistente em PostgreSQL, com três perfis, gestão de equipe pelo OWNER, onboarding contextual, isolamento multiempresa, pesquisa com perfil histórico, encerramento determinístico, privacidade de respostas, plano de ação com execução restrita do EMPLOYEE, dashboards, relatórios, limites comerciais internos e aceite jurídico obrigatório no primeiro acesso. As lacunas restantes concentram-se no acabamento operacional: e-mail real, revisão profissional dos textos jurídicos, convite de colaboradores e remoção de módulos legados/mock.
 
 A **Sprint 3.13 — Aceite jurídico obrigatório e primeiro cliente real** já concluiu o gate técnico de aceite. Os próximos passos da sprint são a revisão profissional dos textos, a recuperação segura e a validação assistida do fluxo completo por uma empresa autorizada. Pagamentos e recursos futuros devem esperar essa validação.

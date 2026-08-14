@@ -149,6 +149,7 @@ export class ActionPlanRepository {
         INNER JOIN companies c ON c.id = u.company_id
         WHERE u.company_id = ?
           AND u.status = 'ACTIVE'
+          AND u.role = 'EMPLOYEE'
         ORDER BY
           CASE u.role WHEN 'OWNER' THEN 1 ELSE 2 END,
           u.name ASC

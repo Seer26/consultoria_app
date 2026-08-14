@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/section_header.dart';
+import '../../../action_plan/presentation/action_plan_labels.dart';
 import 'dashboard_banner.dart';
 import 'dashboard_info_panel.dart';
 import 'kpi_card.dart';
+import 'owner_onboarding_checklist.dart';
 
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key, required this.data});
@@ -16,6 +18,7 @@ class OwnerDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final company = _readMap(data['company']);
+    final onboarding = _readMap(data['onboarding']);
     final metrics = _readMap(data['metrics']);
     final pillarScores = _readList(data['pillarScores']);
     final criticalPoints = _readStrings(data['criticalPoints']);
@@ -48,6 +51,8 @@ class OwnerDashboard extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        OwnerOnboardingChecklist(data: onboarding),
         const SizedBox(height: 20),
         _MetricsGrid(
           cards: [
@@ -401,8 +406,8 @@ class _TaskCard extends StatelessWidget {
         title: Text(task['title']?.toString() ?? 'Tarefa'),
         subtitle: Text(
           [
-            task['priority']?.toString() ?? '',
-            task['status']?.toString() ?? '',
+            actionPlanPriorityLabel(task['priority']),
+            actionPlanStatusLabel(task['status']),
             task['pillar']?.toString() ?? '',
             if (dueDate != null)
               'Prazo ${DateFormatter.formatDate(dueDate.toLocal())}',

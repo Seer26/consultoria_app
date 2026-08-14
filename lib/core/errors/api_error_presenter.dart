@@ -112,6 +112,12 @@ const _apiCodeMessages = <String, String>{
   'RESEARCH_SUBMISSION_NOT_FOUND': 'A pesquisa nao foi encontrada.',
   'REPORT_NOT_FOUND': 'O relatorio nao foi encontrado.',
   'PLAN_NOT_FOUND': 'O plano da empresa nao foi encontrado.',
+  'RESPONSIBLE_USER_ROLE_NOT_ALLOWED':
+      'Selecione um colaborador ativo da empresa como responsável.',
+  'EMPLOYEE_TASK_FIELDS_FORBIDDEN':
+      'Como colaborador, você pode atualizar somente o andamento das tarefas atribuídas a você.',
+  'EMPLOYEE_TASK_STATUS_TRANSITION_FORBIDDEN':
+      'Avance a tarefa na ordem: Pendente, Em andamento e Concluída.',
 };
 
 String? _readApiCode(dynamic data) {

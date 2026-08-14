@@ -118,10 +118,13 @@ export class ActionPlanController {
         case 'INVALID_ACTION_PLAN_SOURCE':
         case 'INVALID_ACTION_PLAN_DUE_DATE':
         case 'RESPONSIBLE_USER_COMPANY_MISMATCH':
+        case 'RESPONSIBLE_USER_ROLE_NOT_ALLOWED':
         case 'SUBMISSION_COMPANY_MISMATCH':
         case 'COMPANY_ID_REQUIRED':
           return 400;
         case 'FORBIDDEN':
+        case 'EMPLOYEE_TASK_FIELDS_FORBIDDEN':
+        case 'EMPLOYEE_TASK_STATUS_TRANSITION_FORBIDDEN':
           return 403;
         case 'ACTION_PLAN_TASK_NOT_FOUND':
         case 'RESPONSIBLE_USER_NOT_FOUND':

@@ -43,6 +43,7 @@ export class DashboardService {
         id: company.id,
         name: company.name,
       },
+      onboarding: await this.repository.getCompanyOnboarding(companyId),
       metrics: await this.repository.getCompanyMetrics(companyId),
       pillarScores: latestCompletedResearch.pillarScores,
       criticalPoints: recentInsights.criticalPoints,
