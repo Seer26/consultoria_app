@@ -14,7 +14,7 @@ class OwnerOnboardingChecklist extends StatelessWidget {
 
     final itemsState = _readMap(data['items']);
     final completedCount = (data['completedCount'] as num?)?.toInt() ?? 0;
-    final totalCount = (data['totalCount'] as num?)?.toInt() ?? 6;
+    final totalCount = (data['totalCount'] as num?)?.toInt() ?? 7;
     final progress = ((data['progress'] as num?)?.toDouble() ?? 0) / 100;
     final isComplete = data['isComplete'] == true;
     final items = <_OnboardingItem>[
@@ -70,6 +70,15 @@ class OwnerOnboardingChecklist extends StatelessWidget {
         actionLabel: 'Ver plano de ação',
         route: '/tasks',
         icon: Icons.task_alt_outlined,
+      ),
+      _OnboardingItem(
+        keyName: 'strategyDefined',
+        title: 'Defina a estratégia empresarial',
+        description:
+            'Registre missão, visão e o primeiro objetivo estratégico.',
+        actionLabel: 'Abrir estratégia',
+        route: '/strategy',
+        icon: Icons.account_tree_outlined,
       ),
     ];
 

@@ -19,6 +19,7 @@ class OwnerDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final company = _readMap(data['company']);
     final onboarding = _readMap(data['onboarding']);
+    final strategySummary = _readMap(data['strategySummary']);
     final metrics = _readMap(data['metrics']);
     final pillarScores = _readList(data['pillarScores']);
     final criticalPoints = _readStrings(data['criticalPoints']);
@@ -53,6 +54,53 @@ class OwnerDashboard extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         OwnerOnboardingChecklist(data: onboarding),
+        const SizedBox(height: 20),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final summary = Row(
+                  children: [
+                    const CircleAvatar(
+                      child: Icon(Icons.account_tree_outlined),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Resumo estratégico',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          Text(
+                            '${strategySummary['activeObjectives'] ?? 0} objetivo(s) ativo(s) · ${strategySummary['goalsDueSoon'] ?? 0} meta(s) próxima(s) do prazo · ${strategySummary['progress'] ?? 0}% concluído',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+                final button = TextButton(
+                  onPressed: () => context.go('/strategy'),
+                  child: const Text('Ver estratégia'),
+                );
+                return constraints.maxWidth < 600
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [summary, const SizedBox(height: 8), button],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: summary),
+                          button,
+                        ],
+                      );
+              },
+            ),
+          ),
+        ),
         const SizedBox(height: 20),
         _MetricsGrid(
           cards: [

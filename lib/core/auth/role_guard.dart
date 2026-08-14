@@ -5,8 +5,8 @@ import '../widgets/sidebar.dart';
 ///
 /// Regras resumidas:
 /// - ADMIN: dashboard global, empresas, usuarios, relatorios e consulta de pesquisas.
-/// - OWNER: dashboard da empresa, relatorios, pesquisa e plano de acao.
-/// - EMPLOYEE: pesquisa operacional e tarefas.
+/// - OWNER: dashboard, estrategia, relatorios, pesquisa e plano de acao.
+/// - EMPLOYEE: pesquisa, tarefas e consulta da estrategia da empresa.
 class RoleGuard {
   static const String admin = 'ADMIN';
   static const String owner = 'OWNER';
@@ -30,6 +30,7 @@ class RoleGuard {
           SidebarItem.dashboard,
           SidebarItem.diagnostico,
           SidebarItem.tarefas,
+          SidebarItem.estrategia,
           SidebarItem.relatorios,
           SidebarItem.plano,
           SidebarItem.configuracoesEmpresa,
@@ -40,6 +41,7 @@ class RoleGuard {
           SidebarItem.dashboard,
           SidebarItem.diagnostico,
           SidebarItem.tarefas,
+          SidebarItem.estrategia,
         ];
       default:
         return const [];
@@ -121,6 +123,8 @@ class RoleGuard {
         return SidebarItem.configuracoesEmpresa;
       case '/team':
         return SidebarItem.equipe;
+      case '/strategy':
+        return SidebarItem.estrategia;
       default:
         return null;
     }

@@ -10,6 +10,87 @@ Data da atualização: 14/08/2026
 
 Escopo: análise do Flutter, API Node/TypeScript, migrations, testes e documentação. Somente bancos sintéticos e descartáveis das suítes automatizadas foram usados; nenhum dado real de cliente foi aberto ou alterado.
 
+## Atualização da Sprint 3.18
+
+### Resultado entregue
+
+A Sprint 3.18 entregou a fundação de Gestão Estratégica do FLUXO, integrada ao Flutter e à API real. O OWNER registra missão, visão e valores, mantém objetivos estratégicos, associa metas mensuráveis e organiza a análise SWOT nas quatro categorias. O EMPLOYEE consulta o direcionamento da própria empresa em modo somente leitura. O ADMIN preserva a capacidade global no backend mediante seleção explícita da empresa.
+
+Toda leitura e mutação é vinculada a `company_id`, com validação da empresa do ator e da entidade persistida. Responsáveis por objetivos são limitados a EMPLOYEEs ativos da mesma empresa. IDs ou `companyId` manipulados não ampliam acesso.
+
+### Persistência e API
+
+A migration incremental `008_basic_strategy_module.sql` cria, sem reescrever migrations anteriores:
+
+- `company_strategy`: missão, visão e valores por empresa;
+- `strategic_objectives`: título, descrição, status, prioridade, datas, responsável opcional e observações;
+- `strategic_goals`: metas ligadas ao objetivo, com valores inicial, atual e alvo, unidade, prazo e status;
+- `swot_items`: forças, fraquezas, oportunidades e ameaças.
+
+Os índices priorizam consultas por empresa, status, prazo, objetivo e categoria SWOT. A migration foi aplicada e exercitada em PostgreSQL temporário; o schema SQLite equivalente preserva o desenvolvimento local e as suítes históricas.
+
+Endpoints adicionados:
+
+- `GET /strategy` e `GET /strategy/assignees`;
+- `PUT /strategy/profile`;
+- `POST /strategy/objectives` e `PUT /strategy/objectives/:id`;
+- `POST /strategy/objectives/:objectiveId/goals` e `PUT /strategy/goals/:id`;
+- `POST /strategy/swot`, `PUT /strategy/swot/:id` e `DELETE /strategy/swot/:id`.
+
+### Flutter, dashboard e onboarding
+
+A rota `/strategy` e o item **Estratégia** foram incluídos para OWNER e EMPLOYEE depois de o fluxo estar funcional. A tela possui estados de carregamento, falha e vazio; resumos; formulários; objetivos e metas; matriz SWOT responsiva; rótulos centralizados em português; e mensagens seguras pela camada comum de apresentação de erros.
+
+O dashboard do OWNER agora exibe objetivos ativos, metas próximas do prazo e progresso estratégico, com atalho para o módulo. O onboarding passa a ter sete etapas. A etapa de estratégia é concluída somente quando existem missão, visão e ao menos um objetivo persistido.
+
+### Permissões confirmadas
+
+| Perfil | Leitura | Escrita |
+| --- | --- | --- |
+| ADMIN | Empresa indicada explicitamente | Preservada no backend, sempre no escopo da empresa indicada |
+| OWNER | Somente a própria empresa | Perfil, objetivos, metas e SWOT da própria empresa |
+| EMPLOYEE | Estratégia da própria empresa | Bloqueada no backend e ocultada no Flutter |
+
+### Arquivos principais
+
+- `saas/apps/api/src/database/migrations/008_basic_strategy_module.sql` e `src/db/schema.ts`;
+- `saas/apps/api/src/modules/strategy/*` e registro em `src/app.ts`;
+- `saas/apps/api/src/modules/dashboard/*` e `src/tests/multitenant.e2e.ts`;
+- `lib/features/strategy/*`;
+- `lib/core/router/app_router.dart`, `role_guard.dart`, `app_shell.dart` e `sidebar.dart`;
+- `lib/features/dashboard/presentation/widgets/owner_dashboard.dart` e `owner_onboarding_checklist.dart`;
+- `test/sprint_318_strategy_test.dart` e regressão de `test/sprint_317_onboarding_test.dart`.
+
+### Testes e regressões verificadas
+
+| Verificação | Resultado |
+| --- | --- |
+| `dart analyze` | Sucesso, sem issues |
+| `flutter test` | 82 testes aprovados |
+| `flutter build web --release` | Sucesso; somente avisos preventivos já conhecidos do dry-run Wasm em dependências |
+| `npm --workspace @consultoria/api test` | Sucesso: unitários, operações, E2E, segurança, readiness e cenários estratégicos multiempresa |
+| `npm run build` no monorepo | Sucesso: domain, API TypeScript e React/Vite |
+| Regressão PostgreSQL temporária | Sucesso com migration 008, smoke e E2E completos |
+
+Os cenários estratégicos cobrem OWNER, EMPLOYEE e ADMIN; criação e edição; meta mensurável; SWOT; responsável inválido; leitura somente do EMPLOYEE; autenticação; isolamento entre duas empresas; IDs manipulados; onboarding; SQLite e PostgreSQL. Permanecem preservados os fluxos de pesquisa, IA, score, privacidade individual, relatórios/PDF, planos, tarefas, aceite jurídico, senha e operações.
+
+### ROADMAP CONSULTORIA 360
+
+| Área | Classificação | Observação |
+| --- | --- | --- |
+| Diagnóstico, resultados, IA consultiva, plano de ação, tarefas, dashboards e relatórios | Implementado | Núcleo atual integrado e testado |
+| Gestão Estratégica básica: identidade, objetivos, metas e SWOT | Implementado | Entregue nesta sprint |
+| Integração Consultoria 360 entre estratégia, diagnóstico e plano de ação | Parcial | Há resumo no dashboard; associação formal entre objetivos, diagnósticos e tarefas fica para evolução futura |
+| Financeiro, Marketing, Comercial e Processos como módulos operacionais dedicados | Planejado | Os pilares atuais de diagnóstico não equivalem a esses módulos |
+| Gestão Estratégica avançada: mapas, indicadores compostos, ciclos, revisões e alinhamento com projetos/orçamento | Futuro | Não confundir com a fundação entregue |
+| Recrutamento e Treinamentos como módulos dedicados | Futuro | Não foram criadas telas, menus, entidades ou endpoints vazios |
+
+### Pendências e recomendação
+
+Não ficou pendência funcional dentro do escopo básico da Sprint 3.18. Permanecem gates externos conhecidos: revisão visual manual em dispositivos reais, validação assistida no ambiente publicado, entrega real de e-mail e revisão jurídica.
+
+Recomendação para a próxima sprint: validar a fundação estratégica com usuários em staging e definir, em escopo separado, qual evolução traz mais valor — indicadores/ciclos estratégicos ou convite seguro de colaboradores. Os módulos Financeiro, Marketing, Comercial, Recrutamento, Treinamentos e Processos devem permanecer explicitamente no roadmap futuro até terem requisitos e modelo de dados próprios.
+
 ## Atualização da Sprint 3.17
 
 ### Resultado entregue
@@ -520,9 +601,12 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 - atribuição limitada a EMPLOYEEs ativos da mesma empresa;
 - responsividade e mensagens em português cobertas por testes.
 
-### Sprint 3.18 — Convite e ativação de colaboradores
+### Sprint 3.18 — Fundação de Gestão Estratégica
 
-- somente após validar o beta: pricing, trial, checkout, cobrança, webhooks e estados de assinatura.
+- missão, visão, valores, objetivos, metas e SWOT concluídos;
+- leitura do EMPLOYEE e edição do OWNER com isolamento multiempresa concluídas;
+- resumo no dashboard e sétima etapa do onboarding concluídos;
+- gestão estratégica avançada e demais módulos da Consultoria 360 permanecem futuros.
 
 ## 11. Situação PostgreSQL e SQLite
 
@@ -531,7 +615,7 @@ Não há P0 de código confirmado no núcleo. Permanecem gates P0 antes de coloc
 - A seleção do provider ocorre por `DATABASE_URL`; com ela definida, `dataSource.provider` é `postgres`.
 - Repositories centrais usam o adaptador assíncrono compartilhado, que traduz parâmetros e algumas expressões SQLite para PostgreSQL.
 - O startup importa `database/init.ts` dinamicamente somente quando o provider é SQLite; PostgreSQL não carrega o módulo SQLite com efeito colateral.
-- Migrations PostgreSQL 001–007 cobrem companies, users, perfis profissionais, snapshots de pesquisa, submissions/answers, tarefas, planos, assinaturas, uso, reset de senha, aceite legal, auditoria, IA e hardening.
+- Migrations PostgreSQL 001–008 cobrem companies, users, perfis profissionais, snapshots de pesquisa, submissions/answers, tarefas, planos, assinaturas, uso, reset de senha, aceite legal, auditoria, IA, hardening e a fundação de gestão estratégica.
 
 ### 11.2 Código SQLite ainda presente
 

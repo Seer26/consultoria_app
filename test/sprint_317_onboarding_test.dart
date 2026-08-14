@@ -33,9 +33,9 @@ void main() {
   }) {
     return {
       'completedCount': completedCount,
-      'totalCount': 6,
-      'progress': (completedCount / 6 * 100).round(),
-      'isComplete': completedCount == 6,
+      'totalCount': 7,
+      'progress': (completedCount / 7 * 100).round(),
+      'isComplete': completedCount == 7,
       'items': items,
     };
   }
@@ -49,6 +49,7 @@ void main() {
       'firstResearch': false,
       'firstResult': false,
       'firstActionPlan': false,
+      'strategyDefined': false,
     },
   );
 
@@ -72,7 +73,7 @@ void main() {
         find.byKey(const ValueKey('owner-onboarding-checklist')),
         findsOneWidget,
       );
-      expect(find.text('0 de 6 etapas concluídas'), findsOneWidget);
+      expect(find.text('0 de 7 etapas concluídas'), findsOneWidget);
       expect(find.text('Completar dados'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -113,7 +114,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
-    expect(find.text('3 de 6 etapas concluídas'), findsOneWidget);
+    expect(find.text('3 de 7 etapas concluídas'), findsOneWidget);
 
     await tester.tap(find.text('Gerenciar equipe'));
     await tester.pumpAndSettle();
@@ -123,7 +124,7 @@ void main() {
   testWidgets('onboarding completo fica recolhido e discreto', (tester) async {
     useSurface(tester, 768);
     final complete = onboarding(
-      completedCount: 6,
+      completedCount: 7,
       items: const {
         'companyProfile': true,
         'team': true,
@@ -131,6 +132,7 @@ void main() {
         'firstResearch': true,
         'firstResult': true,
         'firstActionPlan': true,
+        'strategyDefined': true,
       },
     );
 
@@ -142,7 +144,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Configuração inicial concluída'), findsOneWidget);
-    expect(find.text('6 de 6 etapas concluídas'), findsOneWidget);
+    expect(find.text('7 de 7 etapas concluídas'), findsOneWidget);
     expect(find.text('Etapa concluída.'), findsNothing);
     expect(tester.takeException(), isNull);
   });

@@ -114,6 +114,25 @@ const _apiCodeMessages = <String, String>{
   'PLAN_NOT_FOUND': 'O plano da empresa nao foi encontrado.',
   'RESPONSIBLE_USER_ROLE_NOT_ALLOWED':
       'Selecione um colaborador ativo da empresa como responsável.',
+  'STRATEGY_READ_ONLY':
+      'Colaboradores podem consultar a estrategia, mas nao altera-la.',
+  'STRATEGY_MISSION_REQUIRED': 'Informe a missao da empresa.',
+  'STRATEGY_VISION_REQUIRED': 'Informe a visao da empresa.',
+  'STRATEGY_VALUES_REQUIRED': 'Informe os valores da empresa.',
+  'STRATEGIC_OBJECTIVE_TITLE_REQUIRED': 'Informe o titulo do objetivo.',
+  'STRATEGIC_GOAL_TITLE_REQUIRED': 'Informe o titulo da meta.',
+  'SWOT_TITLE_REQUIRED': 'Informe o titulo do item SWOT.',
+  'STRATEGY_TEXT_TOO_LONG': 'Reduza o texto informado e tente novamente.',
+  'STRATEGY_RESPONSIBLE_INVALID':
+      'Selecione um colaborador ativo da empresa como responsavel.',
+  'INVALID_STRATEGY_STATUS': 'Selecione um status estrategico valido.',
+  'INVALID_STRATEGY_PRIORITY': 'Selecione uma prioridade valida.',
+  'INVALID_SWOT_CATEGORY': 'Selecione uma categoria SWOT valida.',
+  'INVALID_STRATEGY_DATE': 'Informe uma data valida.',
+  'INVALID_STRATEGY_NUMBER': 'Informe um valor numerico valido.',
+  'STRATEGIC_OBJECTIVE_NOT_FOUND': 'O objetivo nao foi encontrado.',
+  'STRATEGIC_GOAL_NOT_FOUND': 'A meta nao foi encontrada.',
+  'SWOT_ITEM_NOT_FOUND': 'O item SWOT nao foi encontrado.',
   'EMPLOYEE_TASK_FIELDS_FORBIDDEN':
       'Como colaborador, você pode atualizar somente o andamento das tarefas atribuídas a você.',
   'EMPLOYEE_TASK_STATUS_TRANSITION_FORBIDDEN':

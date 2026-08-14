@@ -23,6 +23,7 @@ import '../../features/diagnosis/presentation/pages/chat_diagnosis_page.dart';
 import '../../features/diagnosis/presentation/pages/research_details_page.dart';
 import '../../features/reports/presentation/pages/reports_page.dart';
 import '../../features/legal/presentation/pages/legal_acceptance_page.dart';
+import '../../features/strategy/presentation/strategy_page.dart';
 import '../../features/legal/presentation/providers/legal_acceptance_providers.dart';
 import '../../features/legal/presentation/state/legal_acceptance_state.dart';
 import '../auth/role_guard.dart';
@@ -305,6 +306,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => RbacGuard(
                   allowedRoles: const [RoleGuard.owner],
                   child: const TeamPage(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/strategy',
+                name: 'strategy',
+                builder: (context, state) => RbacGuard(
+                  allowedRoles: const [RoleGuard.owner, RoleGuard.employee],
+                  child: const StrategyPage(),
                 ),
               ),
             ],

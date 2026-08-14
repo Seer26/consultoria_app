@@ -6,6 +6,7 @@ import type {
   DashboardOnboardingProgress,
   DashboardPillarScore,
   DashboardResearchItem,
+  DashboardStrategySummary,
   DashboardTaskItem,
 } from './dashboard.types';
 
@@ -87,6 +88,7 @@ interface OnboardingRow {
   research_total: number;
   completed_research_total: number;
   action_plan_total: number;
+  strategy_defined: number;
 }
 
 function roundScore(value: number | null | undefined): number | null {
@@ -280,7 +282,18 @@ export class DashboardRepository {
         (
           SELECT COUNT(*) FROM action_plan_tasks apt
           WHERE apt.company_id = c.id AND apt.submission_id IS NOT NULL
-        ) AS action_plan_total
+        ) AS action_plan_total,
+        CASE WHEN
+          EXISTS (
+            SELECT 1 FROM company_strategy cs
+            WHERE cs.company_id = c.id
+              AND TRIM(COALESCE(cs.mission, '')) <> ''
+              AND TRIM(COALESCE(cs.vision, '')) <> ''
+          )
+          AND EXISTS (
+            SELECT 1 FROM strategic_objectives so WHERE so.company_id = c.id
+          )
+          THEN 1 ELSE 0 END AS strategy_defined
       FROM companies c
       WHERE c.id = ?
       `,
@@ -296,6 +309,7 @@ export class DashboardRepository {
       firstResearch: Number(row?.research_total ?? 0) > 0,
       firstResult: Number(row?.completed_research_total ?? 0) > 0,
       firstActionPlan: Number(row?.action_plan_total ?? 0) > 0,
+      strategyDefined: Number(row?.strategy_defined ?? 0) === 1,
     };
     const completedCount = Object.values(items).filter(Boolean).length;
     const totalCount = Object.keys(items).length;
@@ -306,6 +320,31 @@ export class DashboardRepository {
       progress: Math.round((completedCount / totalCount) * 100),
       isComplete: completedCount === totalCount,
       items,
+    };
+  }
+
+  async getStrategySummary(companyId: string): Promise<DashboardStrategySummary> {
+    const now = new Date();
+    const limit = new Date(now.getTime() + 30 * 86_400_000);
+    const row = await dataSource.one<{
+      active_objectives: number | null;
+      total_objectives: number | null;
+      completed_objectives: number | null;
+      goals_due_soon: number | null;
+    }>(
+      `SELECT
+        (SELECT COUNT(*) FROM strategic_objectives WHERE company_id=@companyId AND status IN ('PLANNED','IN_PROGRESS')) AS active_objectives,
+        (SELECT COUNT(*) FROM strategic_objectives WHERE company_id=@companyId) AS total_objectives,
+        (SELECT COUNT(*) FROM strategic_objectives WHERE company_id=@companyId AND status='COMPLETED') AS completed_objectives,
+        (SELECT COUNT(*) FROM strategic_goals WHERE company_id=@companyId AND status NOT IN ('COMPLETED','CANCELED') AND due_date BETWEEN @now AND @limit) AS goals_due_soon`,
+      { companyId, now: now.toISOString(), limit: limit.toISOString() },
+    );
+    const total = Number(row?.total_objectives ?? 0);
+    const completed = Number(row?.completed_objectives ?? 0);
+    return {
+      activeObjectives: Number(row?.active_objectives ?? 0),
+      goalsDueSoon: Number(row?.goals_due_soon ?? 0),
+      progress: total === 0 ? 0 : Math.round((completed / total) * 100),
     };
   }
 

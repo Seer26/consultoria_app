@@ -15,6 +15,7 @@ import { reportsRouter } from './modules/reports/reports.router';
 import { researchRouter } from './modules/research/research.router';
 import { operationsRouter } from './modules/operations/operations.router';
 import { legalRouter } from './modules/legal/legal.router';
+import { strategyRouter } from './modules/strategy/strategy.router';
 import { logger } from './shared/logger';
 import { requestContext } from './shared/request-context';
 import { securityHeaders } from './shared/security-headers';
@@ -64,6 +65,7 @@ app.use('/', dashboardRouter);
 app.use('/api/diagnosis', diagnosisRouter);
 app.use('/', operationsRouter);
 app.use('/', legalRouter);
+app.use('/', strategyRouter);
 
 app.use((request: Request, response: Response) => {
   response.status(404).json({

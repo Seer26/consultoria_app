@@ -195,6 +195,63 @@ async function main(): Promise<void> {
       token: employeeA.token,
       expectedStatus: 403,
     });
+    await request(baseUrl, 'PUT', '/strategy/profile', {
+      token: ownerA.token,
+      body: {
+        mission: 'Gerar crescimento sustentavel.',
+        vision: 'Ser referencia em consultoria.',
+        values: 'Etica e resultado.',
+      },
+    });
+    const strategicObjective = await request<{ id: string; companyId: string }>(
+      baseUrl,
+      'POST',
+      '/strategy/objectives',
+      {
+        token: ownerA.token,
+        expectedStatus: 201,
+        body: {
+          title: 'Crescer com previsibilidade',
+          status: 'IN_PROGRESS',
+          priority: 'HIGH',
+          responsibleUserId: employeeA.user.id,
+        },
+      },
+    );
+    assert(
+      strategicObjective.companyId === companyA.company.id,
+      'POSTGRES_E2E_STRATEGY_TENANT',
+    );
+    await request(baseUrl, 'POST', `/strategy/objectives/${strategicObjective.id}/goals`, {
+      token: ownerA.token,
+      expectedStatus: 201,
+      body: {
+        title: 'Atingir a meta anual',
+        initialValue: 100,
+        targetValue: 180,
+        currentValue: 125,
+        unit: 'BRL mil',
+        status: 'IN_PROGRESS',
+      },
+    });
+    const employeeStrategy = await request<{
+      canEdit: boolean;
+      objectives: Array<{ id: string; goals: Array<{ title: string }> }>;
+    }>(baseUrl, 'GET', '/strategy', { token: employeeA.token });
+    assert(
+      employeeStrategy.canEdit === false &&
+        employeeStrategy.objectives[0]?.goals[0]?.title === 'Atingir a meta anual',
+      'POSTGRES_E2E_STRATEGY_EMPLOYEE_READ_ONLY',
+    );
+    await request(baseUrl, 'PUT', '/strategy/profile', {
+      token: employeeA.token,
+      expectedStatus: 403,
+      body: { mission: 'Bloqueada', vision: 'Bloqueada', values: 'Bloqueada' },
+    });
+    await request(baseUrl, 'GET', `/strategy?companyId=${companyA.company.id}`, {
+      token: ownerB.token,
+      expectedStatus: 403,
+    });
     const starterPlan = await request<{ plan: { slug: string } }>(
       baseUrl,
       'GET',

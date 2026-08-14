@@ -84,5 +84,12 @@ export interface DashboardOnboardingProgress {
     firstResearch: boolean;
     firstResult: boolean;
     firstActionPlan: boolean;
+    strategyDefined: boolean;
   };
+}
+
+export interface DashboardStrategySummary {
+  activeObjectives: number;
+  goalsDueSoon: number;
+  progress: number;
 }

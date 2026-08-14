@@ -357,6 +357,221 @@ async function main(): Promise<void> {
       'Owner onboarding should expose the real initial state',
     );
 
+    await expectStatus(baseUrl, 'GET', '/strategy', 401);
+    await expectStatus(baseUrl, 'GET', '/strategy', 400, { token: admin.token });
+    await expectStatus(
+      baseUrl,
+      'GET',
+      `/strategy?companyId=${companyB.company.id}`,
+      403,
+      { token: ownerA.token },
+    );
+    const profileA = await request<{ companyId: string; mission: string }>(
+      baseUrl,
+      'PUT',
+      '/strategy/profile',
+      {
+        token: ownerA.token,
+        body: {
+          mission: 'Ajudar clientes a crescer com consistencia.',
+          vision: 'Ser referencia nacional em consultoria empresarial.',
+          values: 'Etica, clareza e resultado.',
+        },
+      },
+    );
+    assert(
+      profileA.companyId === companyA.company.id && profileA.mission.length > 0,
+      'Owner should update only the strategy profile of their own company',
+    );
+    const editedProfileA = await request<{ mission: string; vision: string }>(
+      baseUrl,
+      'PUT',
+      '/strategy/profile',
+      {
+        token: ownerA.token,
+        body: { mission: 'Transformar empresas com gestao clara.' },
+      },
+    );
+    assert(
+      editedProfileA.mission === 'Transformar empresas com gestao clara.' &&
+        editedProfileA.vision === 'Ser referencia nacional em consultoria empresarial.',
+      'Strategy profile should support safe partial editing',
+    );
+    const objectiveA = await request<{
+      id: string;
+      companyId: string;
+      responsibleUserId: string | null;
+    }>(baseUrl, 'POST', '/strategy/objectives', {
+      token: ownerA.token,
+      expectedStatus: 201,
+      body: {
+        title: 'Aumentar a previsibilidade de receita',
+        description: 'Consolidar uma operacao comercial previsivel.',
+        priority: 'HIGH',
+        status: 'IN_PROGRESS',
+        responsibleUserId: employeeA.user.id,
+        dueDate: new Date(Date.now() + 90 * 86_400_000).toISOString(),
+        notes: 'Revisao mensal pela diretoria.',
+      },
+    });
+    assert(
+      objectiveA.companyId === companyA.company.id &&
+        objectiveA.responsibleUserId === employeeA.user.id,
+      'Objective should persist the tenant and active employee assignee',
+    );
+    const editedObjectiveA = await request<{ status: string; priority: string }>(
+      baseUrl,
+      'PUT',
+      `/strategy/objectives/${objectiveA.id}`,
+      {
+        token: ownerA.token,
+        body: {
+          title: 'Aumentar a previsibilidade de receita',
+          description: 'Consolidar uma operacao comercial previsivel.',
+          priority: 'CRITICAL',
+          status: 'IN_PROGRESS',
+          responsibleUserId: employeeA.user.id,
+          notes: 'Atualizado no ciclo mensal.',
+        },
+      },
+    );
+    assert(
+      editedObjectiveA.status === 'IN_PROGRESS' &&
+        editedObjectiveA.priority === 'CRITICAL',
+      'Owner should edit objective status and priority',
+    );
+    await expectStatus(baseUrl, 'POST', '/strategy/objectives', 400, {
+      token: ownerA.token,
+      body: {
+        title: 'Responsavel de outra empresa',
+        responsibleUserId: ownerB.user.id,
+      },
+    });
+    const goalA = await request<{ id: string; objectiveId: string; targetValue: number }>(
+      baseUrl,
+      'POST',
+      `/strategy/objectives/${objectiveA.id}/goals`,
+      {
+        token: ownerA.token,
+        expectedStatus: 201,
+        body: {
+          title: 'Atingir receita recorrente alvo',
+          initialValue: 100000,
+          targetValue: 180000,
+          currentValue: 125000,
+          unit: 'BRL',
+          dueDate: new Date(Date.now() + 20 * 86_400_000).toISOString(),
+          status: 'IN_PROGRESS',
+        },
+      },
+    );
+    assert(
+      goalA.objectiveId === objectiveA.id && goalA.targetValue === 180000,
+      'Goal should be linked to its objective with measurable values',
+    );
+    const updatedGoalA = await request<{ currentValue: number; status: string }>(
+      baseUrl,
+      'PUT',
+      `/strategy/goals/${goalA.id}`,
+      {
+        token: ownerA.token,
+        body: {
+          title: 'Atingir receita recorrente alvo',
+          initialValue: 100000,
+          targetValue: 180000,
+          currentValue: 140000,
+          unit: 'BRL',
+          status: 'IN_PROGRESS',
+        },
+      },
+    );
+    assert(
+      updatedGoalA.currentValue === 140000 && updatedGoalA.status === 'IN_PROGRESS',
+      'Owner should update strategic goal progress',
+    );
+    const swotA = await request<{ id: string; category: string }>(
+      baseUrl,
+      'POST',
+      '/strategy/swot',
+      {
+        token: ownerA.token,
+        expectedStatus: 201,
+        body: {
+          category: 'STRENGTH',
+          title: 'Equipe experiente',
+          description: 'Conhecimento profundo dos clientes.',
+        },
+      },
+    );
+    assert(swotA.category === 'STRENGTH', 'SWOT category should be persisted');
+    await expectStatus(baseUrl, 'POST', '/strategy/swot', 400, {
+      token: ownerA.token,
+      body: { category: 'INVALID', title: 'Categoria invalida' },
+    });
+    const updatedSwotA = await request<{ category: string; title: string }>(
+      baseUrl,
+      'PUT',
+      `/strategy/swot/${swotA.id}`,
+      {
+        token: ownerA.token,
+        body: { category: 'OPPORTUNITY', title: 'Novo segmento de mercado' },
+      },
+    );
+    assert(
+      updatedSwotA.category === 'OPPORTUNITY',
+      'Owner should update SWOT items',
+    );
+    await expectStatus(baseUrl, 'PUT', '/strategy/profile', 403, {
+      token: employeeA.token,
+      body: { mission: 'Nao permitido', vision: 'Nao permitido', values: 'Nao permitido' },
+    });
+    await expectStatus(baseUrl, 'POST', '/strategy/objectives', 403, {
+      token: employeeA.token,
+      body: { title: 'Nao permitido' },
+    });
+    const employeeStrategy = await request<{
+      canEdit: boolean;
+      companyId: string;
+      objectives: Array<{ id: string }>;
+    }>(baseUrl, 'GET', '/strategy', { token: employeeA.token });
+    assert(
+      !employeeStrategy.canEdit &&
+        employeeStrategy.companyId === companyA.company.id &&
+        employeeStrategy.objectives.some((item) => item.id === objectiveA.id),
+      'Employee should have read-only access to their company strategy',
+    );
+    const adminStrategyA = await request<{ companyId: string }>(
+      baseUrl,
+      'GET',
+      `/strategy?companyId=${companyA.company.id}`,
+      { token: admin.token },
+    );
+    assert(
+      adminStrategyA.companyId === companyA.company.id,
+      'Admin should preserve explicit company-scoped strategy access',
+    );
+    const objectiveB = await request<{ id: string }>(
+      baseUrl,
+      'POST',
+      '/strategy/objectives',
+      {
+        token: ownerB.token,
+        expectedStatus: 201,
+        body: { title: 'Objetivo privado da empresa B' },
+      },
+    );
+    await expectStatus(baseUrl, 'PUT', `/strategy/objectives/${objectiveB.id}`, 403, {
+      token: ownerA.token,
+      body: { title: 'Tentativa de invasao' },
+    });
+    await expectStatus(baseUrl, 'DELETE', `/strategy/swot/${swotA.id}`, 403, {
+      token: ownerB.token,
+    });
+    await request<void>(baseUrl, 'DELETE', `/strategy/swot/${swotA.id}`, {
+      token: ownerA.token,
+      expectedStatus: 204,
+    });
+
     const updatedSettingsA = await request<CompanySettingsResponse>(
       baseUrl,
       'PUT',
