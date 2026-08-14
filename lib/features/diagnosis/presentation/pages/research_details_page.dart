@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/role_guard.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
@@ -62,7 +63,7 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = userFriendlyError(error);
         _isLoading = false;
       });
     }
@@ -87,7 +88,7 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.danger,
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          content: Text(userFriendlyError(error)),
         ),
       );
     } finally {
@@ -114,7 +115,7 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.danger,
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          content: Text(userFriendlyError(error)),
         ),
       );
     } finally {
@@ -134,7 +135,7 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.danger,
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          content: Text(userFriendlyError(error)),
         ),
       );
     } finally {
@@ -251,7 +252,8 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
     );
     return ResearchDetailsContent(
       details: details,
-      rawAnswersRestricted: role == RoleGuard.owner &&
+      rawAnswersRestricted:
+          role == RoleGuard.owner &&
           details.userId != ref.read(authControllerProvider).user?.id,
       canGenerateAi: role != RoleGuard.admin,
       isGeneratingAi: _isGeneratingAi,

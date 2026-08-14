@@ -7,7 +7,11 @@ import bcrypt from 'bcrypt';
 process.env.NODE_ENV = 'test';
 process.env.ENABLE_DEMO_SEED = 'false';
 process.env.JWT_SECRET = 'consultoria-e2e-multitenant-secret';
+process.env.DATABASE_URL = '';
 process.env.DATABASE_PATH = './data/consultoria-e2e-multitenant.sqlite';
+process.env.AI_ENABLED = 'true';
+process.env.AI_PROVIDER = 'gemini';
+process.env.GEMINI_API_KEY = 'fake-key-blocked-before-provider-call';
 
 type JsonValue = Record<string, unknown> | Array<unknown>;
 
@@ -251,16 +255,19 @@ async function createCompletedResearch(
     },
   });
 
-  await request(baseUrl, 'POST', `/research/submissions/${submission.id}/answers`, {
-    token: ownerToken,
-    expectedStatus: 201,
-    body: {
-      question: `Como esta o pilar ${pillar}?`,
-      answer: `Existe rotina inicial em ${pillar}, mas ainda falta controle e previsibilidade.`,
-      pillar,
-      score: 45,
-    },
-  });
+  const answerPillars = [pillar, 'Pessoas', 'Processos', pillar, 'Pessoas'];
+  for (const [index, answerPillar] of answerPillars.entries()) {
+    await request(baseUrl, 'POST', `/research/submissions/${submission.id}/answers`, {
+      token: ownerToken,
+      expectedStatus: 201,
+      body: {
+        question: `Pergunta ${index + 1} sobre ${answerPillar}`,
+        answer: `Existe rotina inicial em ${answerPillar}, mas ainda falta controle e previsibilidade.`,
+        pillar: answerPillar,
+        score: 45,
+      },
+    });
+  }
 
   const completed = await request<SubmissionResponse>(
     baseUrl,
@@ -847,10 +854,15 @@ async function main(): Promise<void> {
         quantity = excluded.quantity,
         updated_at = excluded.updated_at
     `).run(companyB.company.id, usagePeriod, now);
+    database.prepare(`
+      UPDATE diagnosis_submissions
+      SET status = 'IN_PROGRESS'
+      WHERE id = ?
+    `).run(researchB.submission.id);
     await expectStatus(baseUrl, 'POST', '/ai/next-question', 402, {
       token: ownerB.token,
       body: {
-        answer: 'Temos alguns controles, mas ainda faltam rotinas consistentes.',
+        submissionId: researchB.submission.id,
       },
     });
 

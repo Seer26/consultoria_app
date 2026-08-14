@@ -55,7 +55,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final role = user?.role.toUpperCase();
 
     return AppPageScaffold(
-      title: 'Dashboard',
+      title: 'Visao geral',
       subtitle: _subtitleForRole(role),
       actions: role == 'OWNER' || role == 'EMPLOYEE'
           ? [

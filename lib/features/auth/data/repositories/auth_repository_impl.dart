@@ -1,4 +1,5 @@
 import '../../../../core/errors/failure.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/http/token_storage.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -26,7 +27,12 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthFailure {
       rethrow;
     } catch (e) {
-      throw AuthFailure(e.toString().replaceFirst('Exception: ', ''));
+      throw AuthFailure(
+        userFriendlyError(
+          e,
+          fallback: 'Nao foi possivel iniciar sessao. Tente novamente.',
+        ),
+      );
     }
   }
 

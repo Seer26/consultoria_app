@@ -2,13 +2,69 @@
 
 Projeto: Plataforma de Consultoria Empresarial
 
-Branch auditada: `codex/sprint-3-15-team-research-privacy`
+Branch auditada: `codex/railway-deployment`
 
-Checkpoint de origem: `1d14b58f9af37796f6db9692100c3f369c186766`
+Checkpoint de origem: `41ff539` (`chore: prepare railway deployment`)
 
-Data da atualização: 12/08/2026
+Data da atualização: 14/08/2026
 
-Escopo: análise estática do Flutter, API Node/TypeScript, migrations, testes e documentação. Nenhum banco foi aberto ou alterado.
+Escopo: análise do Flutter, API Node/TypeScript, migrations, testes e documentação. Somente bancos sintéticos e descartáveis das suítes automatizadas foram usados; nenhum dado real de cliente foi aberto ou alterado.
+
+## Atualização da Sprint 3.16
+
+### Resultado da auditoria desta branch
+
+A comparação entre este relatório, o Flutter ativo, a API e os testes confirmou que o núcleo funcional descrito abaixo continua presente. Não foram alteradas regras de RBAC, escopo por `company_id`, privacidade de respostas de EMPLOYEE, score determinístico, limites de perguntas, integração de IA, planos ou persistência PostgreSQL/Railway.
+
+| Situação | Resultado confirmado |
+| --- | --- |
+| Completo | Login e sessão local; ADMIN/OWNER/EMPLOYEE; empresas; usuários; equipe; configurações; pesquisa; resultado; IA; plano de ação; tarefas; dashboards; relatórios/PDF; planos Starter/Growth; aceite legal; troca e recuperação de senha. |
+| Parcial | Onboarding pós-login; entrega real de e-mail; auditoria consultável; notificações; política de mutação de tarefas por EMPLOYEE. |
+| Ausente | Cobrança self-service; convite/ativação por e-mail; configurações administrativas globais. |
+| Obsoleto/desativado | Clientes, formulários genéricos, chat genérico, workspace de diagnóstico legado e frontend React secundário não integram o produto Flutter roteado. |
+
+Os principais problemas de produto encontrados foram: mensagens montadas separadamente em diversos serviços; risco de exibição de `Exception`, código da API ou resposta HTTP; status e perfis em inglês; barra inferior mobile com destinos demais; login sem rolagem em telas baixas; campos de configuração com largura fixa; cards da equipe apertados no celular; dialogs sem margem global pequena; e testes SQLite/E2E desatualizados em relação às migrations 006/007 e às regras MIN 5/cobertura de três pilares.
+
+### Implementado com segurança nesta sprint
+
+1. Camada central `api_error_presenter.dart` para rede, timeout, HTTP e códigos conhecidos da API, preservando mensagens específicas de domínio e ocultando detalhes técnicos.
+2. Aplicação da camada nas telas e serviços ativos de autenticação, administração, dashboard, configurações, plano, equipe, pesquisa, IA, tarefas e relatórios; também aplicada nas telas legadas ainda compiladas.
+3. Tradução de perfis, status, prioridades, origens e estados de tarefas exibidos ao usuário (`OWNER`, `EMPLOYEE`, `TODO`, `IN_PROGRESS`, `DONE`, `CANCELED`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, `AI`).
+4. Navegação mobile substituída por drawer rolável, evitando comprimir muitos destinos em 320–390 px.
+5. Login rolável com padding adaptativo; margens globais seguras para dialogs; campos da empresa fluidos; cards e ações da equipe adaptados para telas estreitas; página do plano com padding e estados padronizados.
+6. Estados vazios e feedback da equipe tornados orientativos, com sucesso/erro padronizados e falha de alteração de status tratada.
+7. Compatibilidade SQLite/local restaurada para `department`, `job_function`, snapshots profissionais e `ai_analysis`, sem modificar migrations ou comportamento PostgreSQL.
+8. E2E sintético isolado de `DATABASE_URL` local e atualizado para as regras atuais de pesquisa e contrato de IA, evitando uso acidental de banco configurado pelo desenvolvedor.
+
+### Backlog real após a Sprint 3.16
+
+| Prioridade | O que falta / onde | Impacto | Dependências | Risco | Complexidade |
+| --- | --- | --- | --- | --- | --- |
+| P0 | Provar entrega real de recuperação de senha e revisar textos legais | Gate operacional para cliente real | Provedor de e-mail e revisão jurídica | Médio | Média |
+| P0 | Executar validação assistida ADMIN → OWNER → EMPLOYEE no ambiente publicado | Evidência final de uso e deploy | Dados sintéticos/autorizados e acesso Railway | Baixo | Baixa |
+| P0 | Revisão visual manual completa em navegadores/dispositivos reais | Pode revelar variações não reproduzidas por widget test | Chrome/Edge e dispositivos | Baixo | Média |
+| P1 | Onboarding guiado de OWNER após primeiro login | Reduz abandono e suporte manual | Definição de checklist/progresso | Médio | Média |
+| P1 | Formalizar e restringir, se aprovado, mutações de tarefas por EMPLOYEE | Política atual pode ser ampla demais | Decisão de produto e testes RBAC | Médio | Média |
+| P1 | Convite/ativação por e-mail para colaboradores | Evita compartilhamento de senha inicial | E-mail transacional | Médio | Alta |
+| P2 | Consulta administrativa de auditoria/observabilidade | Facilita suporte e investigação | Endpoint paginado e política de retenção | Médio | Média |
+| P2 | Decidir e implementar relatório próprio de EMPLOYEE no Flutter | Backend seguro já possui parte da capacidade | Decisão de oferta | Baixo | Baixa |
+| P2 | Remover/congelar módulos Flutter legados | Reduz manutenção e risco de texto obsoleto | Gate de remoção separado | Médio | Média |
+| P2 | Refresh/revogação central de sessão | Melhora segurança e continuidade | Novo contrato de autenticação | Médio | Alta |
+| P3 | Notificações, cobrança, checkout, webhooks e estados comerciais ricos | Necessário para escala/self-service, não para beta manual | Provedores externos e regras comerciais | Alto | Alta |
+
+### Testes da Sprint 3.16
+
+| Verificação | Resultado |
+| --- | --- |
+| `flutter analyze` | Sucesso, sem issues |
+| `flutter test` | 66 testes aprovados, incluindo tradução e responsividade |
+| `flutter build web --release` | Sucesso; apenas aviso preventivo de incompatibilidade Wasm em dependências atuais |
+| Testes unitários/operacionais da API | Sucesso |
+| E2E API (multiempresa, segurança, operações e readiness) | Sucesso após alinhar fixtures locais ao contrato atual |
+| Build TypeScript da API/domain e React/Vite | Sucesso |
+| Testes Flutter adicionados | Tradução de erros; login em 320/390/768/1280; equipe/dialog e plano em 320 px |
+
+Recomendação objetiva: a próxima sprint deve priorizar validação visual/manual no deploy e onboarding guiado, em paralelo aos gates externos de e-mail e revisão jurídica. Pagamentos e integrações grandes devem continuar fora do escopo até o beta assistido estar comprovado.
 
 ## 1. Resumo executivo
 

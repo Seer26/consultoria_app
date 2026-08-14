@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/errors/api_error_presenter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -198,7 +200,7 @@ class ClientsPage extends ConsumerWidget {
                   const AppLoadingState(message: 'Carregando empresas'),
               error: (error, _) => AppErrorState(
                 title: 'Falha ao carregar empresas',
-                message: error.toString(),
+                message: userFriendlyError(error),
                 onRetry: () =>
                     ref.read(clientsControllerProvider.notifier).load(),
               ),

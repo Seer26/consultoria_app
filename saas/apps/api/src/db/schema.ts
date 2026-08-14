@@ -26,6 +26,8 @@ export const schemaStatements = [
     updated_at TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'ACTIVE',
     auth_version INTEGER NOT NULL DEFAULT 0,
+    department TEXT,
+    job_function TEXT,
     FOREIGN KEY (company_id) REFERENCES companies(id)
   )
   `,
@@ -38,6 +40,8 @@ export const schemaStatements = [
     questionnaire_id TEXT NOT NULL,
     respondent_role TEXT,
     department TEXT,
+    respondent_department TEXT,
+    respondent_job_function TEXT,
     status TEXT NOT NULL DEFAULT 'COMPLETED',
     overall_score REAL,
     summary TEXT,
@@ -46,6 +50,7 @@ export const schemaStatements = [
     recommendations TEXT,
     next_steps TEXT,
     pillar_scores TEXT,
+    ai_analysis TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT,

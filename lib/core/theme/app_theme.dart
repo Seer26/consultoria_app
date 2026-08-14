@@ -37,6 +37,9 @@ class AppTheme {
         ),
       ),
       dividerColor: AppColors.border,
+      dialogTheme: const DialogThemeData(
+        insetPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,

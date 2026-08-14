@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
@@ -27,7 +28,7 @@ class ReportsPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => AppErrorState(
           title: 'Falha ao carregar relatorios',
-          message: error.toString(),
+          message: userFriendlyError(error),
           onRetry: () => ref.invalidate(reportsProvider),
         ),
         data: (reports) {
@@ -78,7 +79,7 @@ class ReportDetailsPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => AppErrorState(
           title: 'Falha ao carregar relatorio',
-          message: error.toString(),
+          message: userFriendlyError(error),
           onRetry: () => ref.invalidate(executiveReportProvider(submissionId)),
         ),
         data: (report) => ExecutiveReportView(report: report),
@@ -124,7 +125,7 @@ class _ExecutiveReportViewState extends ConsumerState<ExecutiveReportView> {
         messenger.showSnackBar(
           SnackBar(
             backgroundColor: AppColors.danger,
-            content: Text(error.toString().replaceFirst('Exception: ', '')),
+            content: Text(userFriendlyError(error)),
           ),
         );
       }
@@ -151,7 +152,7 @@ class _ExecutiveReportViewState extends ConsumerState<ExecutiveReportView> {
         messenger.showSnackBar(
           SnackBar(
             backgroundColor: AppColors.danger,
-            content: Text(error.toString().replaceFirst('Exception: ', '')),
+            content: Text(userFriendlyError(error)),
           ),
         );
       } finally {
@@ -375,19 +376,19 @@ class _ExecutiveReportViewState extends ConsumerState<ExecutiveReportView> {
                         color: AppColors.primary,
                       ),
                       _StatusChip(
-                        label: 'TODO ${report.tasksTodo}',
+                        label: 'A fazer ${report.tasksTodo}',
                         color: AppColors.textMuted,
                       ),
                       _StatusChip(
-                        label: 'IN_PROGRESS ${report.tasksInProgress}',
+                        label: 'Em andamento ${report.tasksInProgress}',
                         color: AppColors.indigo,
                       ),
                       _StatusChip(
-                        label: 'DONE ${report.tasksDone}',
+                        label: 'Concluidas ${report.tasksDone}',
                         color: AppColors.success,
                       ),
                       _StatusChip(
-                        label: 'CANCELED ${report.tasksCanceled}',
+                        label: 'Canceladas ${report.tasksCanceled}',
                         color: AppColors.danger,
                       ),
                       _StatusChip(
@@ -534,12 +535,18 @@ class _TaskTile extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _StatusChip(label: task.priority, color: AppColors.amber),
               _StatusChip(
-                label: task.status,
+                label: _taskPriorityLabel(task.priority),
+                color: AppColors.amber,
+              ),
+              _StatusChip(
+                label: _taskStatusLabel(task.status),
                 color: _taskStatusColor(task.status),
               ),
-              _StatusChip(label: task.source, color: AppColors.primary),
+              _StatusChip(
+                label: _taskSourceLabel(task.source),
+                color: AppColors.primary,
+              ),
               if (task.pillar?.trim().isNotEmpty == true)
                 _StatusChip(label: task.pillar!, color: AppColors.teal),
               if (task.dueDate != null)
@@ -730,6 +737,27 @@ Color _taskStatusColor(String status) {
       return AppColors.textMuted;
   }
 }
+
+String _taskStatusLabel(String status) => switch (status) {
+  'DONE' => 'Concluida',
+  'IN_PROGRESS' => 'Em andamento',
+  'CANCELED' => 'Cancelada',
+  _ => 'A fazer',
+};
+
+String _taskPriorityLabel(String priority) => switch (priority) {
+  'LOW' => 'Baixa',
+  'HIGH' => 'Alta',
+  'CRITICAL' => 'Critica',
+  _ => 'Media',
+};
+
+String _taskSourceLabel(String source) => switch (source) {
+  'AI' => 'IA',
+  'RESEARCH_RECOMMENDATION' => 'Pesquisa',
+  'MANUAL' => 'Manual',
+  _ => 'Origem nao informada',
+};
 
 String _score(double? value) {
   if (value == null) {

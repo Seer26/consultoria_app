@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/role_guard.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/di/providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -104,7 +105,7 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
       }
 
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = userFriendlyError(error);
         _isLoading = false;
       });
     }
@@ -157,10 +158,7 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
       if (!mounted) {
         return;
       }
-      _showMessage(
-        error.toString().replaceFirst('Exception: ', ''),
-        isError: true,
-      );
+      _showMessage(userFriendlyError(error), isError: true);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -275,10 +273,7 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
       if (!mounted) {
         return;
       }
-      _showMessage(
-        error.toString().replaceFirst('Exception: ', ''),
-        isError: true,
-      );
+      _showMessage(userFriendlyError(error), isError: true);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -974,26 +969,26 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
 (String, Color) _priorityStyle(ActionPlanTaskPriority priority) {
   switch (priority) {
     case ActionPlanTaskPriority.low:
-      return ('LOW', AppColors.teal);
+      return ('Baixa', AppColors.teal);
     case ActionPlanTaskPriority.medium:
-      return ('MEDIUM', AppColors.amber);
+      return ('Media', AppColors.amber);
     case ActionPlanTaskPriority.high:
-      return ('HIGH', AppColors.danger);
+      return ('Alta', AppColors.danger);
     case ActionPlanTaskPriority.critical:
-      return ('CRITICAL', const Color(0xFF7A1828));
+      return ('Critica', const Color(0xFF7A1828));
   }
 }
 
 (String, Color) _statusStyle(ActionPlanTaskStatus status) {
   switch (status) {
     case ActionPlanTaskStatus.todo:
-      return ('TODO', AppColors.textMuted);
+      return ('A fazer', AppColors.textMuted);
     case ActionPlanTaskStatus.inProgress:
-      return ('IN_PROGRESS', AppColors.indigo);
+      return ('Em andamento', AppColors.indigo);
     case ActionPlanTaskStatus.done:
-      return ('DONE', AppColors.success);
+      return ('Concluida', AppColors.success);
     case ActionPlanTaskStatus.canceled:
-      return ('CANCELED', AppColors.danger);
+      return ('Cancelada', AppColors.danger);
   }
 }
 
@@ -1004,7 +999,7 @@ String _sourceLabel(ActionPlanTaskSource source) {
     case ActionPlanTaskSource.manual:
       return 'Manual';
     case ActionPlanTaskSource.ai:
-      return 'AI';
+      return 'IA';
   }
 }
 

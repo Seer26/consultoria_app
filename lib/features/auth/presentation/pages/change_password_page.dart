@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/role_guard.dart';
 import '../../../../core/di/providers.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/services/change_password_service.dart';
 import '../providers/auth_providers.dart';
@@ -99,7 +100,7 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = userFriendlyError(error);
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);

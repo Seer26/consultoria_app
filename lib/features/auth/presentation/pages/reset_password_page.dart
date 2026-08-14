@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../providers/auth_providers.dart';
 
@@ -92,7 +93,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = userFriendlyError(error);
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);

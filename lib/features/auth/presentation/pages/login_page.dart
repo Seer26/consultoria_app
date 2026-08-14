@@ -61,34 +61,39 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             colors: [Color(0xFFF5F7FC), Color(0xFFEAF0FF)],
           ),
         ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1120),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 900;
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: isWide
-                          ? Row(
-                              children: [
-                                const Expanded(child: _LoginAside()),
-                                const SizedBox(width: 24),
-                                Expanded(
-                                  child: _LoginForm(
-                                    state: state,
-                                    onSubmit: _submit,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : _LoginForm(state: state, onSubmit: _submit),
-                    ),
-                  );
-                },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1120),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 900;
+                      return Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(isWide ? 24 : 18),
+                          child: isWide
+                              ? Row(
+                                  children: [
+                                    const Expanded(child: _LoginAside()),
+                                    const SizedBox(width: 24),
+                                    Expanded(
+                                      child: _LoginForm(
+                                        state: state,
+                                        onSubmit: _submit,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : _LoginForm(state: state, onSubmit: _submit),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -194,7 +199,7 @@ class _LoginForm extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Use seu acesso para entrar no painel conforme o perfil ADMIN, OWNER ou EMPLOYEE.',
+          'Use seu e-mail e senha para acessar o painel conforme seu perfil.',
           style: Theme.of(
             context,
           ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
@@ -214,13 +219,19 @@ class _LoginForm extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Usuarios de teste',
+                  'Usuarios de demonstracao',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
                 SizedBox(height: 8),
-                Text('ADMIN: use o e-mail configurado no seed explícito.'),
-                Text('OWNER: use o e-mail configurado no seed explícito.'),
-                Text('EMPLOYEE: use o e-mail configurado no seed explícito.'),
+                Text(
+                  'Administrador: use o e-mail configurado para a demonstracao.',
+                ),
+                Text(
+                  'Proprietario: use o e-mail configurado para a demonstracao.',
+                ),
+                Text(
+                  'Colaborador: use o e-mail configurado para a demonstracao.',
+                ),
                 SizedBox(height: 6),
                 Text('A senha não é armazenada nem exibida pelo aplicativo.'),
               ],

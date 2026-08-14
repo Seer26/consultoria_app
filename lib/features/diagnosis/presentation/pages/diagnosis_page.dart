@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/role_guard.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_state_widgets.dart';
@@ -69,7 +70,7 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
       }
 
       setState(() {
-        _historyError = error.toString().replaceFirst('Exception: ', '');
+        _historyError = userFriendlyError(error);
         _isLoadingHistory = false;
       });
     }
@@ -145,10 +146,7 @@ class _DiagnosisPageState extends ConsumerState<DiagnosisPage> {
         return;
       }
 
-      _showMessage(
-        error.toString().replaceFirst('Exception: ', ''),
-        isError: true,
-      );
+      _showMessage(userFriendlyError(error), isError: true);
     } finally {
       if (mounted) {
         setState(() => _isStarting = false);
@@ -351,7 +349,7 @@ class _HistoryCard extends StatelessWidget {
                   ),
                 ),
                 _StatusBadge(
-                  label: isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
+                  label: isCompleted ? 'Concluida' : 'Em andamento',
                   color: isCompleted ? AppColors.success : AppColors.amber,
                 ),
               ],

@@ -121,10 +121,14 @@ function runMigrations(): void {
   ensureColumn('users', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('users', 'status', `TEXT NOT NULL DEFAULT 'ACTIVE'`);
   ensureColumn('users', 'auth_version', `INTEGER NOT NULL DEFAULT 0`);
+  ensureColumn('users', 'department', `TEXT`);
+  ensureColumn('users', 'job_function', `TEXT`);
   ensureColumn('diagnosis_submissions', 'user_id', `TEXT`);
   ensureColumn('diagnosis_submissions', 'submission_type', `TEXT NOT NULL DEFAULT 'DIAGNOSIS'`);
   ensureColumn('diagnosis_submissions', 'respondent_role', `TEXT`);
   ensureColumn('diagnosis_submissions', 'department', `TEXT`);
+  ensureColumn('diagnosis_submissions', 'respondent_department', `TEXT`);
+  ensureColumn('diagnosis_submissions', 'respondent_job_function', `TEXT`);
   ensureColumn('diagnosis_submissions', 'status', `TEXT NOT NULL DEFAULT 'COMPLETED'`);
   ensureColumn('diagnosis_submissions', 'overall_score', `REAL`);
   ensureColumn('diagnosis_submissions', 'summary', `TEXT`);
@@ -133,6 +137,7 @@ function runMigrations(): void {
   ensureColumn('diagnosis_submissions', 'recommendations', `TEXT`);
   ensureColumn('diagnosis_submissions', 'next_steps', `TEXT`);
   ensureColumn('diagnosis_submissions', 'pillar_scores', `TEXT`);
+  ensureColumn('diagnosis_submissions', 'ai_analysis', `TEXT`);
   ensureColumn('diagnosis_submissions', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('diagnosis_submissions', 'completed_at', `TEXT`);
   ensureColumn('diagnosis_answers', 'question', `TEXT`);

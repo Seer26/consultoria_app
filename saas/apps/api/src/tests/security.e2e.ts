@@ -9,8 +9,11 @@ import bcrypt from 'bcrypt';
 process.env.NODE_ENV = 'test';
 process.env.ENABLE_DEMO_SEED = 'false';
 process.env.JWT_SECRET = 'consultoria-security-e2e-secret';
+process.env.DATABASE_URL = '';
 process.env.DATABASE_PATH = './data/consultoria-e2e-security.sqlite';
 process.env.EMAIL_PROVIDER = 'console';
+process.env.AI_ENABLED = 'true';
+process.env.AI_PROVIDER = 'openai';
 process.env.OPENAI_API_KEY = '';
 process.env.TRUST_PROXY_HOPS = '1';
 process.env.LOGIN_RATE_LIMIT_WINDOW_MS = '60000';
@@ -156,19 +159,23 @@ async function main(): Promise<void> {
       body: { respondentRole: 'Diretor', department: 'Financeiro' },
     });
     assert.equal(submission.status, 201);
-    await call(baseUrl, 'POST', `/research/submissions/${submission.body.id}/answers`, {
-      token: ownerToken,
-      body: {
-        question: 'Como esta a seguranca operacional?',
-        answer: 'Existe uma rotina inicial com melhorias planejadas.',
-        pillar: 'Processos',
-        score: 60,
-      },
-    });
-    await call(baseUrl, 'POST', `/research/submissions/${submission.body.id}/complete`, {
+    const pillars = ['Processos', 'Pessoas', 'Estrategia', 'Processos', 'Pessoas'];
+    for (const [index, pillar] of pillars.entries()) {
+      await call(baseUrl, 'POST', `/research/submissions/${submission.body.id}/answers`, {
+        token: ownerToken,
+        body: {
+          question: `Pergunta de seguranca ${index + 1}`,
+          answer: 'Existe uma rotina inicial com melhorias planejadas.',
+          pillar,
+          score: 60,
+        },
+      });
+    }
+    const completed = await call(baseUrl, 'POST', `/research/submissions/${submission.body.id}/complete`, {
       token: ownerToken,
       body: {},
     });
+    assert.equal(completed.status, 200);
 
     const firstPdf = await call(baseUrl, 'GET', `/reports/research/${submission.body.id}/executive/pdf`, {
       token: ownerToken,
@@ -179,18 +186,22 @@ async function main(): Promise<void> {
     });
     assert.equal(secondPdf.status, 429);
 
+    database.prepare(`
+      UPDATE diagnosis_submissions SET status = 'IN_PROGRESS' WHERE id = ?
+    `).run(submission.body.id);
+
     const aiUsageBefore = database.prepare(`
       SELECT COALESCE(SUM(quantity), 0) AS total FROM usage_counters
       WHERE company_id = ? AND feature = 'AI_QUESTIONS_MONTHLY'
     `).get(companyId) as { total: number };
     const firstAi = await call(baseUrl, 'POST', '/ai/question/next', {
       token: ownerToken,
-      body: { answer: 'Ainda estamos estruturando os controles.' },
+      body: { submissionId: submission.body.id },
     });
-    assert.equal(firstAi.status, 503);
+    assert.equal(firstAi.status, 200);
     const secondAi = await call(baseUrl, 'POST', '/ai/question/next', {
       token: ownerToken,
-      body: { answer: 'Nova chamada em rajada.' },
+      body: { submissionId: submission.body.id },
     });
     assert.equal(secondAi.status, 429);
     const aiUsageAfter = database.prepare(`

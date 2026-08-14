@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_feedback.dart';
@@ -435,7 +436,7 @@ class CompaniesManagementPage extends ConsumerWidget {
   }
 
   String _formatError(Object error) {
-    final raw = error.toString().replaceFirst('Exception: ', '');
+    final raw = userFriendlyError(error);
     if (raw.contains('EMAIL_ALREADY_IN_USE')) {
       return 'Este email ja esta em uso.';
     }
@@ -460,7 +461,7 @@ class CompaniesManagementPage extends ConsumerWidget {
     if (raw.contains('INVALID_PLAN_SLUG')) {
       return 'Selecione um plano valido.';
     }
-    return raw;
+    return userFriendlyError(error);
   }
 }
 
@@ -915,7 +916,8 @@ class _PlanEventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final previous = event.previousPlanName ?? 'Sem plano anterior';
-    final actor = event.actorUserName ?? event.actorUserEmail ?? 'ADMIN';
+    final actor =
+        event.actorUserName ?? event.actorUserEmail ?? 'Administrador';
     final createdAt = event.createdAt == null
         ? 'Data nao informada'
         : DateFormatter.formatDateTime(event.createdAt!);
@@ -1267,8 +1269,8 @@ class _UserCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   _StatusBadge(
                     label: user.role == CompanyUserRole.owner
-                        ? 'OWNER'
-                        : 'EMPLOYEE',
+                        ? 'Proprietario'
+                        : 'Colaborador',
                     color: user.role == CompanyUserRole.owner
                         ? AppColors.primary
                         : AppColors.indigo,
@@ -1702,11 +1704,11 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 items: const [
                   DropdownMenuItem(
                     value: CompanyUserRole.owner,
-                    child: Text('OWNER'),
+                    child: Text('Proprietario'),
                   ),
                   DropdownMenuItem(
                     value: CompanyUserRole.employee,
-                    child: Text('EMPLOYEE'),
+                    child: Text('Colaborador'),
                   ),
                 ],
                 onChanged: (value) {

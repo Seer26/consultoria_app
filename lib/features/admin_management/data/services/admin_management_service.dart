@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/http/plan_limit_error_mapper.dart';
 import '../../../billing/data/services/current_plan_service.dart';
 import '../../domain/entities/company_account.dart';
@@ -349,11 +350,18 @@ class AdminManagementService {
       return planLimitMessage;
     }
 
-    final data = error.response?.data;
-    if (data is Map && data['error'] != null) {
-      return data['error'].toString();
-    }
-
-    return fallback;
+    return dioErrorMessage(
+      error,
+      fallback: fallback,
+      codeMessages: const {
+        'INVALID_COMPANY_NAME': 'Informe um nome valido para a empresa.',
+        'INVALID_COMPANY_SLUG':
+            'Informe um identificador valido para a empresa.',
+        'INVALID_USER_NAME': 'Informe o nome do usuario.',
+        'INVALID_USER_EMAIL': 'Informe um e-mail valido.',
+        'INVALID_USER_ROLE': 'Selecione um perfil de acesso valido.',
+        'USER_NOT_FOUND': 'O usuario nao foi encontrado.',
+      },
+    );
   }
 }

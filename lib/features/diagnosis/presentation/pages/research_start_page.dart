@@ -68,8 +68,12 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
   String? _selectedCompanyId;
 
   Future<void> _handleStart() async {
-    final role = (widget.lockAssignedProfile ? widget.assignedRole : _selectedRole)?.trim();
-    final sector = (widget.lockAssignedProfile ? widget.assignedSector : _selectedSector)?.trim();
+    final role =
+        (widget.lockAssignedProfile ? widget.assignedRole : _selectedRole)
+            ?.trim();
+    final sector =
+        (widget.lockAssignedProfile ? widget.assignedSector : _selectedSector)
+            ?.trim();
     final companyId = _selectedCompanyId?.trim();
 
     if (role == null || role.isEmpty || sector == null || sector.isEmpty) {
@@ -100,8 +104,8 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
       title: 'Pesquisa Empresarial',
       subtitle: widget.allowStart
           ? widget.lockAssignedProfile
-            ? 'Seu perfil profissional atribuido sera usado nesta pesquisa.'
-            : 'Antes de comecar, informe sua funcao e o setor em que atua.'
+                ? 'Seu perfil profissional atribuido sera usado nesta pesquisa.'
+                : 'Antes de comecar, informe sua funcao e o setor em que atua.'
           : 'Acompanhe as pesquisas das empresas. O perfil ADMIN possui acesso somente para consulta.',
       child: ListView(
         children: [
@@ -144,59 +148,71 @@ class _ResearchStartPageState extends State<ResearchStartPage> {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.badge_outlined),
-                        title: Text(widget.assignedRole?.trim().isNotEmpty == true
-                            ? widget.assignedRole! : 'Perfil profissional incompleto'),
-                        subtitle: Text(widget.assignedSector?.trim().isNotEmpty == true
-                            ? widget.assignedSector! : 'Solicite ao OWNER o preenchimento do departamento e da funcao.'),
+                        title: Text(
+                          widget.assignedRole?.trim().isNotEmpty == true
+                              ? widget.assignedRole!
+                              : 'Perfil profissional incompleto',
+                        ),
+                        subtitle: Text(
+                          widget.assignedSector?.trim().isNotEmpty == true
+                              ? widget.assignedSector!
+                              : 'Solicite ao OWNER o preenchimento do departamento e da funcao.',
+                        ),
                       ),
                     ] else ...[
-                    _FieldLabel(text: 'Funcao (cargo)'),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedRole,
-                      items: _roles
-                          .map(
-                            (item) => DropdownMenuItem(
-                              value: item,
-                              child: Text(item),
-                            ),
-                          )
-                          .toList(),
-                      decoration: _inputDecoration(
-                        hintText: 'Selecione sua funcao',
+                      _FieldLabel(text: 'Funcao (cargo)'),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedRole,
+                        items: _roles
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: item,
+                                child: Text(item),
+                              ),
+                            )
+                            .toList(),
+                        decoration: _inputDecoration(
+                          hintText: 'Selecione sua funcao',
+                        ),
+                        onChanged: (value) =>
+                            setState(() => _selectedRole = value),
                       ),
-                      onChanged: (value) =>
-                          setState(() => _selectedRole = value),
-                    ),
-                    const SizedBox(height: 16),
-                    _FieldLabel(text: 'Setor'),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedSector,
-                      items: _sectors
-                          .map(
-                            (item) => DropdownMenuItem(
-                              value: item,
-                              child: Text(item),
-                            ),
-                          )
-                          .toList(),
-                      decoration: _inputDecoration(
-                        hintText: 'Selecione seu setor',
+                      const SizedBox(height: 16),
+                      _FieldLabel(text: 'Setor'),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedSector,
+                        items: _sectors
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: item,
+                                child: Text(item),
+                              ),
+                            )
+                            .toList(),
+                        decoration: _inputDecoration(
+                          hintText: 'Selecione seu setor',
+                        ),
+                        onChanged: (value) =>
+                            setState(() => _selectedSector = value),
                       ),
-                      onChanged: (value) =>
-                          setState(() => _selectedSector = value),
-                    ),
                     ],
                     const SizedBox(height: 24),
                     Align(
                       alignment: Alignment.centerRight,
                       child: FilledButton.icon(
-                        onPressed: widget.isStarting ||
-                            (widget.lockAssignedProfile &&
-                              ((widget.assignedRole?.trim().isEmpty ?? true) ||
-                               (widget.assignedSector?.trim().isEmpty ?? true)))
-                          ? null : _handleStart,
+                        onPressed:
+                            widget.isStarting ||
+                                (widget.lockAssignedProfile &&
+                                    ((widget.assignedRole?.trim().isEmpty ??
+                                            true) ||
+                                        (widget.assignedSector
+                                                ?.trim()
+                                                .isEmpty ??
+                                            true)))
+                            ? null
+                            : _handleStart,
                         icon: widget.isStarting
                             ? const SizedBox(
                                 width: 16,

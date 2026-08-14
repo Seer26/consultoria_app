@@ -18,7 +18,7 @@ enum SidebarGroup { workspace, management }
 
 extension SidebarItemX on SidebarItem {
   String get label => switch (this) {
-    SidebarItem.dashboard => 'Dashboard',
+    SidebarItem.dashboard => 'Visao geral',
     SidebarItem.diagnostico => 'Pesquisa Empresarial',
     SidebarItem.empresas => 'Empresas',
     SidebarItem.relatorios => 'Relatório Executivo',
@@ -68,7 +68,7 @@ extension SidebarItemX on SidebarItem {
 
 extension SidebarGroupX on SidebarGroup {
   String get label => switch (this) {
-    SidebarGroup.workspace => 'Workspace',
+    SidebarGroup.workspace => 'Trabalho',
     SidebarGroup.management => 'Gestao',
   };
 }

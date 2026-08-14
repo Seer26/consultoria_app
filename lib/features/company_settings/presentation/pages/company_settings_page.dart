@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
@@ -91,7 +92,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
       if (mounted) {
         AppFeedback.showSnackBar(
           context,
-          message: error.toString().replaceFirst('Exception: ', ''),
+          message: userFriendlyError(error),
           type: AppFeedbackType.error,
         );
       }
@@ -129,7 +130,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
             const AppLoadingState(message: 'Carregando configuracoes'),
         error: (error, _) => AppErrorState(
           title: 'Nao foi possivel carregar as configuracoes',
-          message: error.toString(),
+          message: userFriendlyError(error),
           onRetry: () => ref.invalidate(companySettingsProvider),
         ),
         data: (settings) {
@@ -191,58 +192,72 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                           : null,
                     ),
                     const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 14,
-                      runSpacing: 14,
-                      children: [
-                        SizedBox(
-                          width: 320,
-                          child: TextFormField(
-                            controller: _sectorController,
-                            decoration: const InputDecoration(
-                              labelText: 'Setor',
-                              border: OutlineInputBorder(),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final fieldWidth = constraints.maxWidth >= 670
+                            ? (constraints.maxWidth - 14) / 2
+                            : constraints.maxWidth;
+                        return Wrap(
+                          spacing: 14,
+                          runSpacing: 14,
+                          children: [
+                            SizedBox(
+                              width: fieldWidth,
+                              child: TextFormField(
+                                controller: _sectorController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Setor',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 320,
-                          child: TextFormField(
-                            controller: _sizeController,
-                            decoration: const InputDecoration(
-                              labelText: 'Porte',
-                              border: OutlineInputBorder(),
+                            SizedBox(
+                              width: fieldWidth,
+                              child: TextFormField(
+                                controller: _sizeController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Porte',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 14,
-                      runSpacing: 14,
-                      children: [
-                        SizedBox(
-                          width: 320,
-                          child: TextFormField(
-                            controller: _phoneController,
-                            decoration: const InputDecoration(
-                              labelText: 'Telefone',
-                              border: OutlineInputBorder(),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final fieldWidth = constraints.maxWidth >= 670
+                            ? (constraints.maxWidth - 14) / 2
+                            : constraints.maxWidth;
+                        return Wrap(
+                          spacing: 14,
+                          runSpacing: 14,
+                          children: [
+                            SizedBox(
+                              width: fieldWidth,
+                              child: TextFormField(
+                                controller: _phoneController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Telefone',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 320,
-                          child: TextFormField(
-                            controller: _responsibleController,
-                            decoration: const InputDecoration(
-                              labelText: 'Responsavel',
-                              border: OutlineInputBorder(),
+                            SizedBox(
+                              width: fieldWidth,
+                              child: TextFormField(
+                                controller: _responsibleController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Responsavel',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 14),
                     TextFormField(

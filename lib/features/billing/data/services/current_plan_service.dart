@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
+
 class CurrentPlanService {
   CurrentPlanService(this._dio);
 
@@ -14,7 +16,12 @@ class CurrentPlanService {
     } on DioException catch (error) {
       throw Exception(_extractError(error));
     } catch (error) {
-      throw Exception('Falha ao carregar o plano atual: $error');
+      throw Exception(
+        userFriendlyError(
+          error,
+          fallback: 'Nao foi possivel carregar o plano atual.',
+        ),
+      );
     }
   }
 
@@ -31,7 +38,10 @@ class CurrentPlanService {
       }
     }
 
-    return 'Falha ao carregar o plano atual.';
+    return dioErrorMessage(
+      error,
+      fallback: 'Nao foi possivel carregar o plano atual.',
+    );
   }
 }
 

@@ -204,7 +204,7 @@ class AppShell extends ConsumerWidget {
                                                   ),
                                             ),
                                             Text(
-                                              'Permissoes aplicadas por role no app',
+                                              'Permissoes aplicadas por perfil',
                                             ),
                                           ],
                                         ),
@@ -222,7 +222,7 @@ class AppShell extends ConsumerWidget {
                                   ),
                                   child: Text(
                                     isLarge
-                                        ? 'A interface e as rotas seguem as permissoes do usuario logado.'
+                                        ? 'A interface respeita as permissoes do usuario conectado.'
                                         : 'Permissoes',
                                     style: const TextStyle(
                                       color: Colors.white,
@@ -245,6 +245,61 @@ class AppShell extends ConsumerWidget {
         }
 
         return Scaffold(
+          drawer: Drawer(
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          child: Icon(Icons.insights_outlined),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Consultoria Pro',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                              Text(_roleLabel(role)),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Fechar menu',
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(12),
+                      children: [
+                        Sidebar(
+                          items: safeItems,
+                          selectedItem: selectedItem,
+                          onSelect: (item) {
+                            Navigator.of(context).pop();
+                            _goToItem(item);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           appBar: AppBar(
             title: const Text('Consultoria Pro'),
             actions: [
@@ -262,26 +317,18 @@ class AppShell extends ConsumerWidget {
             ],
           ),
           body: navigationShell,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: safeItems
-                .indexOf(selectedItem)
-                .clamp(0, safeItems.length - 1),
-            onDestinationSelected: (index) => _goToItem(safeItems[index]),
-            destinations: safeItems
-                .map(
-                  (item) => NavigationDestination(
-                    icon: Icon(item.icon),
-                    selectedIcon: Icon(item.icon),
-                    label: item.label,
-                  ),
-                )
-                .toList(),
-          ),
         );
       },
     );
   }
 }
+
+String _roleLabel(String? role) => switch (RoleGuard.normalizeRole(role)) {
+  RoleGuard.admin => 'Administrador',
+  RoleGuard.owner => 'Proprietario',
+  RoleGuard.employee => 'Colaborador',
+  _ => 'Usuario',
+};
 
 class _SidebarWorkspace extends ConsumerWidget {
   const _SidebarWorkspace({

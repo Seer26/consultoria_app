@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
+
 class DashboardService {
   DashboardService(this._dio);
 
@@ -28,13 +30,19 @@ class DashboardService {
 
       return data;
     } on DioException catch (error) {
-      final message =
-          error.response?.data?.toString() ??
-          error.message ??
-          'Falha desconhecida';
-      throw Exception('Falha ao carregar dashboard: $message');
+      throw Exception(
+        dioErrorMessage(
+          error,
+          fallback: 'Nao foi possivel carregar o painel. Tente novamente.',
+        ),
+      );
     } catch (error) {
-      throw Exception('Falha ao carregar dashboard: $error');
+      throw Exception(
+        userFriendlyError(
+          error,
+          fallback: 'Nao foi possivel carregar o painel. Tente novamente.',
+        ),
+      );
     }
   }
 }

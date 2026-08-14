@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../domain/entities/legal_document.dart';
 
 abstract class LegalAcceptanceApi {
@@ -66,6 +67,10 @@ class LegalAcceptanceService implements LegalAcceptanceApi {
     if (error.response?.statusCode == 401) {
       return 'Sua sessao expirou. Saia e entre novamente.';
     }
-    return 'Nao foi possivel consultar ou registrar o aceite. Verifique sua conexao e tente novamente.';
+    return dioErrorMessage(
+      error,
+      fallback:
+          'Nao foi possivel consultar ou registrar o aceite. Tente novamente.',
+    );
   }
 }

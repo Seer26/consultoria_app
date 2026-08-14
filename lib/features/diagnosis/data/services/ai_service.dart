@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../../core/errors/api_error_presenter.dart';
+
 class AiDiagnosisResult {
   const AiDiagnosisResult({
     required this.problems,
@@ -77,9 +79,7 @@ class AIService {
       );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(
-          'Falha ao consultar IA: ${response.statusCode} ${response.body}',
-        );
+        throw Exception('Nao foi possivel consultar a IA neste momento.');
       }
 
       final decoded = jsonDecode(response.body);
@@ -90,7 +90,12 @@ class AIService {
 
       return AiDiagnosisResult.fromJson(decoded);
     } catch (error) {
-      throw Exception('Nao foi possivel consultar a IA: $error');
+      throw Exception(
+        userFriendlyError(
+          error,
+          fallback: 'Nao foi possivel consultar a IA neste momento.',
+        ),
+      );
     }
   }
 }

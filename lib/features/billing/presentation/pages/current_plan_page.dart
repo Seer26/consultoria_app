@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_state_widgets.dart';
 import '../../data/services/current_plan_service.dart';
 
 final currentPlanServiceProvider = Provider<CurrentPlanService>((ref) {
@@ -25,40 +27,12 @@ class CurrentPlanPage extends ConsumerWidget {
       body: SafeArea(
         child: plan.when(
           data: (snapshot) => _CurrentPlanContent(snapshot: snapshot),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.warning_amber_rounded,
-                        color: AppColors.amber,
-                        size: 40,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Nao foi possivel carregar o plano atual',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(error.toString(), textAlign: TextAlign.center),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: () => ref.invalidate(currentPlanProvider),
-                        icon: const Icon(Icons.refresh_outlined),
-                        label: const Text('Tentar novamente'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          loading: () =>
+              const AppLoadingState(message: 'Carregando plano atual'),
+          error: (error, _) => AppErrorState(
+            title: 'Nao foi possivel carregar o plano atual',
+            message: userFriendlyError(error),
+            onRetry: () => ref.invalidate(currentPlanProvider),
           ),
         ),
       ),
@@ -76,7 +50,9 @@ class _CurrentPlanContent extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(currentPlanProvider),
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(
+          MediaQuery.sizeOf(context).width < 600 ? 16 : 24,
+        ),
         children: [
           Wrap(
             alignment: WrapAlignment.spaceBetween,
@@ -104,7 +80,9 @@ class _CurrentPlanContent extends ConsumerWidget {
               ),
               Chip(
                 avatar: const Icon(Icons.verified_outlined, size: 18),
-                label: Text(snapshot.subscriptionStatus),
+                label: Text(
+                  _subscriptionStatusLabel(snapshot.subscriptionStatus),
+                ),
               ),
             ],
           ),
@@ -156,6 +134,15 @@ class _CurrentPlanContent extends ConsumerWidget {
     );
   }
 }
+
+String _subscriptionStatusLabel(String status) => switch (status) {
+  'ACTIVE' => 'Ativo',
+  'INACTIVE' => 'Inativo',
+  'TRIALING' => 'Periodo de avaliacao',
+  'PAST_DUE' => 'Pagamento pendente',
+  'CANCELED' => 'Cancelado',
+  _ => 'Status indisponivel',
+};
 
 class _PlanHeaderCard extends StatelessWidget {
   const _PlanHeaderCard({required this.snapshot});

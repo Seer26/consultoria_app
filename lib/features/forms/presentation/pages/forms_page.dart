@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
@@ -125,7 +126,7 @@ class FormsPage extends ConsumerWidget {
                   const AppLoadingState(message: 'Carregando formularios'),
               error: (error, _) => AppErrorState(
                 title: 'Nao foi possivel carregar os formularios',
-                message: error.toString(),
+                message: userFriendlyError(error),
                 onRetry: () => ref
                     .read(formsControllerProvider.notifier)
                     .load(clientId: selectedCompanyId),

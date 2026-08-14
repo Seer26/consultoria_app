@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
@@ -209,10 +210,13 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
             _lastAssistantQuestion = nextQuestion.question;
             _lastAssistantPillar = nextQuestion.pillar;
           } else {
-            messages.add(const Message(
-              text: 'O diagnostico possui cobertura suficiente e sera finalizado.',
-              isUser: false,
-            ));
+            messages.add(
+              const Message(
+                text:
+                    'O diagnostico possui cobertura suficiente e sera finalizado.',
+                isUser: false,
+              ),
+            );
             _lastAssistantQuestion = null;
             finishAfterAnswer = true;
           }
@@ -222,7 +226,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
           return;
         }
 
-        final message = error.toString().replaceFirst('Exception: ', '');
+        final message = userFriendlyError(error);
         setState(() {
           messages.add(Message(text: message, isUser: false));
         });
@@ -243,10 +247,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
         );
       });
 
-      _showMessage(
-        error.toString().replaceFirst('Exception: ', ''),
-        isError: true,
-      );
+      _showMessage(userFriendlyError(error), isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -314,10 +315,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
         return;
       }
 
-      _showMessage(
-        error.toString().replaceFirst('Exception: ', ''),
-        isError: true,
-      );
+      _showMessage(userFriendlyError(error), isError: true);
     } finally {
       if (mounted) {
         setState(() => isFinishing = false);
@@ -539,10 +537,7 @@ class _ChatDiagnosisPageState extends ConsumerState<ChatDiagnosisPage> {
                           if (!mounted) {
                             return;
                           }
-                          _showMessage(
-                            error.toString().replaceFirst('Exception: ', ''),
-                            isError: true,
-                          );
+                          _showMessage(userFriendlyError(error), isError: true);
                         } finally {
                           if (context.mounted) {
                             setSheetState(() => isGeneratingActionPlan = false);

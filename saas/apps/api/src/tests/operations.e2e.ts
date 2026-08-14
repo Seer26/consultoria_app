@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 process.env.NODE_ENV = 'test';
 process.env.ENABLE_DEMO_SEED = 'false';
 process.env.JWT_SECRET = 'consultoria-operations-e2e-secret';
+process.env.DATABASE_URL = '';
 process.env.DATABASE_PATH = './data/consultoria-e2e-operations.sqlite';
 process.env.EMAIL_PROVIDER = 'console';
 process.env.OPENAI_API_KEY = 'fake-key-for-readiness-only';

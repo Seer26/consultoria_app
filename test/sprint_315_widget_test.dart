@@ -18,21 +18,50 @@ void main() {
   }
 
   test('menu Equipe e exclusivo do OWNER', () {
-    expect(RoleGuard.sidebarItemsForRole(RoleGuard.owner), contains(SidebarItem.equipe));
+    expect(
+      RoleGuard.sidebarItemsForRole(RoleGuard.owner),
+      contains(SidebarItem.equipe),
+    );
     expect(RoleGuard.canAccessRoute(RoleGuard.owner, '/team'), isTrue);
-    expect(RoleGuard.sidebarItemsForRole(RoleGuard.employee), isNot(contains(SidebarItem.equipe)));
-    expect(RoleGuard.sidebarItemsForRole(RoleGuard.admin), isNot(contains(SidebarItem.equipe)));
+    expect(
+      RoleGuard.sidebarItemsForRole(RoleGuard.employee),
+      isNot(contains(SidebarItem.equipe)),
+    );
+    expect(
+      RoleGuard.sidebarItemsForRole(RoleGuard.admin),
+      isNot(contains(SidebarItem.equipe)),
+    );
   });
 
   testWidgets('Equipe exibe perfil, status, criacao e edicao', (tester) async {
     useLargeSurface(tester);
-    await tester.pumpWidget(ProviderScope(
-      overrides: [teamProvider.overrideWith((ref) async => const [
-        TeamMember(id: '1', name: 'Ana', email: 'ana@example.invalid', status: 'ACTIVE', department: 'Financeiro', jobFunction: 'Analista'),
-        TeamMember(id: '2', name: 'Bruno', email: 'bruno@example.invalid', status: 'INACTIVE', department: 'Comercial', jobFunction: 'Vendedor'),
-      ])],
-      child: const MaterialApp(home: TeamPage()),
-    ));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          teamProvider.overrideWith(
+            (ref) async => const [
+              TeamMember(
+                id: '1',
+                name: 'Ana',
+                email: 'ana@example.invalid',
+                status: 'ACTIVE',
+                department: 'Financeiro',
+                jobFunction: 'Analista',
+              ),
+              TeamMember(
+                id: '2',
+                name: 'Bruno',
+                email: 'bruno@example.invalid',
+                status: 'INACTIVE',
+                department: 'Comercial',
+                jobFunction: 'Vendedor',
+              ),
+            ],
+          ),
+        ],
+        child: const MaterialApp(home: TeamPage()),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.textContaining('Analista | Financeiro'), findsOneWidget);
     expect(find.byType(Switch), findsNWidgets(2));
@@ -51,26 +80,48 @@ void main() {
     expect(find.text('Nova senha (opcional)'), findsOneWidget);
   });
 
-  testWidgets('EMPLOYEE ve perfil somente leitura e nenhum seletor', (tester) async {
+  testWidgets('EMPLOYEE ve perfil somente leitura e nenhum seletor', (
+    tester,
+  ) async {
     useLargeSurface(tester);
-    await tester.pumpWidget(MaterialApp(home: ResearchStartPage(
-      lockAssignedProfile: true,
-      assignedRole: 'Analista Financeiro',
-      assignedSector: 'Financeiro',
-      onStart: ({required String role, required String sector, String? companyId}) async {},
-    )));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchStartPage(
+          lockAssignedProfile: true,
+          assignedRole: 'Analista Financeiro',
+          assignedSector: 'Financeiro',
+          onStart:
+              ({
+                required String role,
+                required String sector,
+                String? companyId,
+              }) async {},
+        ),
+      ),
+    );
     await tester.pump();
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.text('Analista Financeiro'), findsOneWidget);
     expect(find.text('Financeiro'), findsOneWidget);
   });
 
-  testWidgets('perfil incompleto bloqueia inicio com mensagem amigavel', (tester) async {
+  testWidgets('perfil incompleto bloqueia inicio com mensagem amigavel', (
+    tester,
+  ) async {
     useLargeSurface(tester);
-    await tester.pumpWidget(MaterialApp(home: ResearchStartPage(
-      lockAssignedProfile: true,
-      onStart: ({required String role, required String sector, String? companyId}) async {},
-    )));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ResearchStartPage(
+          lockAssignedProfile: true,
+          onStart:
+              ({
+                required String role,
+                required String sector,
+                String? companyId,
+              }) async {},
+        ),
+      ),
+    );
     await tester.pump();
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.text('Perfil profissional incompleto'), findsOneWidget);
@@ -82,19 +133,36 @@ void main() {
     expect(tester.widget<FilledButton>(start).onPressed, isNull);
   });
 
-  testWidgets('OWNER recebe aviso de respostas individuais protegidas', (tester) async {
+  testWidgets('OWNER recebe aviso de respostas individuais protegidas', (
+    tester,
+  ) async {
     useLargeSurface(tester);
     final now = DateTime(2026, 1, 1);
     final details = ResearchSubmissionDetails(
-      id: 's', companyId: 'c', companyName: 'Empresa', userId: 'employee',
-      userName: 'Funcionario', userEmail: 'employee@example.invalid',
-      respondentRole: 'Analista', department: 'Financeiro',
-      status: ResearchSubmissionStatus.completed, createdAt: now, updatedAt: now,
-      overallScore: 70, summary: 'Resumo consolidado',
+      id: 's',
+      companyId: 'c',
+      companyName: 'Empresa',
+      userId: 'employee',
+      userName: 'Funcionario',
+      userEmail: 'employee@example.invalid',
+      respondentRole: 'Analista',
+      department: 'Financeiro',
+      status: ResearchSubmissionStatus.completed,
+      createdAt: now,
+      updatedAt: now,
+      overallScore: 70,
+      summary: 'Resumo consolidado',
     );
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ResearchDetailsContent(
-      details: details, rawAnswersRestricted: true,
-    ))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ResearchDetailsContent(
+            details: details,
+            rawAnswersRestricted: true,
+          ),
+        ),
+      ),
+    );
     await tester.pump();
     expect(find.text('Respostas individuais protegidas'), findsOneWidget);
     expect(find.textContaining('resultados consolidados'), findsOneWidget);
