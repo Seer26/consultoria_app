@@ -1,4 +1,5 @@
 import type { AuthTokenPayload, UserRole } from '../auth/auth.types';
+import type { DiagnosisScoreInterpretation } from './score-interpretation';
 
 export type ResearchSubmissionStatus = 'IN_PROGRESS' | 'COMPLETED';
 
@@ -7,6 +8,7 @@ export interface ResearchPillarScore {
   score: number;
   answersCount: number;
   maturity: 'critical' | 'attention' | 'intermediate' | 'good';
+  scoreInterpretation?: DiagnosisScoreInterpretation | null;
 }
 
 export type AiRecommendationPriority = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -28,6 +30,7 @@ export interface AiConsultingAnalysis {
 
 export interface ResearchResultSnapshot {
   overallScore: number | null;
+  scoreInterpretation?: DiagnosisScoreInterpretation | null;
   summary: string | null;
   criticalPoints: string[];
   opportunities: string[];
@@ -106,13 +109,14 @@ export interface CompanyRecord {
 export interface ResearchSubmissionDetails {
   id: string;
   status: ResearchSubmissionStatus;
-  overallScore: number | null;
-  summary: string | null;
-  criticalPoints: string[];
-  opportunities: string[];
-  recommendations: string[];
-  nextSteps: string[];
-  pillarScores: ResearchPillarScore[];
+  overallScore?: number | null;
+  scoreInterpretation?: DiagnosisScoreInterpretation | null;
+  summary?: string | null;
+  criticalPoints?: string[];
+  opportunities?: string[];
+  recommendations?: string[];
+  nextSteps?: string[];
+  pillarScores?: ResearchPillarScore[];
   respondentRole: string;
   department: string;
   respondentDepartment: string;
@@ -123,7 +127,7 @@ export interface ResearchSubmissionDetails {
   company: CompanyRecord | null;
   user: Pick<AuthenticatedUserRecord, 'id' | 'name' | 'email' | 'role' | 'companyId' | 'status'> | null;
   answers: ResearchAnswerRecord[];
-  aiAnalysis: AiConsultingAnalysis | null;
+  aiAnalysis?: AiConsultingAnalysis | null;
 }
 
 export interface ResearchListFilters {

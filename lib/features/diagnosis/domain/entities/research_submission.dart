@@ -2,6 +2,18 @@ enum ResearchSubmissionStatus { inProgress, completed }
 
 enum AiRecommendationPriority { high, medium, low }
 
+class DiagnosisScoreInterpretation {
+  const DiagnosisScoreInterpretation({
+    required this.classification,
+    required this.label,
+    required this.description,
+  });
+
+  final String classification;
+  final String label;
+  final String description;
+}
+
 class AiConsultingRecommendation {
   const AiConsultingRecommendation({
     required this.title,
@@ -36,12 +48,14 @@ class ResearchPillarScore {
     required this.score,
     required this.answersCount,
     required this.maturity,
+    this.scoreInterpretation,
   });
 
   final String pillar;
   final double score;
   final int answersCount;
   final String maturity;
+  final DiagnosisScoreInterpretation? scoreInterpretation;
 }
 
 class ResearchSubmission {
@@ -58,6 +72,7 @@ class ResearchSubmission {
     required this.createdAt,
     required this.updatedAt,
     this.overallScore,
+    this.scoreInterpretation,
     this.summary,
     this.completedAt,
     this.criticalPoints = const [],
@@ -78,6 +93,7 @@ class ResearchSubmission {
   final ResearchSubmissionStatus status;
   final int answersCount;
   final double? overallScore;
+  final DiagnosisScoreInterpretation? scoreInterpretation;
   final String? summary;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -123,6 +139,7 @@ class ResearchSubmissionDetails {
     required this.updatedAt,
     this.completedAt,
     this.overallScore,
+    this.scoreInterpretation,
     this.summary,
     this.criticalPoints = const [],
     this.opportunities = const [],
@@ -146,6 +163,7 @@ class ResearchSubmissionDetails {
   final DateTime updatedAt;
   final DateTime? completedAt;
   final double? overallScore;
+  final DiagnosisScoreInterpretation? scoreInterpretation;
   final String? summary;
   final List<String> criticalPoints;
   final List<String> opportunities;

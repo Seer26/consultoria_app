@@ -46,18 +46,21 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        ref
-            .read(researchServiceProvider)
-            .getSubmissionById(widget.submissionId),
-        ref
-            .read(actionPlanServiceProvider)
-            .listTasks(submissionId: widget.submissionId),
-      ]);
+      final role = RoleGuard.normalizeRole(
+        ref.read(authControllerProvider).user?.role,
+      );
+      final details = await ref
+          .read(researchServiceProvider)
+          .getSubmissionById(widget.submissionId);
+      final tasks = role == RoleGuard.employee
+          ? const []
+          : await ref
+                .read(actionPlanServiceProvider)
+                .listTasks(submissionId: widget.submissionId);
       if (!mounted) return;
       setState(() {
-        _details = results[0] as ResearchSubmissionDetails;
-        _actionPlanExists = (results[1] as List).isNotEmpty;
+        _details = details;
+        _actionPlanExists = tasks.isNotEmpty;
         _isLoading = false;
       });
     } catch (error) {
@@ -154,8 +157,12 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
         (role == RoleGuard.owner || role == RoleGuard.employee);
 
     return AppPageScaffold(
-      title: 'Resultado detalhado da pesquisa',
-      subtitle: 'Diagnóstico consolidado, respostas e próximos passos.',
+      title: role == RoleGuard.employee
+          ? 'Pesquisa empresarial'
+          : 'Resultado detalhado da pesquisa',
+      subtitle: role == RoleGuard.employee
+          ? 'Confirmação da sua participação.'
+          : 'Diagnóstico consolidado, respostas e próximos passos.',
       actions: [
         OutlinedButton.icon(
           onPressed: () => context.go('/research'),
@@ -204,7 +211,7 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
                 : const Icon(Icons.picture_as_pdf_outlined),
             label: Text(_isExportingPdf ? 'Exportando...' : 'Exportar PDF'),
           ),
-        if (completed && role != RoleGuard.admin && !_actionPlanExists)
+        if (completed && role != RoleGuard.employee && !_actionPlanExists)
           FilledButton.icon(
             key: const ValueKey('generate-action-plan'),
             onPressed: _isGenerating ? null : _generateActionPlan,
@@ -255,7 +262,8 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
       rawAnswersRestricted:
           role == RoleGuard.owner &&
           details.userId != ref.read(authControllerProvider).user?.id,
-      canGenerateAi: role != RoleGuard.admin,
+      isEmployeeView: role == RoleGuard.employee,
+      canGenerateAi: role == RoleGuard.owner,
       isGeneratingAi: _isGeneratingAi,
       onGenerateAi: _generateAiAnalysis,
     );
@@ -270,6 +278,7 @@ class ResearchDetailsContent extends StatelessWidget {
     this.isGeneratingAi = false,
     this.onGenerateAi,
     this.rawAnswersRestricted = false,
+    this.isEmployeeView = false,
   });
 
   final ResearchSubmissionDetails details;
@@ -277,6 +286,7 @@ class ResearchDetailsContent extends StatelessWidget {
   final bool isGeneratingAi;
   final VoidCallback? onGenerateAi;
   final bool rawAnswersRestricted;
+  final bool isEmployeeView;
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +305,10 @@ class ResearchDetailsContent extends StatelessWidget {
       children: [
         _IdentificationCard(details: details),
         const SizedBox(height: 16),
+        if (isEmployeeView) ...[
+          _EmployeeParticipationCard(details: details),
+          const SizedBox(height: 16),
+        ] else
         if (details.status == ResearchSubmissionStatus.inProgress)
           const Card(
             child: Padding(
@@ -328,32 +342,80 @@ class ResearchDetailsContent extends StatelessWidget {
             onGenerate: onGenerateAi,
           ),
         ],
-        const SizedBox(height: 16),
-        Text(
-          'Respostas da pesquisa',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        if (grouped.isEmpty)
-          AppEmptyState(
-            title: rawAnswersRestricted
-                ? 'Respostas individuais protegidas'
-                : 'Nenhuma resposta registrada',
-            message: rawAnswersRestricted
-                ? 'O OWNER acessa apenas resultados consolidados das pesquisas de colaboradores.'
-                : 'As respostas salvas serão exibidas aqui.',
-            icon: rawAnswersRestricted
-                ? Icons.privacy_tip_outlined
-                : Icons.question_answer_outlined,
-          )
-        else
-          for (final entry in grouped.entries) ...[
-            _AnswersGroup(pillar: entry.key, answers: entry.value),
-            const SizedBox(height: 12),
-          ],
+        if (!isEmployeeView) ...[
+          const SizedBox(height: 16),
+          Text(
+            'Respostas da pesquisa',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          if (grouped.isEmpty)
+            AppEmptyState(
+              title: rawAnswersRestricted
+                  ? 'Respostas individuais protegidas'
+                  : 'Nenhuma resposta registrada',
+              message: rawAnswersRestricted
+                  ? 'O OWNER acessa apenas resultados consolidados das pesquisas de colaboradores.'
+                  : 'As respostas salvas serão exibidas aqui.',
+              icon: rawAnswersRestricted
+                  ? Icons.privacy_tip_outlined
+                  : Icons.question_answer_outlined,
+            )
+          else
+            for (final entry in grouped.entries) ...[
+              _AnswersGroup(pillar: entry.key, answers: entry.value),
+              const SizedBox(height: 12),
+            ],
+        ],
       ],
+    );
+  }
+}
+
+class _EmployeeParticipationCard extends StatelessWidget {
+  const _EmployeeParticipationCard({required this.details});
+  final ResearchSubmissionDetails details;
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = details.status == ResearchSubmissionStatus.completed;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              completed ? Icons.check_circle_outline : Icons.hourglass_top,
+              color: completed ? AppColors.success : AppColors.amber,
+              size: 36,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              completed ? 'Pesquisa concluída' : 'Pesquisa em andamento',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              completed
+                  ? 'Obrigado pela sua participação. Suas respostas foram registradas e serão utilizadas pela gestão na análise organizacional da empresa.'
+                  : 'Continue a pesquisa para registrar sua participação na análise organizacional da empresa.',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () => context.go('/research'),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Voltar para Minhas Pesquisas'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -518,12 +580,34 @@ class _ScoreCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Score geral: ${details.overallScore?.toStringAsFixed(1) ?? '-'}',
+              'Índice de Diagnóstico Organizacional',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w900,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              '${details.overallScore?.toStringAsFixed(1) ?? '-'}/100',
+              style: Theme.of(
+                context,
+              ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            if (details.scoreInterpretation != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                details.scoreInterpretation!.label,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                details.scoreInterpretation!.description,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
             const SizedBox(height: 18),
             for (final pillar in details.pillarScores) ...[
               Row(
@@ -535,7 +619,7 @@ class _ScoreCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${pillar.score.toStringAsFixed(1)} · ${pillar.maturity}',
+                    '${pillar.score.toStringAsFixed(1)}/100 • ${pillar.scoreInterpretation?.label ?? '-'}',
                   ),
                 ],
               ),

@@ -22,6 +22,7 @@ class ResearchSubmissionSession {
     this.recommendations = const [],
     this.nextSteps = const [],
     this.pillarScores = const [],
+    this.scoreInterpretation,
     this.aiAnalysis,
   });
 
@@ -41,6 +42,7 @@ class ResearchSubmissionSession {
   final List<String> recommendations;
   final List<String> nextSteps;
   final List<ResearchPillarScore> pillarScores;
+  final DiagnosisScoreInterpretation? scoreInterpretation;
   final AiConsultingAnalysis? aiAnalysis;
 }
 
@@ -261,6 +263,7 @@ class ResearchService {
           ? ResearchSubmissionStatus.completed
           : ResearchSubmissionStatus.inProgress,
       overallScore: (map['overallScore'] as num?)?.toDouble(),
+      scoreInterpretation: _readScoreInterpretation(map['scoreInterpretation']),
       summary: map['summary']?.toString(),
       createdAt:
           DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
@@ -310,6 +313,7 @@ class ResearchService {
       department: map['department']?.toString() ?? '',
       status: map['status']?.toString() ?? 'IN_PROGRESS',
       overallScore: (map['overallScore'] as num?)?.toDouble(),
+      scoreInterpretation: _readScoreInterpretation(map['scoreInterpretation']),
       summary: map['summary']?.toString(),
       createdAt:
           DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
@@ -343,6 +347,7 @@ class ResearchService {
           : ResearchSubmissionStatus.inProgress,
       answersCount: (map['answersCount'] as num?)?.toInt() ?? 0,
       overallScore: (map['overallScore'] as num?)?.toDouble(),
+      scoreInterpretation: _readScoreInterpretation(map['scoreInterpretation']),
       summary: map['summary']?.toString(),
       createdAt:
           DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
@@ -381,6 +386,9 @@ class ResearchService {
             score: (item['score'] as num?)?.toDouble() ?? 0,
             answersCount: (item['answersCount'] as num?)?.toInt() ?? 0,
             maturity: item['maturity']?.toString() ?? '',
+            scoreInterpretation: _readScoreInterpretation(
+              item['scoreInterpretation'],
+            ),
           ),
         )
         .where((item) => item.pillar.isNotEmpty)
@@ -390,6 +398,22 @@ class ResearchService {
   AiConsultingAnalysis? _readAiAnalysis(dynamic value) {
     if (value is! Map) return null;
     return _aiAnalysisFromMap(Map<String, dynamic>.from(value));
+  }
+
+  DiagnosisScoreInterpretation? _readScoreInterpretation(dynamic value) {
+    if (value is! Map) return null;
+    final map = Map<String, dynamic>.from(value);
+    final classification = map['classification']?.toString() ?? '';
+    final label = map['label']?.toString() ?? '';
+    final description = map['description']?.toString() ?? '';
+    if (classification.isEmpty || label.isEmpty || description.isEmpty) {
+      return null;
+    }
+    return DiagnosisScoreInterpretation(
+      classification: classification,
+      label: label,
+      description: description,
+    );
   }
 
   AiConsultingAnalysis _aiAnalysisFromMap(Map<String, dynamic> map) {

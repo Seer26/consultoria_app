@@ -39,6 +39,17 @@ interface SubmissionResponse {
   id: string;
   companyId?: string;
   status: string;
+  overallScore?: number;
+  scoreInterpretation?: { classification: string; label: string; description: string };
+  pillarScores?: Array<{
+    pillar: string;
+    score: number;
+    scoreInterpretation?: { classification: string; label: string; description: string };
+  }>;
+  criticalPoints?: string[];
+  opportunities?: string[];
+  recommendations?: string[];
+  nextSteps?: string[];
 }
 
 interface ActionPlanResponse {
@@ -618,11 +629,10 @@ async function main(): Promise<void> {
         department: 'Financeiro',
       },
     });
-    await expectStatus(
+    await request<ActionPlanResponse>(
       baseUrl,
       'POST',
       `/research/submissions/${researchA.submission.id}/generate-action-plan`,
-      403,
       { token: admin.token },
     );
     await expectStatus(baseUrl, 'POST', '/api/diagnosis/submissions', 410, {
@@ -649,6 +659,13 @@ async function main(): Promise<void> {
       `/research/submissions/${researchB.submission.id}/generate-action-plan`,
       403,
       { token: ownerA.token },
+    );
+    await expectStatus(
+      baseUrl,
+      'POST',
+      `/research/submissions/${researchA.submission.id}/generate-action-plan`,
+      403,
+      { token: employeeA.token },
     );
 
     await expectStatus(
@@ -891,15 +908,19 @@ async function main(): Promise<void> {
       403,
       { token: employeeA.token },
     );
-    const employeeReports = await request<Array<{ submissionId: string }>>(
+    await expectStatus(
+      baseUrl,
+      'GET',
+      `/reports/research/${researchA.submission.id}/executive/pdf`,
+      403,
+      { token: employeeA.token },
+    );
+    await expectStatus(
       baseUrl,
       'GET',
       '/reports/research',
+      403,
       { token: employeeA.token },
-    );
-    assert(
-      employeeReports.length === 0,
-      'Employee A must not list reports created by other company members',
     );
     await expectStatus(
       baseUrl,
@@ -939,6 +960,27 @@ async function main(): Promise<void> {
     assert(
       adminResearchDetails.id === researchA.submission.id,
       'Admin should read research details without responding',
+    );
+    assert(
+      adminResearchDetails.scoreInterpretation?.classification === 'ATENCAO',
+      'Admin should receive score interpretation',
+    );
+    assert(
+      adminResearchDetails.pillarScores?.every((item) => item.scoreInterpretation?.label),
+      'Pillar scores should include score interpretation',
+    );
+    const ownerResearchDetails = await request<SubmissionResponse>(
+      baseUrl,
+      'GET',
+      `/research/submissions/${researchA.submission.id}`,
+      { token: ownerA.token },
+    );
+    assert(
+      ownerResearchDetails.criticalPoints?.length &&
+        ownerResearchDetails.opportunities?.length &&
+        ownerResearchDetails.recommendations?.length &&
+        ownerResearchDetails.nextSteps?.length,
+      'Owner should receive the complete strategic diagnosis',
     );
 
     const ownerDashboard = await request<{

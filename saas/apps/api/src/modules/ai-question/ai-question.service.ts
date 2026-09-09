@@ -121,6 +121,7 @@ export class AiQuestionService {
 
   async generateAnalysis(auth: AuthTokenPayload, submissionId: string, retry = false): Promise<AiConsultingAnalysis> {
     const context = await this.authorizedContext(auth, submissionId, 'COMPLETED');
+    if (context.actor.role === 'EMPLOYEE') throw new Error('FORBIDDEN');
     if (context.submission.aiAnalysis && !retry) return context.submission.aiAnalysis;
     if (!env.aiEnabled) throw new Error('AI_DISABLED');
     if (!env.aiProviderKey) throw new Error('AI_API_KEY_NOT_CONFIGURED');
@@ -165,7 +166,7 @@ export class AiQuestionService {
     const company = await this.repository.findCompanyById(submission.companyId);
     if (!company) throw new Error('COMPANY_NOT_FOUND');
     const answers = await this.repository.listAnswersBySubmissionId(submission.id);
-    return { company, submission, answers };
+    return { actor, company, submission, answers };
   }
 
   private fallbackQuestion(answers: ResearchAnswerRecord[]): AdaptiveQuestionResult {

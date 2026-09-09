@@ -1,4 +1,5 @@
 import type { UserRole } from '../auth/auth.types';
+import type { DiagnosisScoreInterpretation } from '../research/score-interpretation';
 
 export type ReportMaturityLevel = 'CRITICAL' | 'INITIAL' | 'INTERMEDIATE' | 'ADVANCED';
 
@@ -27,6 +28,7 @@ export interface ReportResearchInfo {
   overallScore: number | null;
   maturityLevel: ReportMaturityLevel | null;
   maturityLabel: string | null;
+  scoreInterpretation?: DiagnosisScoreInterpretation | null;
 }
 
 export interface ReportPillarScore {
@@ -34,6 +36,7 @@ export interface ReportPillarScore {
   score: number;
   answersCount?: number;
   maturity?: string;
+  scoreInterpretation?: DiagnosisScoreInterpretation | null;
 }
 
 export interface ReportTask {
@@ -83,6 +86,7 @@ export interface ReportSummary {
   overallScore: number | null;
   maturityLevel: ReportMaturityLevel | null;
   maturityLabel: string | null;
+  scoreInterpretation?: DiagnosisScoreInterpretation | null;
   actionPlanGenerated: boolean;
 }
 

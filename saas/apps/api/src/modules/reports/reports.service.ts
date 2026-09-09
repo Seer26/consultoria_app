@@ -4,6 +4,7 @@ import { audit } from '../../shared/audit';
 import type { AuthTokenPayload } from '../auth/auth.types';
 import { EntitlementsRepository } from '../entitlements/entitlements.repository';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { getDiagnosisScoreInterpretation } from '../research/score-interpretation';
 import { ReportsRepository } from './reports.repository';
 import type {
   ExecutiveReport,
@@ -49,6 +50,9 @@ function parsePillarScores(value: string | null): ReportPillarScore[] {
             ? item.answersCount
             : Number(item.answersCount ?? 0),
         maturity: item.maturity == null ? undefined : String(item.maturity),
+        scoreInterpretation: getDiagnosisScoreInterpretation(
+          typeof item.score === 'number' ? item.score : Number(item.score ?? 0),
+        ),
       }))
       .filter((item) => item.pillar.trim().length > 0);
   } catch {
@@ -85,6 +89,7 @@ export class ReportsService {
   async listResearchReports(auth: AuthTokenPayload): Promise<ReportSummary[]> {
     const actor = await this.getActor(auth);
     this.ensureActive(actor);
+    this.ensureStrategicReportAccess(actor);
 
     const filters =
       actor.role === 'ADMIN'
@@ -108,6 +113,7 @@ export class ReportsService {
         overallScore: roundScore(item.overall_score),
         maturityLevel,
         maturityLabel: this.getMaturityLabel(maturityLevel),
+        scoreInterpretation: getDiagnosisScoreInterpretation(item.overall_score),
         actionPlanGenerated: item.action_plan_generated === 1,
       };
     });
@@ -119,6 +125,7 @@ export class ReportsService {
   ): Promise<ExecutiveReport> {
     const actor = await this.getActor(auth);
     this.ensureActive(actor);
+    this.ensureStrategicReportAccess(actor);
 
     const report = await this.repository.findExecutiveReportBySubmissionId(submissionId);
     if (!report) {
@@ -178,6 +185,7 @@ export class ReportsService {
         overallScore: roundScore(report.overall_score),
         maturityLevel,
         maturityLabel: this.getMaturityLabel(maturityLevel),
+        scoreInterpretation: getDiagnosisScoreInterpretation(report.overall_score),
       },
       result: {
         summary: report.summary,
@@ -259,11 +267,11 @@ export class ReportsService {
       case 'CRITICAL':
         return 'Crítico';
       case 'INITIAL':
-        return 'Inicial';
+        return 'Atenção';
       case 'INTERMEDIATE':
-        return 'Intermediário';
+        return 'Bom';
       case 'ADVANCED':
-        return 'Avançado';
+        return 'Excelente';
       default:
         return null;
     }
@@ -289,6 +297,12 @@ export class ReportsService {
     }
   }
 
+  private ensureStrategicReportAccess(actor: ReportActor): void {
+    if (actor.role === 'EMPLOYEE') {
+      throw new Error('FORBIDDEN');
+    }
+  }
+
   private ensureAccess(
     actor: ReportActor,
     companyId: string,
@@ -302,9 +316,7 @@ export class ReportsService {
       throw new Error('FORBIDDEN');
     }
 
-    if (actor.role === 'EMPLOYEE' && actor.id !== respondentUserId) {
-      throw new Error('FORBIDDEN');
-    }
+    void respondentUserId;
   }
 
   private async buildPdfBuffer(report: ExecutiveReport): Promise<Buffer> {
@@ -378,7 +390,7 @@ export class ReportsService {
 
       addSectionTitle('Resumo Geral');
       addKeyValue('Score geral', report.research.overallScore?.toFixed(1) ?? '-');
-      addKeyValue('Nível de maturidade', report.research.maturityLabel ?? '-');
+      addKeyValue('Classificação', report.research.scoreInterpretation?.label ?? report.research.maturityLabel ?? '-');
       doc.moveDown(0.3);
       doc.font('Helvetica').fontSize(10).fillColor('#111827').text(
         report.result.summary != null && report.result.summary.trim().length > 0
@@ -400,7 +412,7 @@ export class ReportsService {
             top,
           );
           doc.font('Helvetica').fontSize(9).fillColor('#4B5563').text(
-            `Score: ${pillar.score.toFixed(1)} | Maturidade: ${pillar.maturity ?? '-'} | Respostas: ${pillar.answersCount ?? '-'}`,
+            `Score: ${pillar.score.toFixed(1)} | Classificação: ${pillar.scoreInterpretation?.label ?? pillar.maturity ?? '-'} | Respostas: ${pillar.answersCount ?? '-'}`,
             doc.page.margins.left + 10,
             top + 16,
           );

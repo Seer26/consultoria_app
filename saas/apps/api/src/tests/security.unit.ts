@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { validatePasswordPolicy } from '../modules/auth/password-policy';
+import { getDiagnosisScoreInterpretation } from '../modules/research/score-interpretation';
 import { sanitizeForLog } from '../shared/logger';
 import { operationalAlert } from '../shared/alerts';
 import { env, validateLocalOperationalProfile } from '../config/env';
@@ -11,6 +12,25 @@ function main(): void {
   assert.equal(validatePasswordPolicy('curta1').errors.includes('PASSWORD_MIN_LENGTH'), true);
   assert.equal(validatePasswordPolicy('owner@empresa.com', 'owner@empresa.com').errors.includes('PASSWORD_EQUALS_EMAIL'), true);
   assert.equal(validatePasswordPolicy('password').errors.includes('PASSWORD_TOO_COMMON'), true);
+
+  assert.equal(getDiagnosisScoreInterpretation(20)?.classification, 'CRITICO');
+  assert.equal(getDiagnosisScoreInterpretation(50)?.classification, 'ATENCAO');
+  assert.equal(getDiagnosisScoreInterpretation(70)?.classification, 'BOM');
+  assert.equal(getDiagnosisScoreInterpretation(90)?.classification, 'EXCELENTE');
+
+  const scoreBoundaries = [
+    [0, 'CRITICO'],
+    [39, 'CRITICO'],
+    [40, 'ATENCAO'],
+    [59, 'ATENCAO'],
+    [60, 'BOM'],
+    [79, 'BOM'],
+    [80, 'EXCELENTE'],
+    [100, 'EXCELENTE'],
+  ] as const;
+  for (const [score, classification] of scoreBoundaries) {
+    assert.equal(getDiagnosisScoreInterpretation(score)?.classification, classification);
+  }
 
   const sanitized = sanitizeForLog({
     email: 'owner@empresa.com',
@@ -79,7 +99,8 @@ function main(): void {
   console.log(JSON.stringify({
     ok: true,
     passwordPolicyChecked: true,
-    cases: 7,
+    scoreInterpretationChecked: true,
+    cases: 19,
     logSanitizationChecked: true,
     operationalAlertChecked: true,
     localOperationalProfileChecked: true,

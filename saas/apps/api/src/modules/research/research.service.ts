@@ -13,11 +13,13 @@ import type {
   ResearchAccessContext,
   ResearchAnswerRecord,
   ResearchListFilters,
+  ResearchListItem,
   ResearchPillarScore,
   ResearchResultSnapshot,
   ResearchSubmissionDetails,
   ResearchSubmissionRecord,
 } from './research.types';
+import { getDiagnosisScoreInterpretation } from './score-interpretation';
 
 const POSITIVE_HINTS = [
   'temos controle',
@@ -249,6 +251,10 @@ export class ResearchService {
       completedAt: now,
     });
 
+    if (context.actor.role === 'EMPLOYEE') {
+      return this.buildSanitizedEmployeeSubmissionDetails(updated, answers);
+    }
+
     return this.buildSubmissionDetails(updated, answers);
   }
 
@@ -257,9 +263,10 @@ export class ResearchService {
     this.ensureActiveUser(context);
 
     if (context.actor.role === 'ADMIN') {
-      return this.repository.listResearchSubmissions({
+      const items = await this.repository.listResearchSubmissions({
         companyId: filters.companyId?.trim() || undefined,
       });
+      return items.map((item) => this.decorateSubmissionListItem(item));
     }
 
     if (!context.actor.companyId) {
@@ -272,15 +279,17 @@ export class ResearchService {
     }
 
     if (context.actor.role === 'OWNER') {
-      return this.repository.listResearchSubmissions({
+      const items = await this.repository.listResearchSubmissions({
         companyId: context.actor.companyId,
       });
+      return items.map((item) => this.decorateSubmissionListItem(item));
     }
 
-    return this.repository.listResearchSubmissions({
+    const items = await this.repository.listResearchSubmissions({
       companyId: context.actor.companyId,
       userId: context.actor.id,
     });
+    return items.map((item) => this.sanitizeSubmissionListItemForEmployee(item));
   }
 
   async getSubmissionById(
@@ -291,8 +300,12 @@ export class ResearchService {
     this.ensureActiveUser(context);
     const submission = await this.getAuthorizedSubmission(context, submissionId, false);
     const answers = await this.repository.listAnswersBySubmissionId(submission.id);
-    const canReadRawAnswers = context.actor.role === 'ADMIN' ||
-      context.actor.role === 'EMPLOYEE' || submission.userId === context.actor.id;
+    if (context.actor.role === 'EMPLOYEE') {
+      return this.buildSanitizedEmployeeSubmissionDetails(submission, answers);
+    }
+
+    const canReadRawAnswers =
+      context.actor.role === 'ADMIN' || submission.userId === context.actor.id;
 
     return this.buildSubmissionDetails(submission, canReadRawAnswers ? answers : []);
   }
@@ -300,7 +313,7 @@ export class ResearchService {
   async generateActionPlan(auth: AuthTokenPayload, submissionId: string) {
     const context = await this.getAccessContext(auth);
     this.ensureActiveUser(context);
-    this.ensureRespondent(context);
+    this.ensureStrategicResultAccess(context);
     const submission = await this.getAuthorizedSubmission(context, submissionId, false);
 
     return this.actionPlanService.generateFromResearch(auth, {
@@ -329,12 +342,13 @@ export class ResearchService {
       id: submission.id,
       status: submission.status,
       overallScore: submission.overallScore,
+      scoreInterpretation: getDiagnosisScoreInterpretation(submission.overallScore),
       summary: submission.summary,
       criticalPoints: submission.criticalPoints,
       opportunities: submission.opportunities,
       recommendations: submission.recommendations,
       nextSteps: submission.nextSteps,
-      pillarScores: submission.pillarScores,
+      pillarScores: this.decoratePillarScores(submission.pillarScores),
       respondentRole: submission.respondentRole,
       department: submission.department,
       respondentDepartment: submission.respondentDepartment,
@@ -356,6 +370,70 @@ export class ResearchService {
       answers,
       aiAnalysis: submission.aiAnalysis,
     };
+  }
+
+  private async buildSanitizedEmployeeSubmissionDetails(
+    submission: ResearchSubmissionRecord,
+    answers: ResearchAnswerRecord[],
+  ): Promise<ResearchSubmissionDetails> {
+    const details = await this.buildSubmissionDetails(submission, answers);
+    return {
+      id: details.id,
+      status: details.status,
+      respondentRole: details.respondentRole,
+      department: details.department,
+      respondentDepartment: details.respondentDepartment,
+      respondentJobFunction: details.respondentJobFunction,
+      createdAt: details.createdAt,
+      updatedAt: details.updatedAt,
+      completedAt: details.completedAt,
+      company: details.company,
+      user: details.user,
+      answers: details.answers,
+    };
+  }
+
+  private sanitizeSubmissionListItemForEmployee(
+    item: ResearchListItem,
+  ) {
+    const {
+      overallScore,
+      scoreInterpretation,
+      summary,
+      criticalPoints,
+      opportunities,
+      recommendations,
+      nextSteps,
+      pillarScores,
+      ...safeItem
+    } = {
+      ...item,
+      scoreInterpretation: getDiagnosisScoreInterpretation(item.overallScore),
+    };
+    void overallScore;
+    void scoreInterpretation;
+    void summary;
+    void criticalPoints;
+    void opportunities;
+    void recommendations;
+    void nextSteps;
+    void pillarScores;
+    return safeItem;
+  }
+
+  private decorateSubmissionListItem(item: ResearchListItem): ResearchListItem {
+    return {
+      ...item,
+      scoreInterpretation: getDiagnosisScoreInterpretation(item.overallScore),
+      pillarScores: this.decoratePillarScores(item.pillarScores),
+    };
+  }
+
+  private decoratePillarScores(pillarScores: ResearchPillarScore[]): ResearchPillarScore[] {
+    return pillarScores.map((item) => ({
+      ...item,
+      scoreInterpretation: getDiagnosisScoreInterpretation(item.score),
+    }));
   }
 
   private buildInitialResult(
@@ -385,6 +463,7 @@ export class ResearchService {
           score,
           answersCount: items.length,
           maturity: this.getMaturity(score),
+          scoreInterpretation: getDiagnosisScoreInterpretation(score),
         };
       })
       .sort((left, right) => left.score - right.score);
@@ -419,6 +498,7 @@ export class ResearchService {
 
     return {
       overallScore,
+      scoreInterpretation: getDiagnosisScoreInterpretation(overallScore),
       summary: this.buildSummary(overallScore, weakestPillars, strongestPillars),
       criticalPoints,
       opportunities,
@@ -555,6 +635,12 @@ export class ResearchService {
   private ensureRespondent(context: ResearchAccessContext): void {
     if (context.actor.role === 'ADMIN') {
       throw new Error('ADMIN_RESEARCH_READ_ONLY');
+    }
+  }
+
+  private ensureStrategicResultAccess(context: ResearchAccessContext): void {
+    if (context.actor.role === 'EMPLOYEE') {
+      throw new Error('FORBIDDEN');
     }
   }
 

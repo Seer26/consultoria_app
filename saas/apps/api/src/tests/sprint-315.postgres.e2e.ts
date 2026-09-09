@@ -19,6 +19,8 @@ type Json = Record<string, unknown>;
 type Auth = { token: string; user: { id: string; role: string; companyId: string | null; department?: string; jobFunction?: string } };
 const scenarios: string[] = [];
 const passed = (name: string) => scenarios.push(name);
+const hasOwn = (value: object, key: string) =>
+  Object.prototype.hasOwnProperty.call(value, key);
 
 async function call<T>(base: string, method: string, path: string, input: {
   token?: string; body?: Json; status?: number; pdf?: boolean;
@@ -204,9 +206,20 @@ try {
     body: { question: 'Pergunta 11?', answer: 'Nao deve salvar', pillar: 'Financeiro' },
   });
   passed('pergunta MAX+1 nao e salva nem solicitada');
-  const completedA2 = await call<{ overallScore: number; answers: unknown[] }>(base, 'POST', `/research/submissions/${submissionA2.id}/complete`, { token: employeeA2.token, body: {} });
-  assert.equal(completedA2.overallScore, 50);
-  passed('score continua deterministico');
+  const completedA2 = await call<Json>(base, 'POST', `/research/submissions/${submissionA2.id}/complete`, { token: employeeA2.token, body: {} });
+  assert.equal(completedA2.status, 'COMPLETED');
+  assert.equal(hasOwn(completedA2, 'overallScore'), false);
+  assert.equal(hasOwn(completedA2, 'pillarScores'), false);
+  assert.equal(hasOwn(completedA2, 'criticalPoints'), false);
+  assert.equal(hasOwn(completedA2, 'opportunities'), false);
+  assert.equal(hasOwn(completedA2, 'recommendations'), false);
+  assert.equal(hasOwn(completedA2, 'nextSteps'), false);
+  passed('EMPLOYEE conclui pesquisa sem receber diagnostico estrategico');
+  const persistedA2 = await dataSource.one<{ overall_score: number }>(`
+    SELECT overall_score FROM diagnosis_submissions WHERE id = ?
+  `, [submissionA2.id]);
+  assert.equal(Number(persistedA2?.overall_score), 50);
+  passed('score continua deterministico e persistido');
 
   const ownerEmployeeView = await call<{ answers: unknown[]; status: string }>(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: ownerA.token });
   assert.equal(ownerEmployeeView.answers.length, 0);
@@ -219,6 +232,14 @@ try {
   const pdf = await call<Buffer>(base, 'GET', `/reports/research/${submissionA2.id}/executive/pdf`, { token: ownerA.token, pdf: true });
   assert(!pdf.toString('utf8').includes('Resposta limite'));
   passed('PDF OWNER nao contem respostas brutas');
+  await call(base, 'GET', `/reports/research/${submissionA2.id}/executive`, { token: employeeA2.token, status: 403 });
+  passed('EMPLOYEE nao acessa relatorio executivo');
+  await call(base, 'GET', `/reports/research/${submissionA2.id}/executive/pdf`, { token: employeeA2.token, status: 403 });
+  passed('EMPLOYEE nao acessa PDF executivo');
+  await call(base, 'POST', `/research/submissions/${submissionA2.id}/generate-action-plan`, { token: employeeA2.token, status: 403 });
+  passed('EMPLOYEE nao gera plano de acao');
+  await call(base, 'POST', `/ai/research/${submissionA2.id}/analysis`, { token: employeeA2.token, status: 403, body: { retry: true } });
+  passed('EMPLOYEE nao gera analise estrategica por IA');
 
   const ownerSubmission = await call<{ id: string }>(base, 'POST', '/research/submissions', { token: ownerA.token, status: 201, body: { respondentRole: 'Diretor', department: 'Direcao' } });
   await call(base, 'POST', `/research/submissions/${ownerSubmission.id}/answers`, { token: ownerA.token, status: 201, body: { question: 'Pergunta do owner?', answer: 'Resposta do owner', pillar: 'Estrategia' } });
@@ -228,15 +249,18 @@ try {
   const adminView = await call<{ answers: Array<{ answer: string }> }>(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: admin.token });
   assert(adminView.answers.some((answer) => answer.answer.includes(rawMarker)));
   passed('ADMIN acessa respostas individuais');
-  const employeeOwn = await call<{ answers: unknown[] }>(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: employeeA1.token });
+  const employeeOwn = await call<Json & { answers: unknown[] }>(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: employeeA1.token });
   assert.equal(employeeOwn.answers.length, 5);
+  assert.equal(hasOwn(employeeOwn, 'overallScore'), false);
+  assert.equal(hasOwn(employeeOwn, 'pillarScores'), false);
+  passed('EMPLOYEE ve status proprio sem campos estrategicos');
   await call(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: employeeA2.token, status: 403 });
   passed('EMPLOYEE acessa somente as proprias respostas');
   await call(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: ownerB.token, status: 403 });
   await call(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: employeeB1.token, status: 403 });
   passed('isolamento Empresa A/B preservado');
 
-  assert.equal(scenarios.length, 31);
+  assert.equal(scenarios.length, 37);
   console.log(JSON.stringify({ ok: true, scenarios: scenarios.length, names: scenarios, realProviderCalls: 0, temporaryPostgres: true }));
 } finally {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
