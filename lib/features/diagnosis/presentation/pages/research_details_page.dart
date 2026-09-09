@@ -146,11 +146,68 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
     }
   }
 
+  Future<void> _approveDiagnosis() async {
+    setState(() => _isGenerating = true);
+    try {
+      final details = await ref
+          .read(researchServiceProvider)
+          .approveDiagnosis(widget.submissionId);
+      if (!mounted) return;
+      setState(() => _details = details);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.success,
+          content: Text('Diagnóstico aprovado.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.danger,
+          content: Text(userFriendlyError(error)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
+  }
+
+  Future<void> _publishDiagnosis() async {
+    setState(() => _isGenerating = true);
+    try {
+      final details = await ref
+          .read(researchServiceProvider)
+          .publishDiagnosis(widget.submissionId);
+      if (!mounted) return;
+      setState(() => _details = details);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.success,
+          content: Text('Diagnóstico publicado para o cliente.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.danger,
+          content: Text(userFriendlyError(error)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authControllerProvider).user;
     final role = RoleGuard.normalizeRole(currentUser?.role);
     final completed = _details?.status == ResearchSubmissionStatus.completed;
+    final diagnosisReadyForPlan =
+        _details?.diagnosisStatus == DiagnosisReviewStatus.approved ||
+        _details?.diagnosisStatus == DiagnosisReviewStatus.published;
     final canResume =
         _details?.status == ResearchSubmissionStatus.inProgress &&
         _details?.userId == currentUser?.id &&
@@ -211,7 +268,28 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
                 : const Icon(Icons.picture_as_pdf_outlined),
             label: Text(_isExportingPdf ? 'Exportando...' : 'Exportar PDF'),
           ),
-        if (completed && role != RoleGuard.employee && !_actionPlanExists)
+        if (completed &&
+            role == RoleGuard.admin &&
+            _details?.diagnosisStatus == DiagnosisReviewStatus.awaitingReview)
+          OutlinedButton.icon(
+            key: const ValueKey('approve-diagnosis'),
+            onPressed: _isGenerating ? null : _approveDiagnosis,
+            icon: const Icon(Icons.verified_outlined),
+            label: const Text('Aprovar diagnóstico'),
+          ),
+        if (completed &&
+            role == RoleGuard.admin &&
+            _details?.diagnosisStatus == DiagnosisReviewStatus.approved)
+          OutlinedButton.icon(
+            key: const ValueKey('publish-diagnosis'),
+            onPressed: _isGenerating ? null : _publishDiagnosis,
+            icon: const Icon(Icons.publish_outlined),
+            label: const Text('Publicar diagnóstico'),
+          ),
+        if (completed &&
+            role != RoleGuard.employee &&
+            diagnosisReadyForPlan &&
+            !_actionPlanExists)
           FilledButton.icon(
             key: const ValueKey('generate-action-plan'),
             onPressed: _isGenerating ? null : _generateActionPlan,
@@ -229,6 +307,13 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
             onPressed: () => context.go('/tasks'),
             icon: const Icon(Icons.task_alt_outlined),
             label: const Text('Abrir plano de ação'),
+          ),
+        if (_actionPlanExists && role != RoleGuard.employee)
+          OutlinedButton.icon(
+            key: const ValueKey('regenerate-action-plan'),
+            onPressed: _isGenerating ? null : _generateActionPlan,
+            icon: const Icon(Icons.auto_awesome_motion),
+            label: const Text('Gerar novo plano'),
           ),
       ],
       child: _buildBody(),
@@ -263,6 +348,7 @@ class _ResearchDetailsPageState extends ConsumerState<ResearchDetailsPage> {
           role == RoleGuard.owner &&
           details.userId != ref.read(authControllerProvider).user?.id,
       isEmployeeView: role == RoleGuard.employee,
+      role: role,
       canGenerateAi: role == RoleGuard.owner,
       isGeneratingAi: _isGeneratingAi,
       onGenerateAi: _generateAiAnalysis,
@@ -279,6 +365,7 @@ class ResearchDetailsContent extends StatelessWidget {
     this.onGenerateAi,
     this.rawAnswersRestricted = false,
     this.isEmployeeView = false,
+    this.role = '',
   });
 
   final ResearchSubmissionDetails details;
@@ -287,6 +374,7 @@ class ResearchDetailsContent extends StatelessWidget {
   final VoidCallback? onGenerateAi;
   final bool rawAnswersRestricted;
   final bool isEmployeeView;
+  final String role;
 
   @override
   Widget build(BuildContext context) {
@@ -308,6 +396,10 @@ class ResearchDetailsContent extends StatelessWidget {
         if (isEmployeeView) ...[
           _EmployeeParticipationCard(details: details),
           const SizedBox(height: 16),
+        ] else if (role == RoleGuard.owner &&
+            details.diagnosisStatus != DiagnosisReviewStatus.published) ...[
+          _OwnerPendingReviewCard(details: details),
+          const SizedBox(height: 16),
         ] else
         if (details.status == ResearchSubmissionStatus.inProgress)
           const Card(
@@ -322,6 +414,8 @@ class ResearchDetailsContent extends StatelessWidget {
             ),
           )
         else ...[
+          _DiagnosisStatusCard(details: details),
+          const SizedBox(height: 16),
           _ScoreCard(details: details),
           const SizedBox(height: 16),
           _NarrativeSection(
@@ -370,6 +464,89 @@ class ResearchDetailsContent extends StatelessWidget {
             ],
         ],
       ],
+    );
+  }
+}
+
+class _DiagnosisStatusCard extends StatelessWidget {
+  const _DiagnosisStatusCard({required this.details});
+  final ResearchSubmissionDetails details;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (details.diagnosisStatus) {
+      DiagnosisReviewStatus.published => 'Publicado',
+      DiagnosisReviewStatus.approved => 'Aprovado',
+      DiagnosisReviewStatus.awaitingReview => 'Aguardando revisão',
+    };
+    final message = switch (details.diagnosisStatus) {
+      DiagnosisReviewStatus.published =>
+        'Diagnóstico oficial publicado para o cliente e liberado para orientar relatórios e planos de ação.',
+      DiagnosisReviewStatus.approved =>
+        'Diagnóstico aprovado pela consultoria e pronto para publicação ao cliente.',
+      DiagnosisReviewStatus.awaitingReview =>
+        'Este diagnóstico foi produzido com apoio de IA e ainda depende da validação da consultoria antes de orientar a execução.',
+    };
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.rate_review_outlined, color: AppColors.indigo),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Status: $label',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    message,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OwnerPendingReviewCard extends StatelessWidget {
+  const _OwnerPendingReviewCard({required this.details});
+  final ResearchSubmissionDetails details;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.manage_search, color: AppColors.indigo, size: 36),
+            const SizedBox(height: 14),
+            Text(
+              'Diagnóstico em análise pela consultoria',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Seu diagnóstico está sendo revisado antes da publicação oficial.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

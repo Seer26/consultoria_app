@@ -161,6 +161,7 @@ void main() {
           respondentRole: 'Diretora executiva',
           department: 'Direção',
           status: ResearchSubmissionStatus.completed,
+          diagnosisStatus: DiagnosisReviewStatus.published,
           createdAt: DateTime(2026, 7, 1),
           updatedAt: DateTime(2026, 7, 2),
           completedAt: DateTime(2026, 7, 2),
@@ -201,7 +202,11 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Empresa Horizonte Consultoria Demo'), findsOneWidget);
-        expect(find.text('Score geral: 65.3'), findsOneWidget);
+        expect(
+          find.text('Índice de Diagnóstico Organizacional'),
+          findsOneWidget,
+        );
+        expect(find.text('65.3/100'), findsOneWidget);
         expect(find.text('Pontos críticos'), findsOneWidget);
         expect(find.text('Como acompanha o caixa?'), findsOneWidget);
         expect(find.text('Há planilha mensal.'), findsOneWidget);

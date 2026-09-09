@@ -3,11 +3,32 @@ import type { AuthTokenPayload, UserRole } from '../auth/auth.types';
 export type ActionPlanTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ActionPlanTaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
 export type ActionPlanTaskSource = 'RESEARCH_RECOMMENDATION' | 'MANUAL' | 'AI';
+export type ActionPlanVersionStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+export type ActionPlanVersionSource = 'AI' | 'MANUAL';
+
+export interface ActionPlanVersionRecord {
+  id: string;
+  companyId: string;
+  submissionId: string;
+  versionNumber: number;
+  status: ActionPlanVersionStatus;
+  source: ActionPlanVersionSource;
+  generatedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+}
+
+export interface ActionPlanVersionSummary extends ActionPlanVersionRecord {
+  generatedByUserName: string | null;
+  tasksCount: number;
+}
 
 export interface ActionPlanTaskRecord {
   id: string;
   companyId: string;
   submissionId: string | null;
+  planVersionId: string | null;
   title: string;
   description: string;
   pillar: string | null;
@@ -51,6 +72,7 @@ export interface ActionPlanAssignee {
 export interface CreateActionPlanTaskInput {
   companyId?: string;
   submissionId?: string | null;
+  planVersionId?: string | null;
   title: string;
   description?: string;
   pillar?: string | null;
@@ -78,6 +100,7 @@ export interface UpdateActionPlanTaskStatusInput {
 export interface ActionPlanListFilters {
   companyId?: string;
   submissionId?: string;
+  planVersionId?: string;
   scope?: ActionPlanTaskScope;
   search?: string;
 }
@@ -102,6 +125,7 @@ export interface ActionPlanGenerationResult {
   submissionId: string;
   companyId: string;
   alreadyGenerated: boolean;
+  planVersion: ActionPlanVersionSummary;
   createdCount: number;
   tasks: ActionPlanTaskDetails[];
 }

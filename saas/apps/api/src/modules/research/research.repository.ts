@@ -51,6 +51,12 @@ interface SubmissionRow {
   updated_at: string;
   completed_at: string | null;
   ai_analysis: AiConsultingAnalysis | string | null;
+  diagnosis_status: 'AGUARDANDO_REVISAO' | 'APROVADO' | 'PUBLICADO' | null;
+  approved_by_user_id: string | null;
+  approved_at: string | null;
+  published_by_user_id: string | null;
+  published_at: string | null;
+  review_notes: string | null;
 }
 
 interface AnswerRow {
@@ -169,6 +175,12 @@ function mapSubmission(row: SubmissionRow): ResearchSubmissionRecord {
     respondentDepartment: row.respondent_department ?? row.department,
     respondentJobFunction: row.respondent_job_function ?? row.respondent_role,
     status: row.status,
+    diagnosisStatus: row.diagnosis_status ?? 'PUBLICADO',
+    approvedByUserId: row.approved_by_user_id,
+    approvedAt: row.approved_at,
+    publishedByUserId: row.published_by_user_id,
+    publishedAt: row.published_at,
+    reviewNotes: row.review_notes,
     overallScore: row.overall_score,
     summary: row.summary,
     criticalPoints: parseStringArray(row.critical_points),
@@ -242,7 +254,13 @@ export class ResearchRepository {
         pillar_scores,
         created_at,
         updated_at,
-        completed_at
+        completed_at,
+        diagnosis_status,
+        approved_by_user_id,
+        approved_at,
+        published_by_user_id,
+        published_at,
+        review_notes
       )
       VALUES (
         @id,
@@ -264,7 +282,13 @@ export class ResearchRepository {
         @pillarScores,
         @createdAt,
         @updatedAt,
-        @completedAt
+        @completedAt,
+        @diagnosisStatus,
+        @approvedByUserId,
+        @approvedAt,
+        @publishedByUserId,
+        @publishedAt,
+        @reviewNotes
       )
     `, {
       ...input,
@@ -301,7 +325,13 @@ export class ResearchRepository {
         created_at,
         updated_at,
         completed_at,
-        ai_analysis
+        ai_analysis,
+        diagnosis_status,
+        approved_by_user_id,
+        approved_at,
+        published_by_user_id,
+        published_at,
+        review_notes
       FROM diagnosis_submissions
       WHERE id = ? AND submission_type = 'RESEARCH'
     `, [id]);
@@ -327,7 +357,13 @@ export class ResearchRepository {
           next_steps = @nextSteps,
           pillar_scores = @pillarScores,
           updated_at = @updatedAt,
-          completed_at = @completedAt
+          completed_at = @completedAt,
+          diagnosis_status = @diagnosisStatus,
+          approved_by_user_id = @approvedByUserId,
+          approved_at = @approvedAt,
+          published_by_user_id = @publishedByUserId,
+          published_at = @publishedAt,
+          review_notes = @reviewNotes
       WHERE id = @id
     `, {
       ...input,
@@ -449,6 +485,12 @@ export class ResearchRepository {
         ds.updated_at,
         ds.completed_at,
         ds.ai_analysis,
+        ds.diagnosis_status,
+        ds.approved_by_user_id,
+        ds.approved_at,
+        ds.published_by_user_id,
+        ds.published_at,
+        ds.review_notes,
         c.name as company_name,
         u.name as user_name,
         COUNT(da.id) as answers_count
@@ -479,6 +521,12 @@ export class ResearchRepository {
         ds.updated_at,
         ds.completed_at,
         ds.ai_analysis,
+        ds.diagnosis_status,
+        ds.approved_by_user_id,
+        ds.approved_at,
+        ds.published_by_user_id,
+        ds.published_at,
+        ds.review_notes,
         c.name,
         u.name
       ORDER BY ds.created_at DESC
@@ -497,6 +545,12 @@ export class ResearchRepository {
         respondentDepartment: mapped.respondentDepartment,
         respondentJobFunction: mapped.respondentJobFunction,
         status: row.status,
+        diagnosisStatus: mapped.diagnosisStatus,
+        approvedByUserId: mapped.approvedByUserId,
+        approvedAt: mapped.approvedAt,
+        publishedByUserId: mapped.publishedByUserId,
+        publishedAt: mapped.publishedAt,
+        reviewNotes: mapped.reviewNotes,
         overallScore: row.overall_score,
         summary: row.summary,
         criticalPoints: mapped.criticalPoints,

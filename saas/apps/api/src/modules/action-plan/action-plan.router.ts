@@ -14,8 +14,10 @@ export const actionPlanRouter = Router();
 actionPlanRouter.use(authenticate);
 
 actionPlanRouter.get('/action-plan/assignees', controller.listAssignees);
+actionPlanRouter.get('/action-plan/versions', controller.listPlanVersions);
 actionPlanRouter.get('/action-plan/tasks', controller.listTasks);
 actionPlanRouter.get('/action-plan/tasks/:id', controller.getTaskById);
 actionPlanRouter.post('/action-plan/tasks', controller.createTask);
 actionPlanRouter.put('/action-plan/tasks/:id', controller.updateTask);
 actionPlanRouter.patch('/action-plan/tasks/:id/status', controller.updateTaskStatus);
+actionPlanRouter.patch('/action-plan/versions/:id/status', controller.updatePlanVersionStatus);

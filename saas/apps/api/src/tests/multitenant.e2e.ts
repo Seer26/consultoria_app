@@ -39,6 +39,7 @@ interface SubmissionResponse {
   id: string;
   companyId?: string;
   status: string;
+  diagnosisStatus?: string;
   overallScore?: number;
   scoreInterpretation?: { classification: string; label: string; description: string };
   pillarScores?: Array<{
@@ -54,6 +55,14 @@ interface SubmissionResponse {
 
 interface ActionPlanResponse {
   companyId: string;
+  planVersion: {
+    id: string;
+    companyId: string;
+    submissionId: string;
+    versionNumber: number;
+    status: string;
+    tasksCount: number;
+  };
   tasks: Array<{ id: string; companyId: string }>;
 }
 
@@ -255,6 +264,7 @@ async function createEmployee(
 async function createCompletedResearch(
   baseUrl: string,
   ownerToken: string,
+  adminToken: string,
   pillar: string,
 ): Promise<{ submission: SubmissionResponse; actionPlan: ActionPlanResponse }> {
   const submission = await request<SubmissionResponse>(baseUrl, 'POST', '/research/submissions', {
@@ -290,6 +300,24 @@ async function createCompletedResearch(
     },
   );
   assert(completed.status === 'COMPLETED', 'Research was not completed');
+  assert(
+    completed.diagnosisStatus === 'AGUARDANDO_REVISAO',
+    'Completed research should wait for admin review',
+  );
+
+  await request(
+    baseUrl,
+    'POST',
+    `/research/submissions/${submission.id}/diagnosis/approve`,
+    { token: adminToken },
+  );
+  const published = await request<SubmissionResponse>(
+    baseUrl,
+    'POST',
+    `/research/submissions/${submission.id}/diagnosis/publish`,
+    { token: adminToken },
+  );
+  assert(published.diagnosisStatus === 'PUBLICADO', 'Research was not published');
 
   const actionPlan = await request<ActionPlanResponse>(
     baseUrl,
@@ -301,7 +329,7 @@ async function createCompletedResearch(
   );
   assert(actionPlan.tasks.length > 0, 'Action plan was not generated');
 
-  return { submission: completed, actionPlan };
+  return { submission: published, actionPlan };
 }
 
 async function main(): Promise<void> {
@@ -617,8 +645,8 @@ async function main(): Promise<void> {
     assert(ownerBSettings.id === companyB.company.id, 'Owner B should read only own company');
     assert(ownerBSettings.name !== 'Empresa A Beta', 'Owner A settings leaked into Company B');
 
-    const researchA = await createCompletedResearch(baseUrl, ownerA.token, 'Financeiro');
-    const researchB = await createCompletedResearch(baseUrl, ownerB.token, 'Comercial');
+    const researchA = await createCompletedResearch(baseUrl, ownerA.token, admin.token, 'Financeiro');
+    const researchB = await createCompletedResearch(baseUrl, ownerB.token, admin.token, 'Comercial');
     const taskB = researchB.actionPlan.tasks[0];
 
     await expectStatus(baseUrl, 'POST', '/research/submissions', 403, {
@@ -629,11 +657,34 @@ async function main(): Promise<void> {
         department: 'Financeiro',
       },
     });
-    await request<ActionPlanResponse>(
+    const adminPlanV2 = await request<ActionPlanResponse>(
       baseUrl,
       'POST',
       `/research/submissions/${researchA.submission.id}/generate-action-plan`,
       { token: admin.token },
+    );
+    assert(
+      adminPlanV2.planVersion.versionNumber === 2,
+      'Admin should generate a new action plan version',
+    );
+    const planVersionsA = await request<Array<{ versionNumber: number; status: string }>>(
+      baseUrl,
+      'GET',
+      `/action-plan/versions?submissionId=${researchA.submission.id}`,
+      { token: ownerA.token },
+    );
+    assert(
+      planVersionsA.length === 2 &&
+        planVersionsA.some((version) => version.versionNumber === 1 && version.status === 'ARCHIVED') &&
+        planVersionsA.some((version) => version.versionNumber === 2 && version.status === 'ACTIVE'),
+      'Action plan versions should preserve v1 and create active v2',
+    );
+    await expectStatus(
+      baseUrl,
+      'GET',
+      `/action-plan/versions?submissionId=${researchA.submission.id}`,
+      403,
+      { token: employeeA.token },
     );
     await expectStatus(baseUrl, 'POST', '/api/diagnosis/submissions', 410, {
       token: ownerA.token,

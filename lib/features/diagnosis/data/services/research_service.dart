@@ -241,6 +241,61 @@ class ResearchService {
     }
   }
 
+  Future<ResearchSubmissionDetails> reviewDiagnosis(
+    String submissionId, {
+    String? summary,
+    List<String>? criticalPoints,
+    List<String>? opportunities,
+    List<String>? recommendations,
+    List<String>? nextSteps,
+    String? reviewNotes,
+  }) async {
+    try {
+      final response = await _dio.put<Map<String, dynamic>>(
+        '/research/submissions/$submissionId/diagnosis/review',
+        data: {
+          if (summary != null) 'summary': summary,
+          if (criticalPoints != null) 'criticalPoints': criticalPoints,
+          if (opportunities != null) 'opportunities': opportunities,
+          if (recommendations != null) 'recommendations': recommendations,
+          if (nextSteps != null) 'nextSteps': nextSteps,
+          if (reviewNotes != null) 'reviewNotes': reviewNotes,
+        },
+      );
+      return _detailsFromMap(response.data ?? const {});
+    } on DioException catch (error) {
+      throw Exception(
+        _extractError(error, fallback: 'Falha ao revisar o diagnóstico.'),
+      );
+    }
+  }
+
+  Future<ResearchSubmissionDetails> approveDiagnosis(String submissionId) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/research/submissions/$submissionId/diagnosis/approve',
+      );
+      return _detailsFromMap(response.data ?? const {});
+    } on DioException catch (error) {
+      throw Exception(
+        _extractError(error, fallback: 'Falha ao aprovar o diagnóstico.'),
+      );
+    }
+  }
+
+  Future<ResearchSubmissionDetails> publishDiagnosis(String submissionId) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/research/submissions/$submissionId/diagnosis/publish',
+      );
+      return _detailsFromMap(response.data ?? const {});
+    } on DioException catch (error) {
+      throw Exception(
+        _extractError(error, fallback: 'Falha ao publicar o diagnóstico.'),
+      );
+    }
+  }
+
   ResearchSubmissionDetails _detailsFromMap(Map<String, dynamic> map) {
     final company = map['company'] is Map
         ? Map<String, dynamic>.from(map['company'] as Map)
@@ -262,6 +317,7 @@ class ResearchService {
       status: map['status']?.toString() == 'COMPLETED'
           ? ResearchSubmissionStatus.completed
           : ResearchSubmissionStatus.inProgress,
+      diagnosisStatus: _diagnosisStatusFromApi(map['diagnosisStatus']),
       overallScore: (map['overallScore'] as num?)?.toDouble(),
       scoreInterpretation: _readScoreInterpretation(map['scoreInterpretation']),
       summary: map['summary']?.toString(),
@@ -345,6 +401,7 @@ class ResearchService {
       status: map['status']?.toString() == 'COMPLETED'
           ? ResearchSubmissionStatus.completed
           : ResearchSubmissionStatus.inProgress,
+      diagnosisStatus: _diagnosisStatusFromApi(map['diagnosisStatus']),
       answersCount: (map['answersCount'] as num?)?.toInt() ?? 0,
       overallScore: (map['overallScore'] as num?)?.toDouble(),
       scoreInterpretation: _readScoreInterpretation(map['scoreInterpretation']),
@@ -371,6 +428,18 @@ class ResearchService {
       return value.map((item) => item.toString()).toList();
     }
     return const [];
+  }
+
+  DiagnosisReviewStatus _diagnosisStatusFromApi(dynamic value) {
+    switch (value?.toString()) {
+      case 'APROVADO':
+        return DiagnosisReviewStatus.approved;
+      case 'PUBLICADO':
+        return DiagnosisReviewStatus.published;
+      case 'AGUARDANDO_REVISAO':
+      default:
+        return DiagnosisReviewStatus.awaitingReview;
+    }
   }
 
   List<ResearchPillarScore> _readPillarScores(dynamic value) {

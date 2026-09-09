@@ -19,6 +19,9 @@ export class ActionPlanController {
       const submissionId = Array.isArray(request.query.submissionId)
         ? request.query.submissionId[0]
         : request.query.submissionId;
+      const planVersionId = Array.isArray(request.query.planVersionId)
+        ? request.query.planVersionId[0]
+        : request.query.planVersionId;
       const scope = Array.isArray(request.query.scope)
         ? request.query.scope[0]
         : request.query.scope;
@@ -29,6 +32,7 @@ export class ActionPlanController {
       const result = await this.service.listTasks(request.auth!, {
         companyId: typeof companyId === 'string' ? companyId : undefined,
         submissionId: typeof submissionId === 'string' ? submissionId : undefined,
+        planVersionId: typeof planVersionId === 'string' ? planVersionId : undefined,
         scope:
           typeof scope === 'string'
             ? (scope as 'all' | 'mine' | 'overdue' | 'dueSoon' | 'critical' | 'completed')
@@ -103,6 +107,37 @@ export class ActionPlanController {
     }
   };
 
+  listPlanVersions = async (request: Request, response: Response): Promise<void> => {
+    try {
+      const companyId = Array.isArray(request.query.companyId)
+        ? request.query.companyId[0]
+        : request.query.companyId;
+      const submissionId = Array.isArray(request.query.submissionId)
+        ? request.query.submissionId[0]
+        : request.query.submissionId;
+      const result = await this.service.listPlanVersions(request.auth!, {
+        companyId: typeof companyId === 'string' ? companyId : undefined,
+        submissionId: typeof submissionId === 'string' ? submissionId : undefined,
+      });
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
+  updatePlanVersionStatus = async (request: Request, response: Response): Promise<void> => {
+    try {
+      const result = await this.service.updatePlanVersionStatus(
+        request.auth!,
+        this.getParam(request, 'id'),
+        request.body?.status,
+      );
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
   private handleError(error: unknown, response: Response): void {
     if (writePlanLimitResponse(error, response)) {
       return;
@@ -117,6 +152,7 @@ export class ActionPlanController {
         case 'INVALID_ACTION_PLAN_STATUS':
         case 'INVALID_ACTION_PLAN_SOURCE':
         case 'INVALID_ACTION_PLAN_DUE_DATE':
+        case 'INVALID_ACTION_PLAN_VERSION_STATUS':
         case 'RESPONSIBLE_USER_COMPANY_MISMATCH':
         case 'RESPONSIBLE_USER_ROLE_NOT_ALLOWED':
         case 'SUBMISSION_COMPANY_MISMATCH':
@@ -127,6 +163,7 @@ export class ActionPlanController {
         case 'EMPLOYEE_TASK_STATUS_TRANSITION_FORBIDDEN':
           return 403;
         case 'ACTION_PLAN_TASK_NOT_FOUND':
+        case 'ACTION_PLAN_VERSION_NOT_FOUND':
         case 'RESPONSIBLE_USER_NOT_FOUND':
         case 'USER_NOT_FOUND':
         case 'COMPANY_NOT_FOUND':

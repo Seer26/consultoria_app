@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { env } from '../../config/env';
+import { audit } from '../../shared/audit';
 import { ActionPlanService } from '../action-plan/action-plan.service';
 import type { AuthTokenPayload } from '../auth/auth.types';
 import { EntitlementsRepository } from '../entitlements/entitlements.repository';
@@ -18,6 +19,7 @@ import type {
   ResearchResultSnapshot,
   ResearchSubmissionDetails,
   ResearchSubmissionRecord,
+  ReviewResearchDiagnosisInput,
 } from './research.types';
 import { getDiagnosisScoreInterpretation } from './score-interpretation';
 
@@ -155,6 +157,12 @@ export class ResearchService {
       respondentDepartment: department,
       respondentJobFunction: respondentRole,
       status: 'IN_PROGRESS',
+      diagnosisStatus: 'AGUARDANDO_REVISAO',
+      approvedByUserId: null,
+      approvedAt: null,
+      publishedByUserId: null,
+      publishedAt: null,
+      reviewNotes: null,
       overallScore: null,
       summary: null,
       criticalPoints: [],
@@ -240,6 +248,12 @@ export class ResearchService {
     const updated = await this.repository.updateSubmission({
       ...submission,
       status: 'COMPLETED',
+      diagnosisStatus: 'AGUARDANDO_REVISAO',
+      approvedByUserId: null,
+      approvedAt: null,
+      publishedByUserId: null,
+      publishedAt: null,
+      reviewNotes: null,
       overallScore: analysis.overallScore,
       summary: input.summary?.trim() || analysis.summary,
       criticalPoints: analysis.criticalPoints,
@@ -282,7 +296,7 @@ export class ResearchService {
       const items = await this.repository.listResearchSubmissions({
         companyId: context.actor.companyId,
       });
-      return items.map((item) => this.decorateSubmissionListItem(item));
+      return items.map((item) => this.decorateSubmissionListItemForOwner(item));
     }
 
     const items = await this.repository.listResearchSubmissions({
@@ -304,6 +318,10 @@ export class ResearchService {
       return this.buildSanitizedEmployeeSubmissionDetails(submission, answers);
     }
 
+    if (context.actor.role === 'OWNER' && submission.diagnosisStatus !== 'PUBLICADO') {
+      return this.buildUnpublishedOwnerSubmissionDetails(submission);
+    }
+
     const canReadRawAnswers =
       context.actor.role === 'ADMIN' || submission.userId === context.actor.id;
 
@@ -315,6 +333,9 @@ export class ResearchService {
     this.ensureActiveUser(context);
     this.ensureStrategicResultAccess(context);
     const submission = await this.getAuthorizedSubmission(context, submissionId, false);
+    if (submission.diagnosisStatus !== 'APROVADO' && submission.diagnosisStatus !== 'PUBLICADO') {
+      throw new Error('DIAGNOSIS_NOT_PUBLISHED');
+    }
 
     return this.actionPlanService.generateFromResearch(auth, {
       submissionId: submission.id,
@@ -331,6 +352,118 @@ export class ResearchService {
     });
   }
 
+  async reviewDiagnosis(
+    auth: AuthTokenPayload,
+    submissionId: string,
+    input: ReviewResearchDiagnosisInput,
+  ): Promise<ResearchSubmissionDetails> {
+    const context = await this.getAccessContext(auth);
+    this.ensureActiveUser(context);
+    this.ensureAdmin(context);
+    const submission = await this.getAuthorizedSubmission(context, submissionId, false);
+    if (submission.status !== 'COMPLETED') {
+      throw new Error('DIAGNOSIS_REVIEW_REQUIRES_COMPLETED_RESEARCH');
+    }
+
+    const now = new Date().toISOString();
+    const updated = await this.repository.updateSubmission({
+      ...submission,
+      summary: this.pickText(input.summary, submission.summary),
+      criticalPoints: this.pickStringList(input.criticalPoints, submission.criticalPoints),
+      opportunities: this.pickStringList(input.opportunities, submission.opportunities),
+      recommendations: this.pickStringList(input.recommendations, submission.recommendations),
+      nextSteps: this.pickStringList(input.nextSteps, submission.nextSteps),
+      aiAnalysis: input.aiAnalysis === undefined ? submission.aiAnalysis : input.aiAnalysis,
+      reviewNotes: input.reviewNotes === undefined
+        ? submission.reviewNotes
+        : input.reviewNotes?.trim() || null,
+      updatedAt: now,
+    });
+
+    audit('DIAGNOSIS_REVIEWED', {
+      actorUserId: context.actor.id,
+      role: context.actor.role,
+      companyId: submission.companyId,
+      submissionId: submission.id,
+      previousStatus: submission.diagnosisStatus,
+      newStatus: updated.diagnosisStatus,
+      occurredAt: now,
+    });
+
+    const answers = await this.repository.listAnswersBySubmissionId(submission.id);
+    return this.buildSubmissionDetails(updated, answers);
+  }
+
+  async approveDiagnosis(
+    auth: AuthTokenPayload,
+    submissionId: string,
+  ): Promise<ResearchSubmissionDetails> {
+    const context = await this.getAccessContext(auth);
+    this.ensureActiveUser(context);
+    this.ensureAdmin(context);
+    const submission = await this.getAuthorizedSubmission(context, submissionId, false);
+    if (submission.status !== 'COMPLETED') {
+      throw new Error('DIAGNOSIS_REVIEW_REQUIRES_COMPLETED_RESEARCH');
+    }
+
+    const now = new Date().toISOString();
+    const updated = await this.repository.updateSubmission({
+      ...submission,
+      diagnosisStatus: 'APROVADO',
+      approvedByUserId: context.actor.id,
+      approvedAt: now,
+      updatedAt: now,
+    });
+
+    audit('DIAGNOSIS_APPROVED', {
+      actorUserId: context.actor.id,
+      role: context.actor.role,
+      companyId: submission.companyId,
+      submissionId: submission.id,
+      previousStatus: submission.diagnosisStatus,
+      newStatus: updated.diagnosisStatus,
+      occurredAt: now,
+    });
+
+    const answers = await this.repository.listAnswersBySubmissionId(submission.id);
+    return this.buildSubmissionDetails(updated, answers);
+  }
+
+  async publishDiagnosis(
+    auth: AuthTokenPayload,
+    submissionId: string,
+  ): Promise<ResearchSubmissionDetails> {
+    const context = await this.getAccessContext(auth);
+    this.ensureActiveUser(context);
+    this.ensureAdmin(context);
+    const submission = await this.getAuthorizedSubmission(context, submissionId, false);
+    if (submission.diagnosisStatus !== 'APROVADO' && submission.diagnosisStatus !== 'PUBLICADO') {
+      throw new Error('DIAGNOSIS_APPROVAL_REQUIRED');
+    }
+
+    const now = new Date().toISOString();
+    const updated = await this.repository.updateSubmission({
+      ...submission,
+      diagnosisStatus: 'PUBLICADO',
+      publishedByUserId: context.actor.id,
+      publishedAt: now,
+      updatedAt: now,
+    });
+
+    audit('DIAGNOSIS_PUBLISHED', {
+      actorUserId: context.actor.id,
+      role: context.actor.role,
+      companyId: submission.companyId,
+      submissionId: submission.id,
+      previousStatus: submission.diagnosisStatus,
+      newStatus: updated.diagnosisStatus,
+      occurredAt: now,
+    });
+
+    const answers = await this.repository.listAnswersBySubmissionId(submission.id);
+    return this.buildSubmissionDetails(updated, answers);
+  }
+
   private async buildSubmissionDetails(
     submission: ResearchSubmissionRecord,
     answers: ResearchAnswerRecord[],
@@ -341,6 +474,12 @@ export class ResearchService {
     return {
       id: submission.id,
       status: submission.status,
+      diagnosisStatus: submission.diagnosisStatus,
+      approvedByUserId: submission.approvedByUserId,
+      approvedAt: submission.approvedAt,
+      publishedByUserId: submission.publishedByUserId,
+      publishedAt: submission.publishedAt,
+      reviewNotes: submission.reviewNotes,
       overallScore: submission.overallScore,
       scoreInterpretation: getDiagnosisScoreInterpretation(submission.overallScore),
       summary: submission.summary,
@@ -380,6 +519,7 @@ export class ResearchService {
     return {
       id: details.id,
       status: details.status,
+      diagnosisStatus: details.diagnosisStatus,
       respondentRole: details.respondentRole,
       department: details.department,
       respondentDepartment: details.respondentDepartment,
@@ -390,6 +530,37 @@ export class ResearchService {
       company: details.company,
       user: details.user,
       answers: details.answers,
+    };
+  }
+
+  private async buildUnpublishedOwnerSubmissionDetails(
+    submission: ResearchSubmissionRecord,
+  ): Promise<ResearchSubmissionDetails> {
+    const company = await this.repository.findCompanyById(submission.companyId);
+    const user = await this.repository.findUserById(submission.userId);
+    return {
+      id: submission.id,
+      status: submission.status,
+      diagnosisStatus: submission.diagnosisStatus,
+      respondentRole: submission.respondentRole,
+      department: submission.department,
+      respondentDepartment: submission.respondentDepartment,
+      respondentJobFunction: submission.respondentJobFunction,
+      createdAt: submission.createdAt,
+      updatedAt: submission.updatedAt,
+      completedAt: submission.completedAt,
+      company,
+      user: user
+        ? {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            companyId: user.companyId,
+            status: user.status,
+          }
+        : null,
+      answers: [],
     };
   }
 
@@ -427,6 +598,13 @@ export class ResearchService {
       scoreInterpretation: getDiagnosisScoreInterpretation(item.overallScore),
       pillarScores: this.decoratePillarScores(item.pillarScores),
     };
+  }
+
+  private decorateSubmissionListItemForOwner(item: ResearchListItem) {
+    if (item.diagnosisStatus === 'PUBLICADO') {
+      return this.decorateSubmissionListItem(item);
+    }
+    return this.sanitizeSubmissionListItemForEmployee(item);
   }
 
   private decoratePillarScores(pillarScores: ResearchPillarScore[]): ResearchPillarScore[] {
@@ -638,10 +816,26 @@ export class ResearchService {
     }
   }
 
+  private ensureAdmin(context: ResearchAccessContext): void {
+    if (context.actor.role !== 'ADMIN') {
+      throw new Error('FORBIDDEN');
+    }
+  }
+
   private ensureStrategicResultAccess(context: ResearchAccessContext): void {
     if (context.actor.role === 'EMPLOYEE') {
       throw new Error('FORBIDDEN');
     }
+  }
+
+  private pickText(next: string | null | undefined, current: string | null): string | null {
+    return next === undefined ? current : next?.trim() || null;
+  }
+
+  private pickStringList(next: string[] | undefined, current: string[]): string[] {
+    return next === undefined
+      ? current
+      : next.map((item) => String(item).trim()).filter((item) => item.length > 0);
   }
 
   private resolveCompanyId(context: ResearchAccessContext, requestedCompanyId?: string): string {

@@ -148,6 +148,7 @@ void main() {
       respondentRole: 'Analista',
       department: 'Financeiro',
       status: ResearchSubmissionStatus.completed,
+      diagnosisStatus: DiagnosisReviewStatus.published,
       createdAt: now,
       updatedAt: now,
       overallScore: 70,

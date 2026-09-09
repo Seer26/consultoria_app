@@ -2,6 +2,8 @@ enum ResearchSubmissionStatus { inProgress, completed }
 
 enum AiRecommendationPriority { high, medium, low }
 
+enum DiagnosisReviewStatus { awaitingReview, approved, published }
+
 class DiagnosisScoreInterpretation {
   const DiagnosisScoreInterpretation({
     required this.classification,
@@ -68,6 +70,7 @@ class ResearchSubmission {
     required this.respondentRole,
     required this.department,
     required this.status,
+    required this.diagnosisStatus,
     required this.answersCount,
     required this.createdAt,
     required this.updatedAt,
@@ -91,6 +94,7 @@ class ResearchSubmission {
   final String respondentRole;
   final String department;
   final ResearchSubmissionStatus status;
+  final DiagnosisReviewStatus diagnosisStatus;
   final int answersCount;
   final double? overallScore;
   final DiagnosisScoreInterpretation? scoreInterpretation;
@@ -135,6 +139,7 @@ class ResearchSubmissionDetails {
     required this.respondentRole,
     required this.department,
     required this.status,
+    required this.diagnosisStatus,
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
@@ -159,6 +164,7 @@ class ResearchSubmissionDetails {
   final String respondentRole;
   final String department;
   final ResearchSubmissionStatus status;
+  final DiagnosisReviewStatus diagnosisStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;

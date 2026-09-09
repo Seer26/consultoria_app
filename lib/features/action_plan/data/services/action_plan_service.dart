@@ -11,6 +11,7 @@ class CreateActionPlanTaskPayload {
     this.description,
     this.dueDate,
     this.pillar,
+    this.planVersionId,
     this.status,
     this.responsibleUserId,
   });
@@ -21,6 +22,7 @@ class CreateActionPlanTaskPayload {
   final ActionPlanTaskPriority priority;
   final DateTime? dueDate;
   final String? pillar;
+  final String? planVersionId;
   final ActionPlanTaskStatus? status;
   final String? responsibleUserId;
 }
@@ -53,6 +55,7 @@ class ActionPlanService {
   Future<List<ActionPlanTask>> listTasks({
     String? companyId,
     String? submissionId,
+    String? planVersionId,
     ActionPlanTaskScope scope = ActionPlanTaskScope.all,
     String? search,
   }) async {
@@ -64,6 +67,8 @@ class ActionPlanService {
             'companyId': companyId,
           if (submissionId != null && submissionId.trim().isNotEmpty)
             'submissionId': submissionId,
+          if (planVersionId != null && planVersionId.trim().isNotEmpty)
+            'planVersionId': planVersionId,
           'scope': _scopeToApi(scope),
           if (search != null && search.trim().isNotEmpty)
             'search': search.trim(),
@@ -124,6 +129,7 @@ class ActionPlanService {
           'description': input.description ?? '',
           'priority': _priorityToApi(input.priority),
           if (input.pillar != null) 'pillar': input.pillar,
+          if (input.planVersionId != null) 'planVersionId': input.planVersionId,
           if (input.status != null) 'status': _statusToApi(input.status!),
           'responsibleUserId': input.responsibleUserId,
           if (input.dueDate != null)
@@ -199,6 +205,7 @@ class ActionPlanService {
         submissionId: data['submissionId']?.toString() ?? submissionId,
         companyId: data['companyId']?.toString() ?? '',
         alreadyGenerated: data['alreadyGenerated'] == true,
+        planVersion: _readPlanVersion(data['planVersion']),
         createdCount: (data['createdCount'] as num?)?.toInt() ?? 0,
         tasks: _readTasks(data['tasks']),
       );
@@ -223,12 +230,42 @@ class ActionPlanService {
         .toList();
   }
 
+  Future<List<ActionPlanVersionSummary>> listPlanVersions({
+    String? companyId,
+    String? submissionId,
+  }) async {
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/action-plan/versions',
+        queryParameters: {
+          if (companyId != null && companyId.trim().isNotEmpty)
+            'companyId': companyId,
+          if (submissionId != null && submissionId.trim().isNotEmpty)
+            'submissionId': submissionId,
+        },
+      );
+      return (response.data ?? const [])
+          .whereType<Map>()
+          .map((item) => _readPlanVersion(Map<String, dynamic>.from(item)))
+          .whereType<ActionPlanVersionSummary>()
+          .toList();
+    } on DioException catch (error) {
+      throw Exception(
+        _extractError(
+          error,
+          fallback: 'Falha ao carregar o histórico do plano.',
+        ),
+      );
+    }
+  }
+
   ActionPlanTask _taskFromMap(Map<String, dynamic> map) {
     return ActionPlanTask(
       id: map['id']?.toString() ?? '',
       companyId: map['companyId']?.toString() ?? '',
       companyName: map['companyName']?.toString(),
       submissionId: map['submissionId']?.toString(),
+      planVersionId: map['planVersionId']?.toString(),
       title: map['title']?.toString() ?? '',
       description: map['description']?.toString() ?? '',
       pillar: map['pillar']?.toString(),
@@ -246,6 +283,43 @@ class ActionPlanService {
       daysOverdue: (map['daysOverdue'] as num?)?.toInt() ?? 0,
       isDueSoon: map['isDueSoon'] == true,
     );
+  }
+
+  ActionPlanVersionSummary? _readPlanVersion(dynamic value) {
+    if (value is! Map) return null;
+    final map = Map<String, dynamic>.from(value);
+    final id = map['id']?.toString() ?? '';
+    if (id.isEmpty) return null;
+    return ActionPlanVersionSummary(
+      id: id,
+      companyId: map['companyId']?.toString() ?? '',
+      submissionId: map['submissionId']?.toString() ?? '',
+      versionNumber: (map['versionNumber'] as num?)?.toInt() ?? 1,
+      status: _versionStatusFromApi(map['status']?.toString()),
+      source: map['source']?.toString() == 'MANUAL'
+          ? ActionPlanVersionSource.manual
+          : ActionPlanVersionSource.ai,
+      generatedByUserId: map['generatedByUserId']?.toString(),
+      generatedByUserName: map['generatedByUserName']?.toString(),
+      createdAt: _parseDate(map['createdAt']) ?? DateTime.now(),
+      updatedAt: _parseDate(map['updatedAt']) ?? DateTime.now(),
+      archivedAt: _parseDate(map['archivedAt']),
+      tasksCount: (map['tasksCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  ActionPlanVersionStatus _versionStatusFromApi(String? value) {
+    switch (value) {
+      case 'DRAFT':
+        return ActionPlanVersionStatus.draft;
+      case 'COMPLETED':
+        return ActionPlanVersionStatus.completed;
+      case 'ARCHIVED':
+        return ActionPlanVersionStatus.archived;
+      case 'ACTIVE':
+      default:
+        return ActionPlanVersionStatus.active;
+    }
   }
 
   String _scopeToApi(ActionPlanTaskScope scope) {

@@ -40,6 +40,7 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
   List<ActionPlanTask> _tasks = const [];
   List<ActionPlanAssignee> _assignees = const [];
   List<CompanyAccount> _companies = const [];
+  List<ActionPlanVersionSummary> _versions = const [];
 
   @override
   void initState() {
@@ -87,6 +88,9 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
         scope: _scope,
         search: _searchController.text,
       );
+      final versions = role == RoleGuard.employee
+          ? const <ActionPlanVersionSummary>[]
+          : await service.listPlanVersions(companyId: companyId);
       final assignees = companyId == null || role == RoleGuard.employee
           ? const <ActionPlanAssignee>[]
           : await service.listAssignees(companyId: companyId);
@@ -97,6 +101,7 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
 
       setState(() {
         _tasks = _sortTasks(tasks);
+        _versions = versions;
         _assignees = assignees;
         _isLoading = false;
       });
@@ -347,6 +352,10 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
       ],
       child: Column(
         children: [
+          if (role != RoleGuard.employee) ...[
+            _ActionPlanReviewNotice(versions: _versions),
+            const SizedBox(height: 16),
+          ],
           _buildFilters(role),
           const SizedBox(height: 16),
           Expanded(child: _buildBody(role)),
@@ -516,6 +525,43 @@ class _ActionPlanPageState extends ConsumerState<ActionPlanPage> {
           onEdit: () => _openTaskDialog(task: task),
         );
       },
+    );
+  }
+}
+
+class _ActionPlanReviewNotice extends StatelessWidget {
+  const _ActionPlanReviewNotice({required this.versions});
+  final List<ActionPlanVersionSummary> versions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Plano gerado com apoio de IA. Revise antes de colocar em execução.',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            if (versions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final version in versions)
+                    _MetaChip(
+                      label:
+                          'v${version.versionNumber} · ${_versionStatusLabel(version.status)} · ${version.tasksCount} ações',
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1025,6 +1071,19 @@ ActionPlanTaskStatus? _employeeNextStatus(ActionPlanTaskStatus status) {
 
 String _sourceLabel(ActionPlanTaskSource source) {
   return actionPlanSourceLabel(source);
+}
+
+String _versionStatusLabel(ActionPlanVersionStatus status) {
+  switch (status) {
+    case ActionPlanVersionStatus.draft:
+      return 'Rascunho';
+    case ActionPlanVersionStatus.active:
+      return 'Ativo';
+    case ActionPlanVersionStatus.completed:
+      return 'Concluído';
+    case ActionPlanVersionStatus.archived:
+      return 'Arquivado';
+  }
 }
 
 String _scopeLabel(ActionPlanTaskScope scope) {

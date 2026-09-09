@@ -43,6 +43,12 @@ export const schemaStatements = [
     respondent_department TEXT,
     respondent_job_function TEXT,
     status TEXT NOT NULL DEFAULT 'COMPLETED',
+    diagnosis_status TEXT NOT NULL DEFAULT 'PUBLICADO',
+    approved_by_user_id TEXT,
+    approved_at TEXT,
+    published_by_user_id TEXT,
+    published_at TEXT,
+    review_notes TEXT,
     overall_score REAL,
     summary TEXT,
     critical_points TEXT,
@@ -89,6 +95,7 @@ export const schemaStatements = [
     id TEXT PRIMARY KEY,
     company_id TEXT NOT NULL,
     submission_id TEXT,
+    plan_version_id TEXT,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     pillar TEXT,
@@ -102,7 +109,26 @@ export const schemaStatements = [
     completed_at TEXT,
     FOREIGN KEY (company_id) REFERENCES companies(id),
     FOREIGN KEY (submission_id) REFERENCES diagnosis_submissions(id),
+    FOREIGN KEY (plan_version_id) REFERENCES action_plan_versions(id),
     FOREIGN KEY (responsible_user_id) REFERENCES users(id)
+  )
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS action_plan_versions (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    submission_id TEXT NOT NULL,
+    version_number INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    source TEXT NOT NULL DEFAULT 'AI',
+    generated_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    archived_at TEXT,
+    UNIQUE(submission_id, version_number),
+    FOREIGN KEY (company_id) REFERENCES companies(id),
+    FOREIGN KEY (submission_id) REFERENCES diagnosis_submissions(id),
+    FOREIGN KEY (generated_by_user_id) REFERENCES users(id)
   )
   `,
   `
@@ -259,4 +285,7 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_strategic_goals_objective ON strategic_goals(objective_id)`,
   `CREATE INDEX IF NOT EXISTS idx_strategic_goals_company_due_date ON strategic_goals(company_id, due_date)`,
   `CREATE INDEX IF NOT EXISTS idx_swot_items_company_category ON swot_items(company_id, category)`,
+  `CREATE INDEX IF NOT EXISTS idx_diagnosis_submissions_diagnosis_status ON diagnosis_submissions(diagnosis_status)`,
+  `CREATE INDEX IF NOT EXISTS idx_action_plan_versions_company_submission ON action_plan_versions(company_id, submission_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_action_plan_tasks_plan_version ON action_plan_tasks(plan_version_id)`,
 ];

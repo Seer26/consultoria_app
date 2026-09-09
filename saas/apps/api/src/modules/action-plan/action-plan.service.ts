@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { audit } from '../../shared/audit';
 import type { AuthTokenPayload } from '../auth/auth.types';
 import { EntitlementsRepository } from '../entitlements/entitlements.repository';
 import { EntitlementsService } from '../entitlements/entitlements.service';
@@ -14,6 +15,7 @@ import type {
   ActionPlanTaskRecord,
   ActionPlanTaskSource,
   ActionPlanTaskStatus,
+  ActionPlanVersionSummary,
   CreateActionPlanTaskInput,
   UpdateActionPlanTaskInput,
   UpdateActionPlanTaskStatusInput,
@@ -42,6 +44,7 @@ export class ActionPlanService {
       return this.applyListFilters(auth, filters, await this.repository.listTasks({
         companyId: filters.companyId?.trim() || undefined,
         submissionId: filters.submissionId?.trim() || undefined,
+        planVersionId: filters.planVersionId?.trim() || undefined,
       }));
     }
 
@@ -53,6 +56,7 @@ export class ActionPlanService {
     const tasks = await this.repository.listTasks({
       companyId,
       submissionId: filters.submissionId?.trim() || undefined,
+      planVersionId: filters.planVersionId?.trim() || undefined,
     });
 
     return this.applyListFilters(
@@ -121,6 +125,10 @@ export class ActionPlanService {
       companyId,
       input.submissionId ?? null,
     );
+    const planVersionId = await this.validatePlanVersion(
+      companyId,
+      input.planVersionId ?? null,
+    );
     const now = new Date().toISOString();
 
     if (this.isActiveTaskStatus(status)) {
@@ -134,6 +142,7 @@ export class ActionPlanService {
       id: randomUUID(),
       companyId,
       submissionId,
+      planVersionId,
       title,
       description: input.description?.trim() || '',
       pillar: input.pillar?.trim() || null,
@@ -194,6 +203,14 @@ export class ActionPlanService {
       updatedAt,
       completedAt: this.resolveCompletedAt(existing.completedAt, nextStatus, updatedAt),
     });
+    audit('ACTION_PLAN_UPDATED', {
+      actorUserId: context.actor.id,
+      role: context.actor.role,
+      companyId: existing.companyId,
+      taskId,
+      planVersionId: existing.planVersionId,
+      occurredAt: updatedAt,
+    });
 
     return this.decorateTask((await this.repository.findTaskById(taskId))!);
   }
@@ -253,20 +270,10 @@ export class ActionPlanService {
       throw new Error('ACTION_PLAN_SUBMISSION_NOT_COMPLETED');
     }
 
-    const existing = await this.repository.listTasks({
-      submissionId: input.submissionId,
-    });
-    if (existing.length > 0) {
-      return {
-        submissionId: input.submissionId,
-        companyId: input.companyId,
-        alreadyGenerated: true,
-        createdCount: 0,
-        tasks: existing.map((task) => this.decorateTask(task)),
-      };
-    }
-
-    const generated = this.buildTasksFromResearch(input);
+    const now = new Date().toISOString();
+    const versionNumber = await this.repository.getNextPlanVersionNumber(input.submissionId);
+    const planVersionId = randomUUID();
+    const generated = this.buildTasksFromResearch(input, planVersionId);
     if (generated.length > 0) {
       await this.entitlementsService.assertCanUseFeature(
         input.companyId,
@@ -275,17 +282,111 @@ export class ActionPlanService {
       );
     }
 
+    await this.repository.archiveActivePlanVersions(input.submissionId, now);
+    const planVersion = await this.repository.createPlanVersion({
+      id: planVersionId,
+      companyId: input.companyId,
+      submissionId: input.submissionId,
+      versionNumber,
+      status: 'ACTIVE',
+      source: 'AI',
+      generatedByUserId: context.actor.id,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+    });
+
     await this.repository.createTasks(generated);
+    audit(versionNumber > 1 ? 'ACTION_PLAN_REGENERATED' : 'ACTION_PLAN_GENERATED', {
+      actorUserId: context.actor.id,
+      role: context.actor.role,
+      companyId: input.companyId,
+      submissionId: input.submissionId,
+      planVersionId: planVersion.id,
+      versionNumber,
+      createdCount: generated.length,
+      occurredAt: new Date().toISOString(),
+    });
 
     return {
       submissionId: input.submissionId,
       companyId: input.companyId,
-      alreadyGenerated: false,
+      alreadyGenerated: versionNumber > 1,
+      planVersion,
       createdCount: generated.length,
       tasks: (await this.repository
-        .listTasks({ submissionId: input.submissionId }))
+        .listTasks({ planVersionId: planVersion.id }))
         .map((task) => this.decorateTask(task)),
     };
+  }
+
+  async listPlanVersions(
+    auth: AuthTokenPayload,
+    filters: { companyId?: string; submissionId?: string },
+  ): Promise<ActionPlanVersionSummary[]> {
+    const context = await this.getAccessContext(auth);
+    this.ensureActiveUser(context);
+    if (context.actor.role === 'EMPLOYEE') {
+      throw new Error('FORBIDDEN');
+    }
+
+    if (context.actor.role === 'ADMIN') {
+      return this.repository.listPlanVersions({
+        companyId: filters.companyId?.trim() || undefined,
+        submissionId: filters.submissionId?.trim() || undefined,
+      });
+    }
+
+    const companyId = this.ensureActorCompany(context);
+    if (filters.companyId?.trim() && filters.companyId.trim() !== companyId) {
+      throw new Error('FORBIDDEN');
+    }
+
+    if (filters.submissionId?.trim()) {
+      const submission = await this.repository.findSubmissionById(filters.submissionId.trim());
+      if (!submission) throw new Error('RESEARCH_SUBMISSION_NOT_FOUND');
+      if (submission.company_id !== companyId) throw new Error('FORBIDDEN');
+    }
+
+    return this.repository.listPlanVersions({
+      companyId,
+      submissionId: filters.submissionId?.trim() || undefined,
+    });
+  }
+
+  async updatePlanVersionStatus(
+    auth: AuthTokenPayload,
+    versionId: string,
+    status: string,
+  ): Promise<ActionPlanVersionSummary> {
+    const context = await this.getAccessContext(auth);
+    this.ensureActiveUser(context);
+    this.ensureAdministrativeTaskMutation(context);
+    if (!['DRAFT', 'ACTIVE', 'COMPLETED', 'ARCHIVED'].includes(status)) {
+      throw new Error('INVALID_ACTION_PLAN_VERSION_STATUS');
+    }
+
+    const version = await this.repository.findPlanVersionById(versionId);
+    if (!version) throw new Error('ACTION_PLAN_VERSION_NOT_FOUND');
+    this.ensureTaskCompanyAccess(context, version.companyId);
+    const now = new Date().toISOString();
+    const updated = await this.repository.updatePlanVersionStatus(
+      version.id,
+      status as ActionPlanVersionSummary['status'],
+      now,
+    );
+
+    audit(status === 'ARCHIVED' ? 'ACTION_PLAN_ARCHIVED' : 'ACTION_PLAN_UPDATED', {
+      actorUserId: context.actor.id,
+      role: context.actor.role,
+      companyId: version.companyId,
+      planVersionId: version.id,
+      previousStatus: version.status,
+      newStatus: updated.status,
+      occurredAt: now,
+    });
+
+    return updated;
   }
 
   private buildTasksFromResearch(input: {
@@ -296,7 +397,7 @@ export class ActionPlanService {
     recommendations: string[];
     nextSteps: string[];
     pillarScores: Array<{ pillar: string; score: number }>;
-  }): ActionPlanTaskRecord[] {
+  }, planVersionId: string): ActionPlanTaskRecord[] {
     const usedTitles = new Set<string>();
     const tasks: ActionPlanTaskRecord[] = [];
     const now = new Date();
@@ -336,6 +437,7 @@ export class ActionPlanService {
         id: randomUUID(),
         companyId: input.companyId,
         submissionId: input.submissionId,
+        planVersionId,
         title: task.title.trim(),
         description: task.description.trim(),
         pillar: task.pillar,
@@ -585,6 +687,26 @@ export class ActionPlanService {
     }
 
     return submission.id;
+  }
+
+  private async validatePlanVersion(
+    companyId: string,
+    planVersionId: string | null,
+  ): Promise<string | null> {
+    if (!planVersionId) {
+      return null;
+    }
+
+    const version = await this.repository.findPlanVersionById(planVersionId);
+    if (!version) {
+      throw new Error('ACTION_PLAN_VERSION_NOT_FOUND');
+    }
+
+    if (version.companyId !== companyId) {
+      throw new Error('FORBIDDEN');
+    }
+
+    return version.id;
   }
 
   private resolveCompletedAt(

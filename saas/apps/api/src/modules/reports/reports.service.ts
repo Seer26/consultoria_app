@@ -100,7 +100,10 @@ export class ReportsService {
             ? { companyId: actor.companyId }
             : {};
 
-    return (await this.repository.listCompletedResearchReports(filters)).map((item) => {
+    const reports = (await this.repository.listCompletedResearchReports(filters))
+      .filter((item) => actor.role === 'ADMIN' || item.diagnosis_status === 'PUBLICADO');
+
+    return reports.map((item) => {
       const maturityLevel = this.getMaturityLevel(item.overall_score);
       return {
         submissionId: item.submission_id,
@@ -133,6 +136,9 @@ export class ReportsService {
     }
 
     this.ensureAccess(actor, report.company_id, report.user_id);
+    if (actor.role !== 'ADMIN' && report.diagnosis_status !== 'PUBLICADO') {
+      throw new Error('FORBIDDEN');
+    }
 
     if (report.status !== 'COMPLETED') {
       throw new Error('REPORT_NOT_AVAILABLE');

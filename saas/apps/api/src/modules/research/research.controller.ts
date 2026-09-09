@@ -85,6 +85,43 @@ export class ResearchController {
     }
   };
 
+  reviewDiagnosis = async (request: Request, response: Response): Promise<void> => {
+    try {
+      const result = await this.service.reviewDiagnosis(
+        request.auth!,
+        this.getParam(request, 'id'),
+        request.body ?? {},
+      );
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
+  approveDiagnosis = async (request: Request, response: Response): Promise<void> => {
+    try {
+      const result = await this.service.approveDiagnosis(
+        request.auth!,
+        this.getParam(request, 'id'),
+      );
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
+  publishDiagnosis = async (request: Request, response: Response): Promise<void> => {
+    try {
+      const result = await this.service.publishDiagnosis(
+        request.auth!,
+        this.getParam(request, 'id'),
+      );
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
   private handleError(error: unknown, response: Response): void {
     if (writePlanLimitResponse(error, response)) {
       return;
@@ -105,6 +142,9 @@ export class ResearchController {
         case 'RESEARCH_COVERAGE_REQUIRED':
         case 'USER_COMPANY_MISMATCH':
         case 'ACTION_PLAN_SUBMISSION_NOT_COMPLETED':
+        case 'DIAGNOSIS_NOT_PUBLISHED':
+        case 'DIAGNOSIS_REVIEW_REQUIRES_COMPLETED_RESEARCH':
+        case 'DIAGNOSIS_APPROVAL_REQUIRED':
           return 400;
         case 'FORBIDDEN':
         case 'ADMIN_RESEARCH_READ_ONLY':

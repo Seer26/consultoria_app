@@ -130,6 +130,12 @@ function runMigrations(): void {
   ensureColumn('diagnosis_submissions', 'respondent_department', `TEXT`);
   ensureColumn('diagnosis_submissions', 'respondent_job_function', `TEXT`);
   ensureColumn('diagnosis_submissions', 'status', `TEXT NOT NULL DEFAULT 'COMPLETED'`);
+  ensureColumn('diagnosis_submissions', 'diagnosis_status', `TEXT NOT NULL DEFAULT 'PUBLICADO'`);
+  ensureColumn('diagnosis_submissions', 'approved_by_user_id', `TEXT`);
+  ensureColumn('diagnosis_submissions', 'approved_at', `TEXT`);
+  ensureColumn('diagnosis_submissions', 'published_by_user_id', `TEXT`);
+  ensureColumn('diagnosis_submissions', 'published_at', `TEXT`);
+  ensureColumn('diagnosis_submissions', 'review_notes', `TEXT`);
   ensureColumn('diagnosis_submissions', 'overall_score', `REAL`);
   ensureColumn('diagnosis_submissions', 'summary', `TEXT`);
   ensureColumn('diagnosis_submissions', 'critical_points', `TEXT`);
@@ -146,6 +152,7 @@ function runMigrations(): void {
   ensureColumn('diagnosis_answers', 'created_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('action_plan_tasks', 'company_id', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('action_plan_tasks', 'submission_id', `TEXT`);
+  ensureColumn('action_plan_tasks', 'plan_version_id', `TEXT`);
   ensureColumn('action_plan_tasks', 'title', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('action_plan_tasks', 'description', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn('action_plan_tasks', 'pillar', `TEXT`);
@@ -234,6 +241,12 @@ function runMigrations(): void {
     UPDATE diagnosis_submissions
     SET status = 'COMPLETED'
     WHERE status IS NULL OR TRIM(status) = ''
+  `);
+
+  database.exec(`
+    UPDATE diagnosis_submissions
+    SET diagnosis_status = 'PUBLICADO'
+    WHERE diagnosis_status IS NULL OR TRIM(diagnosis_status) = ''
   `);
 
   database.exec(`
@@ -349,6 +362,60 @@ function runMigrations(): void {
   `);
 
   database.exec(`
+    CREATE TABLE IF NOT EXISTS action_plan_versions (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL,
+      submission_id TEXT NOT NULL,
+      version_number INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      source TEXT NOT NULL DEFAULT 'AI',
+      generated_by_user_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE(submission_id, version_number)
+    )
+  `);
+
+  database.exec(`
+    INSERT OR IGNORE INTO action_plan_versions (
+      id,
+      company_id,
+      submission_id,
+      version_number,
+      status,
+      source,
+      generated_by_user_id,
+      created_at,
+      updated_at,
+      archived_at
+    )
+    SELECT
+      'plan-version-' || apt.submission_id || '-1',
+      apt.company_id,
+      apt.submission_id,
+      1,
+      'ACTIVE',
+      'AI',
+      COALESCE(ds.user_id, apt.responsible_user_id),
+      MIN(apt.created_at),
+      MAX(apt.updated_at),
+      NULL
+    FROM action_plan_tasks apt
+    INNER JOIN diagnosis_submissions ds ON ds.id = apt.submission_id
+    WHERE apt.submission_id IS NOT NULL
+      AND apt.plan_version_id IS NULL
+    GROUP BY apt.company_id, apt.submission_id, COALESCE(ds.user_id, apt.responsible_user_id)
+  `);
+
+  database.exec(`
+    UPDATE action_plan_tasks
+    SET plan_version_id = 'plan-version-' || submission_id || '-1'
+    WHERE submission_id IS NOT NULL
+      AND plan_version_id IS NULL
+  `);
+
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_action_plan_tasks_company_id
     ON action_plan_tasks(company_id)
   `);
@@ -356,6 +423,21 @@ function runMigrations(): void {
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_action_plan_tasks_submission_id
     ON action_plan_tasks(submission_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_action_plan_versions_company_submission
+    ON action_plan_versions(company_id, submission_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_action_plan_tasks_plan_version
+    ON action_plan_tasks(plan_version_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_diagnosis_submissions_diagnosis_status
+    ON diagnosis_submissions(diagnosis_status)
   `);
 
   database.exec(`

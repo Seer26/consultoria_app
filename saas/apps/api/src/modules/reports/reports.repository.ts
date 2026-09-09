@@ -16,6 +16,7 @@ interface ReportSummaryRow {
   department: string | null;
   completed_at: string | null;
   overall_score: number | null;
+  diagnosis_status: 'AGUARDANDO_REVISAO' | 'APROVADO' | 'PUBLICADO' | null;
   action_plan_generated: number;
 }
 
@@ -29,6 +30,7 @@ interface ExecutiveReportRow {
   respondent_role: string | null;
   department: string | null;
   status: string;
+  diagnosis_status: 'AGUARDANDO_REVISAO' | 'APROVADO' | 'PUBLICADO' | null;
   created_at: string;
   completed_at: string | null;
   overall_score: number | null;
@@ -96,6 +98,7 @@ export class ReportsRepository {
           ds.department,
           ds.completed_at,
           ds.overall_score,
+          ds.diagnosis_status,
           CASE
             WHEN EXISTS (
               SELECT 1
@@ -129,6 +132,7 @@ export class ReportsRepository {
           ds.respondent_role,
           ds.department,
           ds.status,
+          ds.diagnosis_status,
           ds.created_at,
           ds.completed_at,
           ds.overall_score,

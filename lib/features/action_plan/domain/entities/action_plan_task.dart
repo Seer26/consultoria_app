@@ -6,6 +6,40 @@ enum ActionPlanTaskSource { researchRecommendation, manual, ai }
 
 enum ActionPlanTaskScope { all, mine, overdue, dueSoon, critical, completed }
 
+enum ActionPlanVersionStatus { draft, active, completed, archived }
+
+enum ActionPlanVersionSource { ai, manual }
+
+class ActionPlanVersionSummary {
+  const ActionPlanVersionSummary({
+    required this.id,
+    required this.companyId,
+    required this.submissionId,
+    required this.versionNumber,
+    required this.status,
+    required this.source,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.tasksCount,
+    this.generatedByUserId,
+    this.generatedByUserName,
+    this.archivedAt,
+  });
+
+  final String id;
+  final String companyId;
+  final String submissionId;
+  final int versionNumber;
+  final ActionPlanVersionStatus status;
+  final ActionPlanVersionSource source;
+  final String? generatedByUserId;
+  final String? generatedByUserName;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? archivedAt;
+  final int tasksCount;
+}
+
 class ActionPlanAssignee {
   const ActionPlanAssignee({
     required this.id,
@@ -39,6 +73,7 @@ class ActionPlanTask {
     required this.updatedAt,
     this.companyName,
     this.submissionId,
+    this.planVersionId,
     this.pillar,
     this.dueDate,
     this.responsibleUserId,
@@ -54,6 +89,7 @@ class ActionPlanTask {
   final String companyId;
   final String? companyName;
   final String? submissionId;
+  final String? planVersionId;
   final String title;
   final String description;
   final String? pillar;
@@ -76,6 +112,7 @@ class ActionPlanTask {
     String? companyId,
     String? companyName,
     String? submissionId,
+    String? planVersionId,
     String? title,
     String? description,
     String? pillar,
@@ -98,6 +135,7 @@ class ActionPlanTask {
       companyId: companyId ?? this.companyId,
       companyName: companyName ?? this.companyName,
       submissionId: submissionId ?? this.submissionId,
+      planVersionId: planVersionId ?? this.planVersionId,
       title: title ?? this.title,
       description: description ?? this.description,
       pillar: pillar ?? this.pillar,
@@ -123,6 +161,7 @@ class ActionPlanGenerationResult {
     required this.submissionId,
     required this.companyId,
     required this.alreadyGenerated,
+    this.planVersion,
     required this.createdCount,
     required this.tasks,
   });
@@ -130,6 +169,7 @@ class ActionPlanGenerationResult {
   final String submissionId;
   final String companyId;
   final bool alreadyGenerated;
+  final ActionPlanVersionSummary? planVersion;
   final int createdCount;
   final List<ActionPlanTask> tasks;
 }

@@ -2,6 +2,7 @@ import type { AuthTokenPayload, UserRole } from '../auth/auth.types';
 import type { DiagnosisScoreInterpretation } from './score-interpretation';
 
 export type ResearchSubmissionStatus = 'IN_PROGRESS' | 'COMPLETED';
+export type DiagnosisReviewStatus = 'AGUARDANDO_REVISAO' | 'APROVADO' | 'PUBLICADO';
 
 export interface ResearchPillarScore {
   pillar: string;
@@ -50,6 +51,12 @@ export interface ResearchSubmissionRecord extends ResearchResultSnapshot {
   respondentDepartment: string;
   respondentJobFunction: string;
   status: ResearchSubmissionStatus;
+  diagnosisStatus: DiagnosisReviewStatus;
+  approvedByUserId: string | null;
+  approvedAt: string | null;
+  publishedByUserId: string | null;
+  publishedAt: string | null;
+  reviewNotes: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -109,6 +116,12 @@ export interface CompanyRecord {
 export interface ResearchSubmissionDetails {
   id: string;
   status: ResearchSubmissionStatus;
+  diagnosisStatus?: DiagnosisReviewStatus;
+  approvedByUserId?: string | null;
+  approvedAt?: string | null;
+  publishedByUserId?: string | null;
+  publishedAt?: string | null;
+  reviewNotes?: string | null;
   overallScore?: number | null;
   scoreInterpretation?: DiagnosisScoreInterpretation | null;
   summary?: string | null;
@@ -145,6 +158,12 @@ export interface ResearchListItem extends ResearchResultSnapshot {
   respondentDepartment: string;
   respondentJobFunction: string;
   status: ResearchSubmissionStatus;
+  diagnosisStatus: DiagnosisReviewStatus;
+  approvedByUserId: string | null;
+  approvedAt: string | null;
+  publishedByUserId: string | null;
+  publishedAt: string | null;
+  reviewNotes: string | null;
   answersCount: number;
   createdAt: string;
   updatedAt: string;
@@ -154,4 +173,14 @@ export interface ResearchListItem extends ResearchResultSnapshot {
 export interface ResearchAccessContext {
   auth: AuthTokenPayload;
   actor: AuthenticatedUserRecord;
+}
+
+export interface ReviewResearchDiagnosisInput {
+  summary?: string | null;
+  criticalPoints?: string[];
+  opportunities?: string[];
+  recommendations?: string[];
+  nextSteps?: string[];
+  aiAnalysis?: AiConsultingAnalysis | null;
+  reviewNotes?: string | null;
 }

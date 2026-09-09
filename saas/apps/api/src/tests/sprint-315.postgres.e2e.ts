@@ -208,6 +208,7 @@ try {
   passed('pergunta MAX+1 nao e salva nem solicitada');
   const completedA2 = await call<Json>(base, 'POST', `/research/submissions/${submissionA2.id}/complete`, { token: employeeA2.token, body: {} });
   assert.equal(completedA2.status, 'COMPLETED');
+  assert.equal(completedA2.diagnosisStatus, 'AGUARDANDO_REVISAO');
   assert.equal(hasOwn(completedA2, 'overallScore'), false);
   assert.equal(hasOwn(completedA2, 'pillarScores'), false);
   assert.equal(hasOwn(completedA2, 'criticalPoints'), false);
@@ -220,6 +221,26 @@ try {
   `, [submissionA2.id]);
   assert.equal(Number(persistedA2?.overall_score), 50);
   passed('score continua deterministico e persistido');
+  await call(base, 'POST', `/research/submissions/${submissionA2.id}/diagnosis/approve`, { token: employeeA2.token, status: 403 });
+  passed('EMPLOYEE nao aprova diagnostico');
+  await call(base, 'POST', `/research/submissions/${submissionA2.id}/diagnosis/publish`, { token: employeeA2.token, status: 403 });
+  passed('EMPLOYEE nao publica diagnostico');
+  await call(base, 'GET', `/reports/research/${submissionA2.id}/executive`, { token: ownerA.token, status: 403 });
+  passed('OWNER nao acessa diagnostico nao publicado');
+  const reviewedA2 = await call<Json>(base, 'PUT', `/research/submissions/${submissionA2.id}/diagnosis/review`, {
+    token: admin.token,
+    body: {
+      summary: 'Resumo revisado pela consultoria.',
+      recommendations: ['Recomendacao revisada pela consultoria.'],
+      reviewNotes: 'Validado em teste automatizado.',
+    },
+  });
+  assert.equal(reviewedA2.summary, 'Resumo revisado pela consultoria.');
+  passed('ADMIN revisa diagnostico preliminar');
+  await call(base, 'POST', `/research/submissions/${submissionA2.id}/diagnosis/approve`, { token: admin.token });
+  passed('ADMIN aprova diagnostico');
+  await call(base, 'POST', `/research/submissions/${submissionA2.id}/diagnosis/publish`, { token: admin.token });
+  passed('ADMIN publica diagnostico');
 
   const ownerEmployeeView = await call<{ answers: unknown[]; status: string }>(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: ownerA.token });
   assert.equal(ownerEmployeeView.answers.length, 0);
@@ -260,7 +281,7 @@ try {
   await call(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: employeeB1.token, status: 403 });
   passed('isolamento Empresa A/B preservado');
 
-  assert.equal(scenarios.length, 37);
+  assert.equal(scenarios.length, 43);
   console.log(JSON.stringify({ ok: true, scenarios: scenarios.length, names: scenarios, realProviderCalls: 0, temporaryPostgres: true }));
 } finally {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
