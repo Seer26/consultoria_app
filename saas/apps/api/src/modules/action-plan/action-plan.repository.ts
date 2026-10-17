@@ -1,318 +1,79 @@
 import { database } from '../../db/database';
-import type {
-  ActionPlanCompanyRecord,
-  ActionPlanTaskDetails,
-  ActionPlanTaskRecord,
-  AuthenticatedActionPlanUser,
-} from './action-plan.types';
+import type { Actor, ActionPlanTaskDetails, Evidence, History, Plan, Scope, TaskFilters, TaskRecord } from './action-plan.types';
 
-interface UserRow {
-  id: string;
-  name: string;
-  email: string;
-  role: 'ADMIN' | 'OWNER' | 'EMPLOYEE';
-  company_id: string | null;
-  status: 'ACTIVE' | 'INACTIVE';
-}
-
-interface CompanyRow {
-  id: string;
-  name: string;
-  slug: string;
-  status: 'ACTIVE' | 'INACTIVE';
-}
-
-interface SubmissionRow {
-  id: string;
-  company_id: string;
-  status: 'IN_PROGRESS' | 'COMPLETED';
-}
-
-interface ActionPlanTaskRow {
-  id: string;
-  company_id: string;
-  submission_id: string | null;
-  title: string;
-  description: string;
-  pillar: string | null;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  status: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
-  due_date: string | null;
-  responsible_user_id: string | null;
-  source: 'RESEARCH_RECOMMENDATION' | 'MANUAL' | 'AI';
-  created_at: string;
-  updated_at: string;
-  completed_at: string | null;
-}
-
-interface ActionPlanTaskDetailsRow extends ActionPlanTaskRow {
-  company_name: string | null;
-  responsible_user_name: string | null;
-  responsible_user_email: string | null;
-}
-
-function mapUser(row: UserRow): AuthenticatedActionPlanUser {
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    role: row.role,
-    companyId: row.company_id,
-    status: row.status,
-  };
-}
-
-function mapCompany(row: CompanyRow): ActionPlanCompanyRecord {
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    status: row.status,
-  };
-}
-
-function mapTask(row: ActionPlanTaskRow): ActionPlanTaskRecord {
-  return {
-    id: row.id,
-    companyId: row.company_id,
-    submissionId: row.submission_id,
-    title: row.title,
-    description: row.description,
-    pillar: row.pillar,
-    priority: row.priority,
-    status: row.status,
-    dueDate: row.due_date,
-    responsibleUserId: row.responsible_user_id,
-    source: row.source,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    completedAt: row.completed_at,
-  };
-}
-
-function mapTaskDetails(row: ActionPlanTaskDetailsRow): ActionPlanTaskDetails {
-  return {
-    ...mapTask(row),
-    companyName: row.company_name,
-    responsibleUserName: row.responsible_user_name,
-    responsibleUserEmail: row.responsible_user_email,
-  };
-}
+const taskSelect = `SELECT t.id, t.company_id AS companyId, t.plan_id AS planId, t.submission_id AS submissionId,
+ t.title,t.description,t.pillar,t.priority,t.status,t.start_date AS startDate,t.due_date AS dueDate,
+ t.responsible_user_id AS responsibleUserId,t.progress,t.notes,t.source,t.created_at AS createdAt,
+ t.updated_at AS updatedAt,t.completed_at AS completedAt,u.name AS responsibleUserName,c.name AS companyName
+ FROM action_plan_tasks t JOIN companies c ON c.id=t.company_id
+ LEFT JOIN users u ON u.id=t.responsible_user_id AND u.company_id=t.company_id`;
+const planSelect = `SELECT p.id,p.company_id AS companyId,p.submission_id AS submissionId,p.title,p.description,p.status,
+ p.start_date AS startDate,p.due_date AS dueDate,p.created_by AS createdBy,p.created_at AS createdAt,p.updated_at AS updatedAt,
+ COALESCE((SELECT ROUND(AVG(t.progress),1) FROM action_plan_tasks t WHERE t.plan_id=p.id AND t.company_id=p.company_id AND t.status<>'CANCELADA'),0) AS progress
+ FROM action_plans p`;
+const decorate = (task: Omit<ActionPlanTaskDetails, 'overdue'>): ActionPlanTaskDetails => ({
+  ...task, overdue: Boolean(task.dueDate && Date.parse(task.dueDate) < Date.now() && !['CONCLUIDA', 'CANCELADA'].includes(task.status)),
+});
 
 export class ActionPlanRepository {
-  findUserById(id: string): AuthenticatedActionPlanUser | null {
-    const row = database
-      .prepare(
-        `
-        SELECT id, name, email, role, company_id, status
-        FROM users
-        WHERE id = ?
-        `,
-      )
-      .get(id) as UserRow | undefined;
-
-    return row ? mapUser(row) : null;
+  atomic<T>(work: () => T): T { return database.transaction(work)(); }
+  actor(id: string): Actor | undefined {
+    return database.prepare('SELECT id,name,role,company_id AS companyId,status FROM users WHERE id=?').get(id) as Actor | undefined;
   }
-
-  findCompanyById(id: string): ActionPlanCompanyRecord | null {
-    const row = database
-      .prepare(
-        `
-        SELECT id, name, slug, status
-        FROM companies
-        WHERE id = ?
-        `,
-      )
-      .get(id) as CompanyRow | undefined;
-
-    return row ? mapCompany(row) : null;
+  company(id: string) { return database.prepare("SELECT id FROM companies WHERE id=? AND status='ACTIVE'").get(id); }
+  submission(id: string, companyId: string) { return database.prepare('SELECT id FROM diagnosis_submissions WHERE id=? AND company_id=?').get(id, companyId); }
+  plans(scope: Scope): Plan[] {
+    return database.prepare(`${planSelect} WHERE p.company_id=? ${scope.employeeId ? 'AND EXISTS(SELECT 1 FROM action_plan_tasks t WHERE t.plan_id=p.id AND t.company_id=p.company_id AND t.responsible_user_id=?)' : ''} ORDER BY p.created_at DESC,p.id`).all(...[scope.companyId, ...(scope.employeeId ? [scope.employeeId] : [])]) as Plan[];
   }
-
-  findSubmissionById(id: string): SubmissionRow | null {
-    const row = database
-      .prepare(
-        `
-        SELECT id, company_id, status
-        FROM diagnosis_submissions
-        WHERE id = ? AND submission_type = 'RESEARCH'
-        `,
-      )
-      .get(id) as SubmissionRow | undefined;
-
-    return row ?? null;
+  plan(scope: Scope, id: string): Plan | undefined { return this.plans(scope).find(plan => plan.id === id); }
+  insertPlan(p: Plan): void {
+    database.prepare(`INSERT INTO action_plans(id,company_id,submission_id,title,description,status,start_date,due_date,created_by,created_at,updated_at)
+      VALUES(@id,@companyId,@submissionId,@title,@description,@status,@startDate,@dueDate,@createdBy,@createdAt,@updatedAt)`).run(p);
   }
-
-  createTask(input: ActionPlanTaskRecord): ActionPlanTaskRecord {
-    database
-      .prepare(
-        `
-        INSERT INTO action_plan_tasks (
-          id,
-          company_id,
-          submission_id,
-          title,
-          description,
-          pillar,
-          priority,
-          status,
-          due_date,
-          responsible_user_id,
-          source,
-          created_at,
-          updated_at,
-          completed_at
-        )
-        VALUES (
-          @id,
-          @companyId,
-          @submissionId,
-          @title,
-          @description,
-          @pillar,
-          @priority,
-          @status,
-          @dueDate,
-          @responsibleUserId,
-          @source,
-          @createdAt,
-          @updatedAt,
-          @completedAt
-        )
-        `,
-      )
-      .run(input);
-
-    return input;
+  updatePlan(p: Plan): void {
+    database.prepare(`UPDATE action_plans SET title=@title,description=@description,status=@status,start_date=@startDate,due_date=@dueDate,updated_at=@updatedAt
+      WHERE id=@id AND company_id=@companyId`).run(p);
   }
-
-  createTasks(tasks: ActionPlanTaskRecord[]): ActionPlanTaskRecord[] {
-    const insertMany = database.transaction((items: ActionPlanTaskRecord[]) => {
-      for (const item of items) {
-        this.createTask(item);
-      }
-    });
-
-    insertMany(tasks);
-    return tasks;
-  }
-
-  findTaskById(id: string): ActionPlanTaskDetails | null {
-    const row = database
-      .prepare(
-        `
-        SELECT
-          apt.id,
-          apt.company_id,
-          apt.submission_id,
-          apt.title,
-          apt.description,
-          apt.pillar,
-          apt.priority,
-          apt.status,
-          apt.due_date,
-          apt.responsible_user_id,
-          apt.source,
-          apt.created_at,
-          apt.updated_at,
-          apt.completed_at,
-          c.name AS company_name,
-          u.name AS responsible_user_name,
-          u.email AS responsible_user_email
-        FROM action_plan_tasks apt
-        INNER JOIN companies c ON c.id = apt.company_id
-        LEFT JOIN users u ON u.id = apt.responsible_user_id
-        WHERE apt.id = ?
-        `,
-      )
-      .get(id) as ActionPlanTaskDetailsRow | undefined;
-
-    return row ? mapTaskDetails(row) : null;
-  }
-
-  listTasks(filters: { companyId?: string; submissionId?: string }): ActionPlanTaskDetails[] {
-    const conditions: string[] = [];
-    const params: string[] = [];
-
-    if (filters.companyId) {
-      conditions.push('apt.company_id = ?');
-      params.push(filters.companyId);
+  tasks(scope: Scope, filters: TaskFilters = {}): ActionPlanTaskDetails[] {
+    const conditions = ['t.company_id=?'];
+    const params: string[] = [scope.companyId];
+    if (scope.employeeId) { conditions.push('t.responsible_user_id=?'); params.push(scope.employeeId); }
+    for (const [column, value] of [['t.plan_id', filters.planId], ['t.submission_id', filters.submissionId], ['t.status', filters.status], ['t.responsible_user_id', filters.responsibleUserId], ['t.priority', filters.priority]]) {
+      if (value) { conditions.push(`${column}=?`); params.push(value); }
     }
-
-    if (filters.submissionId) {
-      conditions.push('apt.submission_id = ?');
-      params.push(filters.submissionId);
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = database
-      .prepare(
-        `
-        SELECT
-          apt.id,
-          apt.company_id,
-          apt.submission_id,
-          apt.title,
-          apt.description,
-          apt.pillar,
-          apt.priority,
-          apt.status,
-          apt.due_date,
-          apt.responsible_user_id,
-          apt.source,
-          apt.created_at,
-          apt.updated_at,
-          apt.completed_at,
-          c.name AS company_name,
-          u.name AS responsible_user_name,
-          u.email AS responsible_user_email
-        FROM action_plan_tasks apt
-        INNER JOIN companies c ON c.id = apt.company_id
-        LEFT JOIN users u ON u.id = apt.responsible_user_id
-        ${whereClause}
-        ORDER BY
-          CASE apt.priority
-            WHEN 'CRITICAL' THEN 1
-            WHEN 'HIGH' THEN 2
-            WHEN 'MEDIUM' THEN 3
-            ELSE 4
-          END,
-          CASE apt.status
-            WHEN 'TODO' THEN 1
-            WHEN 'IN_PROGRESS' THEN 2
-            WHEN 'DONE' THEN 3
-            ELSE 4
-          END,
-          COALESCE(apt.due_date, apt.updated_at) ASC,
-          apt.created_at DESC
-        `,
-      )
-      .all(...params) as ActionPlanTaskDetailsRow[];
-
-    return rows.map(mapTaskDetails);
+    const rows = database.prepare(`${taskSelect} WHERE ${conditions.join(' AND ')} ORDER BY CASE t.priority WHEN 'CRITICA' THEN 0 WHEN 'ALTA' THEN 1 WHEN 'MEDIA' THEN 2 ELSE 3 END, t.due_date IS NULL,t.due_date,t.created_at,t.id`).all(...params) as Omit<ActionPlanTaskDetails, 'overdue'>[];
+    return rows.map(decorate).filter(task => (filters.overdue === undefined || task.overdue === filters.overdue) && (filters.completed === undefined || (task.status === 'CONCLUIDA') === filters.completed));
   }
-
-  updateTask(input: ActionPlanTaskRecord): ActionPlanTaskRecord {
-    database
-      .prepare(
-        `
-        UPDATE action_plan_tasks
-        SET company_id = @companyId,
-            submission_id = @submissionId,
-            title = @title,
-            description = @description,
-            pillar = @pillar,
-            priority = @priority,
-            status = @status,
-            due_date = @dueDate,
-            responsible_user_id = @responsibleUserId,
-            source = @source,
-            updated_at = @updatedAt,
-            completed_at = @completedAt
-        WHERE id = @id
-        `,
-      )
-      .run(input);
-
-    return input;
+  task(scope: Scope, id: string): ActionPlanTaskDetails | undefined {
+    const row = database.prepare(`${taskSelect} WHERE t.company_id=? AND t.id=? ${scope.employeeId ? 'AND t.responsible_user_id=?' : ''}`).get(scope.companyId, id, ...(scope.employeeId ? [scope.employeeId] : [])) as Omit<ActionPlanTaskDetails, 'overdue'> | undefined;
+    return row ? decorate(row) : undefined;
+  }
+  insertTask(t: TaskRecord): void {
+    database.prepare(`INSERT INTO action_plan_tasks(id,company_id,plan_id,submission_id,title,description,pillar,priority,status,start_date,due_date,responsible_user_id,progress,notes,source,created_at,updated_at,completed_at)
+      VALUES(@id,@companyId,@planId,@submissionId,@title,@description,@pillar,@priority,@status,@startDate,@dueDate,@responsibleUserId,@progress,@notes,@source,@createdAt,@updatedAt,@completedAt)`).run(t);
+  }
+  updateTask(t: TaskRecord): void {
+    database.prepare(`UPDATE action_plan_tasks SET title=@title,description=@description,pillar=@pillar,priority=@priority,status=@status,start_date=@startDate,due_date=@dueDate,
+      responsible_user_id=@responsibleUserId,progress=@progress,notes=@notes,source=@source,updated_at=@updatedAt,completed_at=@completedAt WHERE id=@id AND company_id=@companyId`).run(t);
+  }
+  addHistory(h: History): void {
+    database.prepare(`INSERT INTO action_plan_history(id,task_id,company_id,event,actor_id,actor_name,old_value,new_value,created_at)
+      VALUES(@id,@taskId,@companyId,@event,@actorId,@actorName,@oldValue,@newValue,@createdAt)`).run({ ...h, oldValue: JSON.stringify(h.oldValue), newValue: JSON.stringify(h.newValue) });
+  }
+  history(scope: Scope, taskId: string): History[] {
+    const rows = database.prepare(`SELECT id,task_id AS taskId,company_id AS companyId,event,actor_id AS actorId,actor_name AS actorName,old_value AS oldValue,new_value AS newValue,created_at AS createdAt
+      FROM action_plan_history WHERE company_id=? AND task_id=? ORDER BY created_at,rowid`).all(scope.companyId, taskId) as (Omit<History, 'oldValue' | 'newValue'> & { oldValue: string | null; newValue: string | null })[];
+    return rows.map(row => ({ ...row, oldValue: row.oldValue === null ? null : JSON.parse(row.oldValue), newValue: row.newValue === null ? null : JSON.parse(row.newValue) }));
+  }
+  addEvidence(e: Evidence): void {
+    database.prepare(`INSERT INTO action_plan_evidence(id,task_id,company_id,type,content,created_by,created_at)
+      VALUES(@id,@taskId,@companyId,@type,@content,@createdBy,@createdAt)`).run(e);
+  }
+  evidence(scope: Scope, taskId: string): Evidence[] {
+    return database.prepare(`SELECT e.id,e.task_id AS taskId,e.company_id AS companyId,e.type,e.content,e.created_by AS createdBy,e.created_at AS createdAt,u.name AS actorName
+      FROM action_plan_evidence e JOIN users u ON u.id=e.created_by WHERE e.company_id=? AND e.task_id=? ORDER BY e.created_at,e.rowid`).all(scope.companyId, taskId) as Evidence[];
+  }
+  members(scope: Scope): { id: string; name: string; role: string }[] {
+    return database.prepare("SELECT id,name,role FROM users WHERE company_id=? AND status='ACTIVE' ORDER BY name,id").all(scope.companyId) as { id: string; name: string; role: string }[];
   }
 }

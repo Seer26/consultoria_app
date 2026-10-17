@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 
 import { database } from '../db/database';
+import { migrateActionPlanMonitoring } from './monitoring-migration';
 
 const TEST_PASSWORD = '123456';
 const TEST_COMPANY_ID = 'company-demo';
@@ -299,6 +300,7 @@ const seedUsers = [
 
 export async function initDatabase(): Promise<void> {
   runMigrations();
+  migrateActionPlanMonitoring(database);
 
   const now = new Date().toISOString();
   database

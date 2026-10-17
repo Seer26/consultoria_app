@@ -19,7 +19,12 @@ export function authenticate(request: Request, response: Response, next: NextFun
 
   try {
     const payload = service.verifyToken(token);
-    request.auth = payload;
+    const user = repository.findUserById(payload.userId);
+    if (!user || user.status !== 'ACTIVE') {
+      response.status(403).json({ error: 'INACTIVE_USER' });
+      return;
+    }
+    request.auth = { userId: user.id, role: user.role, companyId: user.companyId };
     next();
   } catch {
     response.status(401).json({ error: 'INVALID_TOKEN' });

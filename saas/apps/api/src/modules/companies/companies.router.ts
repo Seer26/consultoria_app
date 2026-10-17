@@ -11,7 +11,10 @@ const controller = new CompaniesController(service);
 
 export const companiesRouter = Router();
 
-companiesRouter.use(authenticate, authorize('ADMIN'));
+companiesRouter.use(['/companies', '/users'], authenticate, authorize('ADMIN'), (request, response, next) => {
+  if (request.auth?.companyId) { response.status(403).json({ error: 'FORBIDDEN' }); return; }
+  next();
+});
 
 companiesRouter.get('/companies', controller.listCompanies);
 companiesRouter.get('/companies/:id', controller.getCompanyById);

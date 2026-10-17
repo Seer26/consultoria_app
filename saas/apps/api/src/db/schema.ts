@@ -1,3 +1,5 @@
+// Bootstrap schema retained for upgrades. initDatabase applies migration 011
+// atomically to create plans, monitoring tasks, evidence and history on fresh AND existing databases.
 export const schemaStatements = [
   `
   CREATE TABLE IF NOT EXISTS companies (

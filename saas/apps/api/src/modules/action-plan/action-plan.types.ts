@@ -1,89 +1,44 @@
-import type { AuthTokenPayload, UserRole } from '../auth/auth.types';
+import type { UserRole } from '../auth/auth.types';
 
-export type ActionPlanTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export type ActionPlanTaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELED';
+export const planStatuses = ['RASCUNHO', 'ATIVO', 'CONCLUIDO', 'CANCELADO'] as const;
+export const taskStatuses = ['PENDENTE', 'EM_ANDAMENTO', 'AGUARDANDO_VALIDACAO', 'CONCLUIDA', 'CANCELADA'] as const;
+export const taskPriorities = ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'] as const;
+export type PlanStatus = typeof planStatuses[number];
+export type ActionPlanTaskStatus = typeof taskStatuses[number];
+export type ActionPlanTaskPriority = typeof taskPriorities[number];
 export type ActionPlanTaskSource = 'RESEARCH_RECOMMENDATION' | 'MANUAL' | 'AI';
-
-export interface ActionPlanTaskRecord {
-  id: string;
-  companyId: string;
-  submissionId: string | null;
-  title: string;
-  description: string;
-  pillar: string | null;
-  priority: ActionPlanTaskPriority;
-  status: ActionPlanTaskStatus;
-  dueDate: string | null;
-  responsibleUserId: string | null;
-  source: ActionPlanTaskSource;
-  createdAt: string;
-  updatedAt: string;
-  completedAt: string | null;
+export interface Actor { id: string; name: string; role: UserRole; companyId: string | null; status: string }
+export interface Scope { actor: Actor; companyId: string; employeeId?: string }
+export interface Plan {
+  id: string; companyId: string; submissionId: string | null; title: string; description: string;
+  status: PlanStatus; startDate: string | null; dueDate: string | null;
+  createdBy: string | null; createdAt: string; updatedAt: string; progress: number;
 }
-
-export interface ActionPlanTaskDetails extends ActionPlanTaskRecord {
-  companyName: string | null;
-  responsibleUserName: string | null;
-  responsibleUserEmail: string | null;
+export interface TaskRecord {
+  id: string; companyId: string; planId: string; submissionId: string | null;
+  title: string; description: string; pillar: string | null;
+  priority: ActionPlanTaskPriority; status: ActionPlanTaskStatus;
+  startDate: string | null; dueDate: string | null; responsibleUserId: string | null;
+  progress: number; notes: string; source: ActionPlanTaskSource;
+  createdAt: string; updatedAt: string; completedAt: string | null;
 }
-
-export interface CreateActionPlanTaskInput {
-  companyId?: string;
-  submissionId?: string | null;
-  title: string;
-  description?: string;
-  pillar?: string | null;
-  priority?: ActionPlanTaskPriority;
-  status?: ActionPlanTaskStatus;
-  dueDate?: string | null;
-  responsibleUserId?: string | null;
-  source?: ActionPlanTaskSource;
+export interface ActionPlanTaskDetails extends TaskRecord {
+  responsibleUserName: string | null; companyName: string; overdue: boolean;
 }
-
-export interface UpdateActionPlanTaskInput {
-  title?: string;
-  description?: string;
-  pillar?: string | null;
-  priority?: ActionPlanTaskPriority;
-  status?: ActionPlanTaskStatus;
-  dueDate?: string | null;
-  responsibleUserId?: string | null;
+export type HistoryEvent = 'CRIACAO' | 'RESPONSAVEL' | 'PRAZO' | 'PRIORIDADE' | 'STATUS' | 'PROGRESSO' | 'EVIDENCIA_ADICIONADA' | 'CONCLUSAO' | 'REABERTURA' | 'EDICAO';
+export interface History {
+  id: string; taskId: string; companyId: string; event: HistoryEvent;
+  actorId: string; actorName: string; oldValue: unknown; newValue: unknown; createdAt: string;
 }
-
-export interface UpdateActionPlanTaskStatusInput {
-  status: ActionPlanTaskStatus;
+export interface Evidence {
+  id: string; taskId: string; companyId: string; type: 'COMENTARIO' | 'LINK';
+  content: string; createdBy: string; createdAt: string; actorName?: string;
 }
-
-export interface ActionPlanListFilters {
-  companyId?: string;
-  submissionId?: string;
+export interface TaskFilters {
+  planId?: string; submissionId?: string; status?: string; responsibleUserId?: string;
+  priority?: string; overdue?: boolean; completed?: boolean;
 }
-
-export interface AuthenticatedActionPlanUser {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  companyId: string | null;
-  status: 'ACTIVE' | 'INACTIVE';
-}
-
-export interface ActionPlanCompanyRecord {
-  id: string;
-  name: string;
-  slug: string;
-  status: 'ACTIVE' | 'INACTIVE';
-}
-
 export interface ActionPlanGenerationResult {
-  submissionId: string;
-  companyId: string;
-  alreadyGenerated: boolean;
-  createdCount: number;
-  tasks: ActionPlanTaskDetails[];
-}
-
-export interface ActionPlanAccessContext {
-  auth: AuthTokenPayload;
-  actor: AuthenticatedActionPlanUser;
+  submissionId: string; companyId: string; planId: string; alreadyGenerated: boolean;
+  createdCount: number; tasks: ActionPlanTaskDetails[];
 }

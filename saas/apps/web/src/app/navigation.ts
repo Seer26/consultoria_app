@@ -1,4 +1,5 @@
 export const appSections = [
+  { key: 'action_plan', label: 'Plano de ação' },
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'strategy', label: 'Estrategia' },
   { key: 'people', label: 'Pessoas' },

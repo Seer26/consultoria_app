@@ -6,10 +6,11 @@ import { DashboardPage } from '../features/dashboard/pages/DashboardPage';
 import { DiagnosisPage } from '../features/diagnosis/pages/DiagnosisPage';
 import { diagnosisAreas, diagnosisQuestions, mockAlerts, mockPriorityTasks } from '../features/diagnosis/data/mockDiagnosis';
 import { calculateDiagnosisOverview } from '../features/diagnosis/utils/diagnosisScoring';
+import { MonitoringPage } from '../features/action-plan/MonitoringPage';
 import { AppLayout } from './layout/AppLayout';
 
 export function App() {
-  const [activeSection, setActiveSection] = useState<AppSection>('dashboard');
+  const [activeSection, setActiveSection] = useState<AppSection>('action_plan');
   const [companyName, setCompanyName] = useState('Empresa Exemplo');
   const [answers, setAnswers] = useState<DiagnosisAnswersState>({});
 
@@ -19,6 +20,7 @@ export function App() {
   );
 
   const content = (() => {
+    if (activeSection === 'action_plan') return <MonitoringPage />;
     if (activeSection === 'dashboard') {
       return (
         <DashboardPage

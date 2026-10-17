@@ -9,6 +9,18 @@
     "dev:web": "npm --workspace @consultoria/web run dev",
     "dev:api": "npm --workspace @consultoria/api run dev",
     "dev:all": "npm run dev:api && npm run dev:web",
-    "build": "npm run build --workspace @consultoria/domain && npm run build --workspace @consultoria/api && npm run build --workspace @consultoria/web"
+    "build": "npm run build --workspace @consultoria/domain && npm run build --workspace @consultoria/api && npm run build --workspace @consultoria/web",
+    "test": "npm --workspace @consultoria/api run test",
+    "test:e2e": "playwright test",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "npm run build --workspace @consultoria/domain && npm --workspace @consultoria/api run typecheck && npm --workspace @consultoria/web run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.5.0",
+    "typescript-eslint": "^8.71.2"
   }
 }

@@ -51,3 +51,10 @@ app.*.map.json
 # API Keys
 **/api_keys.dart
 **/secrets.dart
+
+# SaaS development outputs (previously tracked artifacts remain tracked)
+saas/**/node_modules/
+saas/**/dist/
+saas/**/*.tsbuildinfo
+saas/test-results/
+saas/playwright-report/
