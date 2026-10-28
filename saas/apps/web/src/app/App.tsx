@@ -7,6 +7,7 @@ import { DiagnosisPage } from '../features/diagnosis/pages/DiagnosisPage';
 import { diagnosisAreas, diagnosisQuestions, mockAlerts, mockPriorityTasks } from '../features/diagnosis/data/mockDiagnosis';
 import { calculateDiagnosisOverview } from '../features/diagnosis/utils/diagnosisScoring';
 import { MonitoringPage } from '../features/action-plan/MonitoringPage';
+import { PeoplePage } from '../features/people/PeoplePage';
 import { AppLayout } from './layout/AppLayout';
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
 
   const content = (() => {
     if (activeSection === 'action_plan') return <MonitoringPage />;
+    if (activeSection === 'people') return <PeoplePage />;
     if (activeSection === 'dashboard') {
       return (
         <DashboardPage

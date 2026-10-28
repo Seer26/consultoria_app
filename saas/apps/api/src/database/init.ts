@@ -2,6 +2,9 @@ import bcrypt from 'bcrypt';
 
 import { database } from '../db/database';
 import { migrateActionPlanMonitoring } from './monitoring-migration';
+import { migratePeopleDevelopment } from './people-development-migration';
+import { migrateJobFit } from './job-fit-migration';
+import { seedPeopleDevelopment } from './people-development-seed';
 
 const TEST_PASSWORD = '123456';
 const TEST_COMPANY_ID = 'company-demo';
@@ -301,6 +304,9 @@ const seedUsers = [
 export async function initDatabase(): Promise<void> {
   runMigrations();
   migrateActionPlanMonitoring(database);
+  migratePeopleDevelopment(database);
+  migrateJobFit(database);
+  seedPeopleDevelopment();
 
   const now = new Date().toISOString();
   database

@@ -10,6 +10,7 @@ import { companiesRouter } from './modules/companies/companies.router';
 import { dashboardRouter } from './modules/dashboard/dashboard.router';
 import { diagnosisRouter } from './modules/diagnosis/diagnosis.router';
 import { researchRouter } from './modules/research/research.router';
+import { peopleDevelopmentRouter } from './modules/people-development/people-development.router';
 
 export const app = express();
 
@@ -31,6 +32,7 @@ app.use('/auth', authRouter);
 app.use('/', companiesRouter);
 app.use('/', researchRouter);
 app.use('/', actionPlanRouter);
+app.use('/', peopleDevelopmentRouter);
 app.use('/ai', aiQuestionRouter);
 app.use('/ai-diagnosis', aiDiagnosisRouter);
 app.use('/', dashboardRouter);
