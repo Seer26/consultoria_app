@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/behavioral/presentation/pages/behavioral_questionnaire_page.dart';
 import '../../features/auth/presentation/pages/auth_splash_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
@@ -318,6 +319,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => RbacGuard(
                   allowedRoles: const [RoleGuard.owner, RoleGuard.employee],
                   child: const StrategyPage(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/behavioral',
+                name: 'behavioral',
+                builder: (context, state) => RbacGuard(
+                  allowedRoles: const [RoleGuard.owner, RoleGuard.employee],
+                  child: const BehavioralQuestionnairePage(),
                 ),
               ),
             ],

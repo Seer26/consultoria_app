@@ -13,6 +13,7 @@ enum SidebarItem {
   configuracoesEmpresa,
   equipe,
   estrategia,
+  comportamental,
 }
 
 enum SidebarGroup { workspace, management }
@@ -29,6 +30,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.configuracoesEmpresa => 'Configurações',
     SidebarItem.equipe => 'Equipe',
     SidebarItem.estrategia => 'Estratégia',
+    SidebarItem.comportamental => 'Perfil comportamental',
   };
 
   String get helper => switch (this) {
@@ -42,6 +44,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.configuracoesEmpresa => 'Dados da empresa',
     SidebarItem.equipe => 'Perfis dos colaboradores',
     SidebarItem.estrategia => 'Objetivos, metas e SWOT',
+    SidebarItem.comportamental => 'Sua avaliação individual',
   };
 
   IconData get icon => switch (this) {
@@ -55,6 +58,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.configuracoesEmpresa => Icons.settings_outlined,
     SidebarItem.equipe => Icons.groups_outlined,
     SidebarItem.estrategia => Icons.account_tree_outlined,
+    SidebarItem.comportamental => Icons.psychology_outlined,
   };
 
   SidebarGroup get group => switch (this) {
@@ -62,6 +66,7 @@ extension SidebarItemX on SidebarItem {
     SidebarItem.diagnostico ||
     SidebarItem.tarefas => SidebarGroup.workspace,
     SidebarItem.estrategia => SidebarGroup.workspace,
+    SidebarItem.comportamental => SidebarGroup.workspace,
     SidebarItem.empresas ||
     SidebarItem.relatorios ||
     SidebarItem.usuarios ||

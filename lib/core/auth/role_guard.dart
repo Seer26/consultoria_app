@@ -27,6 +27,7 @@ class RoleGuard {
         ];
       case owner:
         return const [
+          SidebarItem.comportamental,
           SidebarItem.dashboard,
           SidebarItem.diagnostico,
           SidebarItem.tarefas,
@@ -38,6 +39,7 @@ class RoleGuard {
         ];
       case employee:
         return const [
+          SidebarItem.comportamental,
           SidebarItem.dashboard,
           SidebarItem.diagnostico,
           SidebarItem.tarefas,
@@ -98,6 +100,8 @@ class RoleGuard {
     }
 
     switch (location) {
+      case '/behavioral':
+        return SidebarItem.comportamental;
       case '/dashboard':
         return SidebarItem.dashboard;
       case '/admin':
