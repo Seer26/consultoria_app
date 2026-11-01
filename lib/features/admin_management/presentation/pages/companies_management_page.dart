@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/auth/role_guard.dart';
+import '../../../../widgets/role_guard.dart';
 
 import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -653,6 +657,18 @@ class _CompanyUsersPanel extends StatelessWidget {
                             onPressed: isSaving ? null : onCreateUser,
                             icon: const Icon(Icons.person_add_alt_1),
                             label: const Text('Novo usuario'),
+                          ),
+                          RbacGuard(
+                            allowedRoles: const [RoleGuard.admin],
+                            deniedChild: const SizedBox.shrink(),
+                            child: OutlinedButton.icon(
+                              onPressed: () => context.pushNamed(
+                                'behavioralAssessments',
+                                pathParameters: {'companyId': company!.id},
+                              ),
+                              icon: const Icon(Icons.psychology_outlined),
+                              label: const Text('Perfil comportamental'),
+                            ),
                           ),
                         ],
                       ),

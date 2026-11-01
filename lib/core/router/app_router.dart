@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/behavioral/presentation/pages/behavioral_questionnaire_page.dart';
+import '../../features/behavioral/presentation/pages/behavioral_assessments_page.dart';
+import '../../features/behavioral/presentation/pages/behavioral_result_page.dart';
 import '../../features/auth/presentation/pages/auth_splash_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
@@ -215,6 +217,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   allowedRoles: const [RoleGuard.admin],
                   child: const CompaniesManagementPage(),
                 ),
+              ),
+              GoRoute(
+                path: '/behavioral/companies/:companyId',
+                name: 'behavioralAssessments',
+                builder: (context, state) => BehavioralAssessmentsPage(
+                  companyId: state.pathParameters['companyId']!,
+                  userId: state.uri.queryParameters['userId'],
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'assessments/:assessmentId',
+                    name: 'behavioralResult',
+                    builder: (context, state) => BehavioralResultPage(
+                      companyId: state.pathParameters['companyId']!,
+                      assessmentId: state.pathParameters['assessmentId']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

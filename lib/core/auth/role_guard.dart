@@ -55,6 +55,9 @@ class RoleGuard {
   }
 
   static bool canAccessRoute(String? role, String location) {
+    if (location.startsWith('/behavioral/companies/')) {
+      return normalizeRole(role) == admin;
+    }
     if (_isSafeUtilityRoute(location)) {
       return true;
     }
