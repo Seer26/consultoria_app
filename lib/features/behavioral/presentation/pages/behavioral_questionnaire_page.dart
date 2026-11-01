@@ -212,6 +212,7 @@ class _BehavioralQuestionnairePageState
     final value = _answers[question.id];
     final isLast = _index == questions.length - 1;
     return ListView(
+      key: ValueKey(question.id),
       children: [
         Card(
           child: Padding(

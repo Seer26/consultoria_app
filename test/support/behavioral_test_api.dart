@@ -7,8 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// In-memory HTTP boundary; widgets, providers, DTOs and service stay real.
 class BehavioralTestApi {
-  BehavioralTestApi({Map<String, int> answers = const {}})
-    : answers = Map.of(answers) {
+  BehavioralTestApi({
+    Map<String, int> answers = const {},
+    this.questionTexts = const {},
+  }) : answers = Map.of(answers) {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (request, handler) async {
@@ -22,6 +24,7 @@ class BehavioralTestApi {
 
   final dio = Dio();
   final Map<String, int> answers;
+  final Map<String, String> questionTexts;
   final requests = <RequestOptions>[];
   bool failSave = false;
   bool failStart = false;
@@ -60,9 +63,11 @@ class BehavioralTestApi {
           (i) => {
             'id': 'q-${i + 1}',
             'position': i + 1,
-            'text': i == 0
-                ? 'Quando surge uma pendência e ainda faltam alguns detalhes, procuro identificar o que já pode ser feito para avançar.'
-                : 'Afirmação ${i + 1}',
+            'text':
+                questionTexts['q-${i + 1}'] ??
+                (i == 0
+                    ? 'Quando surge uma pendência e ainda faltam alguns detalhes, procuro identificar o que já pode ser feito para avançar.'
+                    : 'Afirmação ${i + 1}'),
           },
         ),
         'answers': answers.entries
