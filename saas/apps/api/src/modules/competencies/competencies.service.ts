@@ -118,19 +118,28 @@ export class CompetenciesService {
   async getHistory(actor: AuthTokenPayload, companyId: string, userId: string): Promise<AdminCompetencyAssessmentDto[]> {
     // Persisted company and snapshots authorize historical reads after a subject transfer.
     await this.adminCompany(actor, companyId);
-    this.validUserFilter(userId);
+    await this.companyUserFilter(companyId, userId);
     return Promise.all((await this.repository.listAssessments(companyId, { userId })).map(a => this.dto(a)));
   }
 
   async listCompanyAssessments(actor: AuthTokenPayload, companyId: string, filters: CompetencyAssessmentFilters = {}): Promise<CompetencyAssessment[]> {
     await this.adminCompany(actor, companyId);
     if (filters.status !== undefined && !['IN_PROGRESS', 'COMPLETED'].includes(filters.status)) throw new Error('COMPETENCIES_INVALID_STATUS');
-    if (filters.userId !== undefined) this.validUserFilter(filters.userId);
+    if (filters.userId !== undefined) await this.companyUserFilter(companyId, filters.userId);
     return this.repository.listAssessments(companyId, filters);
   }
 
   private validUserFilter(userId: string): void {
     if (typeof userId !== 'string' || !userId.trim()) throw new Error('COMPETENCIES_INVALID_USER');
+  }
+
+  private async companyUserFilter(companyId: string, userId: string): Promise<void> {
+    this.validUserFilter(userId);
+    const user = await this.repository.findUser(userId);
+    if (user?.companyId === companyId) return;
+    // A transfer cannot revoke access to records owned by the original company.
+    if ((await this.repository.listAssessments(companyId, { userId })).length > 0) return;
+    throw new Error('USER_NOT_FOUND');
   }
 
   private async adminCompany(auth: AuthTokenPayload, companyId: string): Promise<BehavioralUser> {

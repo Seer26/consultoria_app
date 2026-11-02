@@ -9,6 +9,7 @@ import { actionPlanRouter } from './modules/action-plan/action-plan.router';
 import { authRouter } from './modules/auth/auth.router';
 import { behavioralRouter } from './modules/behavioral/behavioral.router';
 import { companiesRouter } from './modules/companies/companies.router';
+import { competenciesRouter } from './modules/competencies/competencies.router';
 import { dashboardRouter } from './modules/dashboard/dashboard.router';
 import { diagnosisRouter } from './modules/diagnosis/diagnosis.router';
 import { entitlementsRouter } from './modules/entitlements/entitlements.router';
@@ -57,6 +58,7 @@ app.post('/ai-diagnosis', (_request, response) => {
 
 app.use('/auth', authRouter);
 app.use('/behavioral', behavioralRouter);
+app.use('/', competenciesRouter);
 app.use('/', companiesRouter);
 app.use('/', researchRouter);
 app.use('/', actionPlanRouter);
