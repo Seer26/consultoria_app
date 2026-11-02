@@ -670,6 +670,18 @@ class _CompanyUsersPanel extends StatelessWidget {
                               label: const Text('Perfil comportamental'),
                             ),
                           ),
+                          RbacGuard(
+                            allowedRoles: const [RoleGuard.admin],
+                            deniedChild: const SizedBox.shrink(),
+                            child: OutlinedButton.icon(
+                              onPressed: () => context.pushNamed(
+                                'competencyAssessments',
+                                pathParameters: {'companyId': company!.id},
+                              ),
+                              icon: const Icon(Icons.fact_check_outlined),
+                              label: const Text('Competências'),
+                            ),
+                          ),
                         ],
                       ),
                     ],

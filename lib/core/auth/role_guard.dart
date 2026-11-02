@@ -24,6 +24,7 @@ class RoleGuard {
           SidebarItem.empresas,
           SidebarItem.relatorios,
           SidebarItem.usuarios,
+          SidebarItem.competencias,
         ];
       case owner:
         return const [
@@ -55,6 +56,9 @@ class RoleGuard {
   }
 
   static bool canAccessRoute(String? role, String location) {
+    if (location == '/competencies' || location.startsWith('/competencies/')) {
+      return normalizeRole(role) == admin;
+    }
     if (location.startsWith('/behavioral/companies/')) {
       return normalizeRole(role) == admin;
     }

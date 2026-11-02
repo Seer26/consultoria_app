@@ -6,6 +6,10 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/behavioral/presentation/pages/behavioral_questionnaire_page.dart';
 import '../../features/behavioral/presentation/pages/behavioral_assessments_page.dart';
 import '../../features/behavioral/presentation/pages/behavioral_result_page.dart';
+import '../../features/competencies/presentation/pages/competency_assessments_page.dart';
+import '../../features/competencies/presentation/pages/competency_catalog_page.dart';
+import '../../features/competencies/presentation/pages/competency_assessment_editor_page.dart';
+import '../../features/competencies/presentation/pages/competency_assessment_result_page.dart';
 import '../../features/auth/presentation/pages/auth_splash_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
@@ -352,6 +356,56 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   allowedRoles: const [RoleGuard.owner, RoleGuard.employee],
                   child: const BehavioralQuestionnairePage(),
                 ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/competencies',
+                name: 'competencies',
+                builder: (context, state) => const CompetencyAssessmentsPage(),
+                routes: [
+                  GoRoute(
+                    path: 'companies/:companyId',
+                    name: 'competencyAssessments',
+                    builder: (context, state) => CompetencyAssessmentsPage(
+                      companyId: state.pathParameters['companyId']!,
+                      userId: state.uri.queryParameters['userId'],
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'catalog',
+                        name: 'competencyCatalog',
+                        builder: (context, state) => CompetencyCatalogPage(
+                          companyId: state.pathParameters['companyId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'assessments/:assessmentId',
+                        name: 'competencyEditor',
+                        builder: (context, state) =>
+                            CompetencyAssessmentEditorPage(
+                              companyId: state.pathParameters['companyId']!,
+                              assessmentId:
+                                  state.pathParameters['assessmentId']!,
+                            ),
+                        routes: [
+                          GoRoute(
+                            path: 'result',
+                            name: 'competencyResult',
+                            builder: (context, state) =>
+                                CompetencyAssessmentResultPage(
+                                  companyId: state.pathParameters['companyId']!,
+                                  assessmentId:
+                                      state.pathParameters['assessmentId']!,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
