@@ -81,14 +81,47 @@ const admin = auth('admin', 'ADMIN', null), admin2 = auth('admin2', 'ADMIN', nul
 const rated = { evidenceStatus: 'RATED' as const, level: 4, observation: 'Concrete evidence' };
 const notObserved = { evidenceStatus: 'NOT_OBSERVED' as const, level: null };
 
+// Revisions must reject stale same-item writes, including remove/reinsert ABA.
+repo.users.set('concurrency', { id: 'concurrency', name: 'Concurrent Subject', role: 'EMPLOYEE', companyId: 'a', status: 'ACTIVE' });
+const concurrentDraft = await service.startOrResumeAssessment(admin, 'a', 'concurrency');
+const version = (item: CompetencyItem) => `${item.id}:${item.updatedAt}`;
+const x = await service.saveItem(admin, 'a', concurrentDraft.id, 'system', { ...rated, expectedVersion: null });
+const realNow = Date.now;
+let x2: CompetencyItem;
+try {
+  Date.now = () => 0; // clock rollback must not reuse or regress an item's version.
+  x2 = await service.saveItem(admin2, 'a', concurrentDraft.id, 'system', { ...rated, level: 5, expectedVersion: version(x) });
+} finally { Date.now = realNow; }
+assert(Date.parse(x2.updatedAt) > Date.parse(x.updatedAt));
+assert.notEqual(version(x2), version(x));
+await assert.rejects(service.saveItem(admin, 'a', concurrentDraft.id, 'system', { ...notObserved, expectedVersion: version(x) }), /COMPETENCIES_ITEM_CONFLICT/);
+await assert.rejects(service.saveItem(admin, 'a', concurrentDraft.id, 'system', { ...notObserved, expectedVersion: null }), /COMPETENCIES_ITEM_CONFLICT/);
+await assert.rejects(service.saveItem(admin, 'a', concurrentDraft.id, 'system', notObserved), /COMPETENCIES_PRECONDITION_REQUIRED/);
+await assert.rejects(service.removeItem(admin, 'a', concurrentDraft.id, 'system', version(x)), /COMPETENCIES_ITEM_CONFLICT/);
+await service.removeItem(admin2, 'a', concurrentDraft.id, 'system', version(x2));
+await assert.rejects(service.saveItem(admin, 'a', concurrentDraft.id, 'system', { ...rated, expectedVersion: version(x2) }), /COMPETENCIES_ITEM_CONFLICT/);
+const replacement = await service.saveItem(admin2, 'a', concurrentDraft.id, 'system', { ...rated, expectedVersion: null });
+assert.notEqual(replacement.id, x.id);
+await assert.rejects(service.removeItem(admin, 'a', concurrentDraft.id, 'system', version(x2)), /COMPETENCIES_ITEM_CONFLICT/);
+assert.equal((await service.getAdminAssessment(admin, 'a', concurrentDraft.id)).items[0].level, 4);
+
 // Removing ADMIN revalidation or company scoping must expose each of these regressions.
+// Legacy lifecycle cases below act on freshly read items; stale cases above never refresh.
+async function saveItem(actor: AuthTokenPayload, companyId: string, assessmentId: string, competencyId: string, input: Parameters<typeof service.saveItem>[4]) {
+  const current = (await repo.items(assessmentId)).find(i => i.competencyId === competencyId);
+  return service.saveItem(actor, companyId, assessmentId, competencyId, { ...input, expectedVersion: current ? version(current) : null });
+}
+async function removeItem(actor: AuthTokenPayload, companyId: string, assessmentId: string, competencyId: string) {
+  const current = (await repo.items(assessmentId)).find(i => i.competencyId === competencyId);
+  return service.removeItem(actor, companyId, assessmentId, competencyId, current ? version(current) : undefined);
+}
 const draft = await service.startOrResumeAssessment(admin, 'a', 'employee');
 for (const actor of [auth('employee', 'EMPLOYEE', 'a'), auth('owner', 'OWNER', 'a')]) {
   const attempts = [
     () => service.listCatalog(actor, 'a'), () => service.createCompanyCompetency(actor, 'a', { name: 'Private', description: 'Description' }),
     () => service.updateCompanyCompetency(actor, 'a', 'system', { name: 'Changed' }), () => service.deactivateCompanyCompetency(actor, 'a', 'system'),
-    () => service.startOrResumeAssessment(actor, 'a', 'employee'), () => service.saveItem(actor, 'a', draft.id, 'system', rated),
-    () => service.removeItem(actor, 'a', draft.id, 'system'), () => service.completeAssessment(actor, 'a', draft.id),
+    () => service.startOrResumeAssessment(actor, 'a', 'employee'), () => saveItem(actor, 'a', draft.id, 'system', rated),
+    () => removeItem(actor, 'a', draft.id, 'system'), () => service.completeAssessment(actor, 'a', draft.id),
     () => service.getAdminAssessment(actor, 'a', draft.id), () => service.getHistory(actor, 'a', 'employee'),
     () => service.listCompanyAssessments(actor, 'a'),
   ];
@@ -114,7 +147,7 @@ await assert.rejects(service.createCompanyCompetency(admin, 'a', { name: ' ', de
 await assert.rejects(service.updateCompanyCompetency(admin, 'a', 'system', { name: 'Changed' }), /COMPETENCIES_SYSTEM_IMMUTABLE/);
 await assert.rejects(service.deactivateCompanyCompetency(admin, 'a', 'system'), /COMPETENCIES_SYSTEM_IMMUTABLE/);
 await assert.rejects(service.updateCompanyCompetency(admin, 'a', foreign.id, { name: 'Changed' }), /FORBIDDEN/);
-await assert.rejects(service.saveItem(admin, 'a', draft.id, foreign.id, rated), /FORBIDDEN/);
+await assert.rejects(saveItem(admin, 'a', draft.id, foreign.id, rated), /FORBIDDEN/);
 await assert.rejects(service.completeAssessment(admin, 'a', draft.id), /COMPETENCIES_ITEMS_REQUIRED/);
 assert.equal((await service.getAdminAssessment(admin, 'a', draft.id)).assessment.status, 'IN_PROGRESS');
 
@@ -123,18 +156,18 @@ for (const input of [
   { evidenceStatus: 'RATED', level: 1.5 }, { evidenceStatus: 'RATED', level: '3' }, { evidenceStatus: 'NOT_OBSERVED', level: 0 },
   { evidenceStatus: 'NOT_OBSERVED', level: 3 }, { evidenceStatus: 'UNKNOWN', level: null }, { evidenceStatus: 'NOT_OBSERVED' },
   { ...rated, observation: 42 },
-]) await assert.rejects(service.saveItem(admin, 'a', draft.id, own.id, input as never), /COMPETENCIES_INVALID_ITEM/);
-for (const level of [1, 2, 3, 4, 5]) assert.equal((await service.saveItem(admin, 'a', draft.id, own.id, { ...rated, level })).level, level);
+]) await assert.rejects(saveItem(admin, 'a', draft.id, own.id, input as never), /COMPETENCIES_INVALID_ITEM/);
+for (const level of [1, 2, 3, 4, 5]) assert.equal((await saveItem(admin, 'a', draft.id, own.id, { ...rated, level })).level, level);
 await service.updateCompanyCompetency(admin, 'a', own.id, { name: 'Renamed', description: 'Changed description', category: null });
 await service.deactivateCompanyCompetency(admin, 'a', own.id);
-const item = await service.saveItem(admin2, 'a', draft.id, own.id, notObserved);
+const item = await saveItem(admin2, 'a', draft.id, own.id, notObserved);
 assert.equal(item.competencyNameSnapshot, 'Original'); assert.equal(item.competencyDescriptionSnapshot, 'Original description');
 assert.equal(item.competencyCategorySnapshot, 'Technical'); assert.equal(item.level, null); assert.equal(item.evidenceStatus, 'NOT_OBSERVED');
 assert(!(await service.listCatalog(admin, 'a')).some(c => c.id === own.id));
 assert((await service.listCatalog(admin, 'a', { status: 'INACTIVE' })).some(c => c.id === own.id));
-await service.removeItem(admin, 'a', draft.id, own.id);
-await assert.rejects(service.saveItem(admin, 'a', draft.id, own.id, rated), /COMPETENCIES_INACTIVE/);
-await service.saveItem(admin, 'a', draft.id, 'system', notObserved);
+await removeItem(admin, 'a', draft.id, own.id);
+await assert.rejects(saveItem(admin, 'a', draft.id, own.id, rated), /COMPETENCIES_INACTIVE/);
+await saveItem(admin, 'a', draft.id, 'system', notObserved);
 const resumed = await service.startOrResumeAssessment(admin2, 'a', 'employee');
 assert.equal(resumed.id, draft.id); assert.equal(resumed.startedByUserId, 'admin'); assert.equal(resumed.startedByNameSnapshot, 'Admin One');
 repo.users.get('employee')!.name = 'Renamed Subject'; repo.users.get('admin')!.name = 'Renamed Admin';
@@ -147,15 +180,15 @@ const result = await service.getAdminAssessment(admin, 'a', draft.id);
 assert.equal(result.insufficientEvidence, true); assert.equal(result.assessment.completedByUserId, 'admin2');
 assert.equal(result.assessment.completedByNameSnapshot, 'Admin Two'); assert.equal(result.assessment.subjectNameSnapshot, 'Subject');
 assert.equal(result.items[0].level, null); assert(!('score' in result)); assert(!('gap' in result)); assert(!('average' in result));
-await assert.rejects(service.saveItem(admin, 'a', draft.id, 'system', rated), /COMPETENCIES_ASSESSMENT_COMPLETED/);
-await assert.rejects(service.removeItem(admin, 'a', draft.id, 'system'), /COMPETENCIES_ASSESSMENT_COMPLETED/);
+await assert.rejects(saveItem(admin, 'a', draft.id, 'system', rated), /COMPETENCIES_ASSESSMENT_COMPLETED/);
+await assert.rejects(removeItem(admin, 'a', draft.id, 'system'), /COMPETENCIES_ASSESSMENT_COMPLETED/);
 await assert.rejects(service.completeAssessment(admin, 'a', draft.id), /COMPETENCIES_ASSESSMENT_COMPLETED/);
 const [next, concurrent] = await Promise.all([service.startOrResumeAssessment(admin, 'a', 'employee'), service.startOrResumeAssessment(admin2, 'a', 'employee')]);
 assert.equal(next.id, concurrent.id); assert.notEqual(next.id, draft.id);
-await service.saveItem(admin, 'a', next.id, 'system', rated);
+await saveItem(admin, 'a', next.id, 'system', rated);
 assert.equal((await service.getAdminAssessment(admin, 'a', next.id)).insufficientEvidence, false);
 // Concurrent actions must either precede completion or reject after it, never mutate history.
-await Promise.all([service.completeAssessment(admin, 'a', next.id), assert.rejects(service.removeItem(admin2, 'a', next.id, 'system'), /COMPETENCIES_ASSESSMENT_COMPLETED/)]);
+await Promise.all([service.completeAssessment(admin, 'a', next.id), assert.rejects(removeItem(admin2, 'a', next.id, 'system'), /COMPETENCIES_ASSESSMENT_COMPLETED/)]);
 assert.equal((await service.getAdminAssessment(admin, 'a', next.id)).items[0].level, 4);
 repo.users.get('employee')!.companyId = 'b';
 assert.equal((await service.getHistory(admin, 'a', 'employee')).length, 2);
@@ -163,7 +196,7 @@ assert.equal((await service.getAdminAssessment(admin, 'a', draft.id)).assessment
 await assert.rejects(service.startOrResumeAssessment(admin, 'a', 'employee'), /FORBIDDEN/);
 const movedDraft = await service.startOrResumeAssessment(admin, 'b', 'employee');
 repo.users.get('employee')!.companyId = 'a';
-for (const action of [() => service.saveItem(admin, 'b', movedDraft.id, 'system', rated), () => service.removeItem(admin, 'b', movedDraft.id, 'system'), () => service.completeAssessment(admin, 'b', movedDraft.id)]) await assert.rejects(action, /FORBIDDEN/);
+for (const action of [() => saveItem(admin, 'b', movedDraft.id, 'system', rated), () => removeItem(admin, 'b', movedDraft.id, 'system'), () => service.completeAssessment(admin, 'b', movedDraft.id)]) await assert.rejects(action, /FORBIDDEN/);
 assert.equal((await service.listCompanyAssessments(admin, 'a', { status: 'COMPLETED' })).length, 2);
 await assert.rejects(service.getHistory(admin, 'a', ''), /COMPETENCIES_INVALID_USER/);
 await assert.rejects(service.listCompanyAssessments(admin, 'a', { userId: '' }), /COMPETENCIES_INVALID_USER/);

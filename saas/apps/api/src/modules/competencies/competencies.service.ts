@@ -74,7 +74,9 @@ export class CompetenciesService {
       // A catalog row lock orders first snapshot capture against edit/deactivation.
       const competency = await this.availableCompetency(companyId, competencyId, true);
       if (!existing && competency.status !== 'ACTIVE') throw new Error('COMPETENCIES_INACTIVE');
-      const now = new Date().toISOString();
+      this.checkItemVersion(existing, input.expectedVersion, true);
+      // Strictly advance the version even for same-millisecond saves / clock rollback.
+      const now = new Date(Math.max(Date.now(), existing ? Date.parse(existing.updatedAt) + 1 : 0)).toISOString();
       const item: CompetencyItem = { ...(existing ?? {
         id: randomUUID(), assessmentId, competencyId, competencyNameSnapshot: competency.name,
         competencyDescriptionSnapshot: competency.description, competencyCategorySnapshot: competency.category,
@@ -85,11 +87,13 @@ export class CompetenciesService {
     });
   }
 
-  async removeItem(actor: AuthTokenPayload, companyId: string, assessmentId: string, competencyId: string): Promise<{ assessmentId: string; competencyId: string }> {
+  async removeItem(actor: AuthTokenPayload, companyId: string, assessmentId: string, competencyId: string, expectedVersion?: string): Promise<{ assessmentId: string; competencyId: string }> {
     return this.repository.transaction(async () => {
       await this.adminCompany(actor, companyId);
       await this.draft(companyId, assessmentId);
       await this.availableCompetency(companyId, competencyId);
+      const existing = (await this.repository.items(assessmentId)).find(i => i.competencyId === competencyId);
+      this.checkItemVersion(existing, expectedVersion, false);
       await this.repository.removeItem(assessmentId, competencyId);
       return { assessmentId, competencyId };
     });
@@ -206,7 +210,14 @@ export class CompetenciesService {
     return fields;
   }
 
-  private itemInput(input: SaveCompetencyItemInput): Required<SaveCompetencyItemInput> {
+  private checkItemVersion(item: CompetencyItem | undefined, expected: unknown, allowCreate: boolean): void {
+    if (expected === undefined || (!allowCreate && expected === null)) throw new Error('COMPETENCIES_PRECONDITION_REQUIRED');
+    if (expected !== null && (typeof expected !== 'string' || !expected)) throw new Error('COMPETENCIES_INVALID_ITEM');
+    const current = item ? `${item.id}:${item.updatedAt}` : null;
+    if (expected !== current || (!allowCreate && !item)) throw new Error('COMPETENCIES_ITEM_CONFLICT');
+  }
+
+  private itemInput(input: SaveCompetencyItemInput): Required<Omit<SaveCompetencyItemInput, 'expectedVersion'>> {
     if (!input || typeof input !== 'object'
       || !((input.evidenceStatus === 'NOT_OBSERVED' && input.level === null)
         || (input.evidenceStatus === 'RATED' && typeof input.level === 'number' && Number.isInteger(input.level) && input.level >= 1 && input.level <= 5))

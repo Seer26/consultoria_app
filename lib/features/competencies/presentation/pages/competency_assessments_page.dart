@@ -298,6 +298,24 @@ class _PersonHistoryContentState extends ConsumerState<_PersonHistoryContent> {
     _load();
   }
 
+  Future<void> _open(CompetencyAssessment item) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => item.isCompleted
+            ? CompetencyAssessmentResultPage(
+                companyId: widget.companyId,
+                assessmentId: item.id,
+              )
+            : CompetencyAssessmentEditorPage(
+                companyId: widget.companyId,
+                assessmentId: item.id,
+              ),
+      ),
+    );
+    if (mounted) setState(_load);
+  }
+
   @override
   Widget build(BuildContext context) => AppPageScaffold(
     title: 'Histórico da pessoa',
@@ -313,20 +331,7 @@ class _PersonHistoryContentState extends ConsumerState<_PersonHistoryContent> {
             _assessmentCard(
               context,
               item.assessment,
-              () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => item.assessment.isCompleted
-                      ? CompetencyAssessmentResultPage(
-                          companyId: widget.companyId,
-                          assessmentId: item.assessment.id,
-                        )
-                      : CompetencyAssessmentEditorPage(
-                          companyId: widget.companyId,
-                          assessmentId: item.assessment.id,
-                        ),
-                ),
-              ),
+              () => _open(item.assessment),
             ),
         ],
       ),

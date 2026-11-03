@@ -5,6 +5,7 @@ import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/widgets/app_page_scaffold.dart';
 import '../../../../widgets/role_guard.dart';
 import '../../domain/entities/competency.dart';
+import '../../data/services/competencies_admin_service.dart';
 import '../../domain/entities/competency_assessment.dart';
 import '../providers/competencies_admin_providers.dart';
 import '../widgets/competencies_async_view.dart';
@@ -33,9 +34,13 @@ class _DraftItem {
   _DraftItem(this.snapshot)
     : level = snapshot.level,
       observation = TextEditingController(text: snapshot.observation);
-  final CompetencyItem snapshot;
+  CompetencyItem snapshot;
   int? level;
   final TextEditingController observation;
+  String? get observationValue =>
+      observation.text.trim().isEmpty ? null : observation.text.trim();
+  bool get dirty =>
+      level != snapshot.level || observationValue != snapshot.observation;
 }
 
 typedef _EditorData = ({
@@ -59,6 +64,8 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
   final _items = <String, _DraftItem>{};
   bool _busy = false;
   bool _completed = false;
+  bool _conflict = false;
+  bool get _locked => _busy || _conflict;
   String? _message;
   @override
   void initState() {
@@ -106,7 +113,14 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
       await action();
       if (mounted) setState(() => _message = success);
     } catch (error) {
-      if (mounted) setState(() => _message = userFriendlyError(error));
+      if (mounted) {
+        setState(() {
+          _message = error is CompetencyConflictException
+              ? error.toString()
+              : userFriendlyError(error);
+          _conflict = error is CompetencyConflictException;
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -128,24 +142,29 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
   Future<void> _remove(String id) => _run(() async {
     await ref
         .read(competenciesAdminServiceProvider)
-        .removeItem(widget.companyId, widget.assessmentId, id);
+        .removeItem(
+          widget.companyId,
+          widget.assessmentId,
+          id,
+          expectedVersion: _items[id]!.snapshot.version,
+        );
     if (mounted) setState(() => _items.remove(id)?.observation.dispose());
   });
   Future<void> _save({bool complete = false}) => _run(() async {
     final service = ref.read(competenciesAdminServiceProvider);
     for (final entry in _items.entries) {
       final item = entry.value;
-      await service.saveItem(
+      if (!item.dirty) continue;
+      item.snapshot = await service.saveItem(
         widget.companyId,
         widget.assessmentId,
         entry.key,
+        expectedVersion: item.snapshot.version,
         evidenceStatus: item.level == null
             ? EvidenceStatus.notObserved
             : EvidenceStatus.rated,
         level: item.level,
-        observation: item.observation.text.trim().isEmpty
-            ? null
-            : item.observation.text.trim(),
+        observation: item.observationValue,
       );
     }
     if (complete) {
@@ -199,7 +218,7 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
                         CompetencyLevelSelector(
                           competencyId: entry.key,
                           level: entry.value.level,
-                          onChanged: _busy
+                          onChanged: _locked
                               ? null
                               : (level) =>
                                     setState(() => entry.value.level = level),
@@ -208,7 +227,7 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
                         TextField(
                           key: Key('observation-${entry.key}'),
                           controller: entry.value.observation,
-                          enabled: !_busy,
+                          enabled: !_locked,
                           minLines: 2,
                           maxLines: 5,
                           decoration: const InputDecoration(
@@ -218,7 +237,7 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
                         ),
                         TextButton.icon(
                           key: Key('remove-${entry.key}'),
-                          onPressed: _busy ? null : () => _remove(entry.key),
+                          onPressed: _locked ? null : () => _remove(entry.key),
                           icon: const Icon(Icons.remove_circle_outline),
                           label: const Text('Remover item'),
                         ),
@@ -246,7 +265,7 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
                         Text(competency.description),
                         TextButton.icon(
                           key: Key('add-${competency.id}'),
-                          onPressed: _busy ? null : () => _add(competency),
+                          onPressed: _locked ? null : () => _add(competency),
                           icon: const Icon(Icons.add),
                           label: const Text('Adicionar'),
                         ),
@@ -260,6 +279,19 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Semantics(liveRegion: true, child: Text(_message!)),
                 ),
+              if (_conflict)
+                OutlinedButton.icon(
+                  key: const Key('assessment-reload'),
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() {
+                          _conflict = false;
+                          _message = null;
+                          _load();
+                        }),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Recarregar avaliação'),
+                ),
               if (_busy) const LinearProgressIndicator(),
               Wrap(
                 spacing: 12,
@@ -267,12 +299,12 @@ class _EditorContentState extends ConsumerState<_EditorContent> {
                 children: [
                   OutlinedButton(
                     key: const Key('assessment-save'),
-                    onPressed: _busy ? null : _save,
+                    onPressed: _locked ? null : _save,
                     child: const Text('Salvar rascunho'),
                   ),
                   FilledButton(
                     key: const Key('assessment-complete'),
-                    onPressed: _busy || _items.isEmpty
+                    onPressed: _locked || _items.isEmpty
                         ? null
                         : () => _save(complete: true),
                     child: const Text('Finalizar avaliação'),

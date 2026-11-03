@@ -3,6 +3,13 @@ import '../../../../core/errors/api_error_presenter.dart';
 import '../../domain/entities/competency.dart';
 import '../../domain/entities/competency_assessment.dart';
 
+class CompetencyConflictException implements Exception {
+  const CompetencyConflictException();
+  @override
+  String toString() =>
+      'Outro administrador alterou este item. Recarregue a avaliação para continuar. Alterações locais não salvas serão descartadas.';
+}
+
 class CompetenciesAdminService {
   CompetenciesAdminService(this._dio);
   final Dio _dio;
@@ -119,6 +126,7 @@ class CompetenciesAdminService {
     required EvidenceStatus evidenceStatus,
     required int? level,
     String? observation,
+    String? expectedVersion,
   }) async {
     if (evidenceStatus == EvidenceStatus.notObserved
         ? level != null
@@ -129,6 +137,7 @@ class CompetenciesAdminService {
       final response = await _dio.put<Map<String, dynamic>>(
         '${_assessment(companyId, assessmentId)}/items/${Uri.encodeComponent(competencyId)}',
         data: {
+          'expectedVersion': expectedVersion,
           'evidenceStatus': evidenceStatus.apiValue,
           'level': level,
           'observation': observation,
@@ -141,10 +150,12 @@ class CompetenciesAdminService {
   Future<void> removeItem(
     String companyId,
     String assessmentId,
-    String competencyId,
-  ) => _request(() async {
+    String competencyId, {
+    required String expectedVersion,
+  }) => _request(() async {
     await _dio.delete(
       '${_assessment(companyId, assessmentId)}/items/${Uri.encodeComponent(competencyId)}',
+      queryParameters: {'expectedVersion': expectedVersion},
     );
   });
   Future<void> complete(String companyId, String assessmentId) =>
@@ -155,6 +166,12 @@ class CompetenciesAdminService {
     try {
       return await operation();
     } on DioException catch (error) {
+      final data = error.response?.data;
+      if (error.response?.statusCode == 409 &&
+          data is Map &&
+          data['error'] == 'COMPETENCIES_ITEM_CONFLICT') {
+        throw const CompetencyConflictException();
+      }
       throw Exception(
         dioErrorMessage(
           error,

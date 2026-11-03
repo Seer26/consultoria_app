@@ -45,12 +45,12 @@ export class CompetenciesController {
   saveItem = async (request: Request, response: Response): Promise<void> => {
     await this.respond(response, () => this.service.saveItem(request.auth!, this.param(request, 'companyId'),
       this.param(request, 'assessmentId'), this.param(request, 'competencyId'),
-      this.body(request, ['evidenceStatus', 'level', 'observation']) as unknown as SaveCompetencyItemInput));
+      this.body(request, ['evidenceStatus', 'level', 'observation', 'expectedVersion']) as unknown as SaveCompetencyItemInput));
   };
 
   removeItem = async (request: Request, response: Response): Promise<void> => {
     await this.respond(response, () => this.service.removeItem(request.auth!, this.param(request, 'companyId'),
-      this.param(request, 'assessmentId'), this.param(request, 'competencyId')));
+      this.param(request, 'assessmentId'), this.param(request, 'competencyId'), this.query(request, 'expectedVersion')));
   };
 
   complete = async (request: Request, response: Response): Promise<void> => {
@@ -94,6 +94,7 @@ export class CompetenciesController {
       }
       const code = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
       const statuses: Record<string, number> = {
+        COMPETENCIES_ITEM_CONFLICT: 409, COMPETENCIES_PRECONDITION_REQUIRED: 428,
         COMPETENCIES_INVALID_INPUT: 400, COMPETENCIES_INVALID_FILTER: 400,
         COMPETENCIES_INVALID_STATUS: 400, COMPETENCIES_INVALID_USER: 400,
         COMPETENCIES_INVALID_ITEM: 400, COMPETENCIES_ITEMS_REQUIRED: 400,

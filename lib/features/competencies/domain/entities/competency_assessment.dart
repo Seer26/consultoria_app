@@ -50,6 +50,7 @@ class CompetencyAssessment {
 class CompetencyItem {
   const CompetencyItem({
     required this.competencyId,
+    required this.version,
     required this.name,
     required this.description,
     required this.evidenceStatus,
@@ -58,10 +59,12 @@ class CompetencyItem {
     this.category,
   });
   final String competencyId, name, description;
+  final String version;
   final String? observation, category;
   final EvidenceStatus evidenceStatus;
   final int? level;
   factory CompetencyItem.fromMap(Map<String, dynamic> map) => CompetencyItem(
+    version: '${map['id'] as String}:${map['updatedAt'] as String}',
     competencyId: map['competencyId'] as String,
     name: map['competencyNameSnapshot'] as String,
     description: map['competencyDescriptionSnapshot'] as String,

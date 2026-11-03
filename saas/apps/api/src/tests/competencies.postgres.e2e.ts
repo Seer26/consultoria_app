@@ -52,6 +52,7 @@ try {
     ['owner-a', 'OWNER', 'a'], ['employee-a', 'EMPLOYEE', 'a'],
     ['owner-b', 'OWNER', 'b'], ['employee-b', 'EMPLOYEE', 'b'],
     ['race-a', 'EMPLOYEE', 'a'], ['catalog-race-a', 'EMPLOYEE', 'a'],
+    ['optimistic-a', 'EMPLOYEE', 'a'],
   ] as const;
   const tokens = new Map<string, string>();
   for (const [id, role, companyId] of actors) {
@@ -80,6 +81,14 @@ try {
     return { status: response.status, body: await response.json() as T };
   }
   async function ok<T = Record<string, unknown>>(route: Route, status = 200, actor = 'admin-a'): Promise<T> {
+    // Existing lifecycle cases explicitly operate on the latest read version. Conflict
+    // cases use request() directly or carry their observed expectedVersion unchanged.
+    if (route[1].includes('/items/') && ((route[0] === 'PUT' && route[2] && !('expectedVersion' in (route[2] as object))) || (route[0] === 'DELETE' && !route[1].includes('?')))) {
+      const path = route[1].split('/items/')[0], competencyId = route[1].split('/items/')[1];
+      const current = (await request<AdminCompetencyAssessmentDto>(['GET', path], actor)).body.items.find(i => i.competencyId === competencyId);
+      const expectedVersion = current ? `${current.id}:${current.updatedAt}` : null;
+      route = route[0] === 'PUT' ? [route[0], route[1], { ...(route[2] as object), expectedVersion }] : [route[0], `${route[1]}?expectedVersion=${encodeURIComponent(expectedVersion!)}`];
+    }
     const reply = await request<T>(route, actor);
     assert.equal(reply.status, status, `${route[0]} ${route[1]}: ${JSON.stringify(reply.body)}`);
     return reply.body;
@@ -115,6 +124,32 @@ try {
   const itemPath = (company: string, id: string, competency: string) => `${assessmentPath(company, id)}/items/${competency}`;
   const rated = { evidenceStatus: 'RATED', level: 4, observation: 'Technical evidence' };
   const unobserved = { evidenceStatus: 'NOT_OBSERVED', level: null, observation: 'Insufficient evidence' };
+  // Use raw requests with the versions actually observed by each ADMIN: no refresh/retry.
+  const optimistic = await ok<CompetencyAssessment>(start('a', 'optimistic-a'), 201);
+  const optimisticPath = itemPath('a', optimistic.id, system);
+  const revision = (item: CompetencyItem) => `${item.id}:${item.updatedAt}`;
+  await denied(['PUT', optimisticPath, rated], [428]);
+  const initial = await ok<CompetencyItem>(['PUT', optimisticPath, { ...rated, expectedVersion: null }]);
+  const newer = await ok<CompetencyItem>(['PUT', optimisticPath, { ...rated, level: 5, expectedVersion: revision(initial) }], 200, 'admin-b');
+  assert.notEqual(revision(newer), revision(initial));
+  for (const expectedVersion of [null, revision(initial)]) {
+    const stale = await request(['PUT', optimisticPath, { ...unobserved, expectedVersion }]);
+    assert.equal(stale.status, 409); assert.deepEqual(stale.body, { error: 'COMPETENCIES_ITEM_CONFLICT' });
+  }
+  await denied(['DELETE', `${optimisticPath}?expectedVersion=${encodeURIComponent(revision(initial))}`], [409]);
+  await denied(['DELETE', optimisticPath], [428]);
+  await ok(['DELETE', `${optimisticPath}?expectedVersion=${encodeURIComponent(revision(newer))}`], 200, 'admin-b');
+  await denied(['DELETE', `${optimisticPath}?expectedVersion=${encodeURIComponent(revision(newer))}`], [409]);
+  await denied(['PUT', optimisticPath, { ...rated, expectedVersion: revision(newer) }], [409]);
+  const additions = await Promise.all([
+    request<CompetencyItem>(['PUT', optimisticPath, { ...rated, level: 2, expectedVersion: null }]),
+    request<CompetencyItem>(['PUT', optimisticPath, { ...rated, level: 5, expectedVersion: null }], 'admin-b'),
+  ]);
+  assert.deepEqual(additions.map(reply => reply.status).sort(), [200, 409]);
+  const winnerItem = additions.find(reply => reply.status === 200)!.body;
+  assert.notEqual(winnerItem.id, newer.id);
+  await denied(['DELETE', `${optimisticPath}?expectedVersion=${encodeURIComponent(revision(newer))}`], [409]);
+  assert.deepEqual((await ok<AdminCompetencyAssessmentDto>(['GET', assessmentPath('a', optimistic.id)])).items, [winnerItem]);
   function routes(company: string, subject: string, id: string, competency: string): Route[] {
     return [
       ['GET', `/companies/${company}/competencies`], create(company, 'Unauthorized private'),
@@ -268,9 +303,9 @@ try {
   assert.equal(starts[0].id, starts[1].id);
   const race = starts[0].id;
   assert.equal((await client.query("SELECT count(*)::int AS n FROM competency_assessments WHERE company_id = 'a' AND subject_user_id = 'race-a' AND status = 'IN_PROGRESS'")).rows[0].n, 1);
-  await ok(['PUT', itemPath('a', race, system), rated]);
+  const raceItem = await ok<CompetencyItem>(['PUT', itemPath('a', race, system), rated]);
   const [saveRace, completeRace] = await Promise.all([
-    request<CompetencyItem>(['PUT', itemPath('a', race, system), { ...rated, level: 5 }]),
+    request<CompetencyItem>(['PUT', itemPath('a', race, system), { ...rated, level: 5, expectedVersion: revision(raceItem) }]),
     request(['POST', `${assessmentPath('a', race)}/complete`], 'admin-b'),
   ]);
   assert.equal(completeRace.status, 200);
@@ -282,9 +317,9 @@ try {
   assert.deepEqual(await ok(['GET', `${assessmentPath('a', race)}/result`]), frozenRace);
   // Removing the only item and completing cannot produce a completed empty assessment.
   const removeDraft = await ok<CompetencyAssessment>(start('a', 'race-a'), 201);
-  await ok(['PUT', itemPath('a', removeDraft.id, system), rated]);
+  const removeItem = await ok<CompetencyItem>(['PUT', itemPath('a', removeDraft.id, system), rated]);
   const [removeRace, finishRemoveRace] = await Promise.all([
-    request(['DELETE', itemPath('a', removeDraft.id, system)]),
+    request(['DELETE', `${itemPath('a', removeDraft.id, system)}?expectedVersion=${encodeURIComponent(revision(removeItem))}`]),
     request(['POST', `${assessmentPath('a', removeDraft.id)}/complete`], 'admin-b'),
   ]);
   const afterRemove = await ok<AdminCompetencyAssessmentDto>(['GET', assessmentPath('a', removeDraft.id)]);
@@ -323,6 +358,7 @@ try {
     crossedIds: true, privateCatalog: true, evidenceValidation: true, allNotObserved: true,
     snapshotsAndHistory: true, completedImmutability: true, concurrentStarts: true,
     concurrentSaveComplete: true, concurrentRemoveComplete: true, concurrentCatalogMutation: true,
+    staleUpdateRemovalAndAba: true, concurrentInsertOnlyOneWinner: true, missingPreconditionDenied: true,
     membershipAndTransfers: true, existingOwnerEmployeeRoutes: true }));
 } finally {
   if (server) {

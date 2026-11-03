@@ -28,6 +28,7 @@ void main() {
       await tapCompetency(tester, 'assessment-save');
       final first = api.requests.lastWhere((r) => r.method == 'PUT');
       expect(first.data, {
+        'expectedVersion': first.data['expectedVersion'],
         'evidenceStatus': 'NOT_OBSERVED',
         'level': null,
         'observation': 'Ainda sem evidência',
@@ -141,6 +142,7 @@ void main() {
       ),
     );
     await tapCompetency(tester, 'add-system-1');
+    await tapCompetency(tester, 'level-system-1-2');
     api.failSave = true;
     await tapCompetency(tester, 'assessment-complete');
     expect(api.completed, isFalse);
@@ -156,6 +158,7 @@ void main() {
     final api = CompetenciesAdminTestApi()..completed = true;
     api.items.add({
       'id': 'i',
+      'updatedAt': '2026-11-03T12:00:00Z',
       'assessmentId': 'assessment-1',
       'competencyId': 'system-1',
       'competencyNameSnapshot': 'Nome histórico',

@@ -70,6 +70,30 @@ class CompetenciesAdminTestApi {
             data = [assessment];
           } else if (path.contains('/items/')) {
             final id = path.split('/').last;
+            final current = items
+                .where((item) => item['competencyId'] == id)
+                .firstOrNull;
+            final expected = request.method == 'DELETE'
+                ? request.queryParameters['expectedVersion']
+                : (request.data as Map)['expectedVersion'];
+            final currentVersion = current == null
+                ? null
+                : '${current['id']}:${current['updatedAt']}';
+            if (expected != currentVersion ||
+                (request.method == 'DELETE' && current == null)) {
+              handler.reject(
+                DioException(
+                  requestOptions: request,
+                  response: Response(
+                    requestOptions: request,
+                    statusCode: 409,
+                    data: {'error': 'COMPETENCIES_ITEM_CONFLICT'},
+                  ),
+                  type: DioExceptionType.badResponse,
+                ),
+              );
+              return;
+            }
             if (request.method == 'DELETE') {
               items.removeWhere((item) => item['competencyId'] == id);
               data = {'assessmentId': 'assessment-1', 'competencyId': id};
@@ -77,7 +101,8 @@ class CompetenciesAdminTestApi {
               items.removeWhere((item) => item['competencyId'] == id);
               final competency = catalog.firstWhere((item) => item['id'] == id);
               final item = <String, Object?>{
-                'id': 'item-$id',
+                'id': current?['id'] ?? 'item-$id-${++revision}',
+                'updatedAt': '${++revision}',
                 'assessmentId': 'assessment-1',
                 'competencyId': id,
                 'competencyNameSnapshot': competency['name'],
@@ -109,6 +134,7 @@ class CompetenciesAdminTestApi {
   }
   final dio = Dio();
   final requests = <RequestOptions>[];
+  int revision = 0;
   bool completed = false;
   bool fail = false;
   bool failSave = false;

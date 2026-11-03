@@ -20,6 +20,8 @@ export type UpdateCompanyCompetencyInput = Partial<CreateCompanyCompetencyInput>
 export interface CompetencyCatalogFilters { status?: CompetencyStatus }
 export interface CompetencyAssessmentFilters { userId?: string; status?: CompetencyAssessmentStatus }
 export interface SaveCompetencyItemInput {
+  /** null means create only; existing items require their observed id:updatedAt. */
+  expectedVersion?: string | null;
   evidenceStatus: EvidenceStatus;
   level: number | null;
   observation?: string | null;
