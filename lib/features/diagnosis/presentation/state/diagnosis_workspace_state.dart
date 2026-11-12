@@ -30,10 +30,7 @@ class PriorityTask {
 }
 
 class WorkspaceAlert {
-  const WorkspaceAlert({
-    required this.title,
-    required this.description,
-  });
+  const WorkspaceAlert({required this.title, required this.description});
 
   final String title;
   final String description;

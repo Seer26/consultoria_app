@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
 class AppLoadingState extends StatelessWidget {
-  const AppLoadingState({
-    super.key,
-    this.message,
-  });
+  const AppLoadingState({super.key, this.message});
 
   final String? message;
 
@@ -26,9 +23,9 @@ class AppLoadingState extends StatelessWidget {
             Text(
               message!,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -73,9 +70,9 @@ class AppEmptyState extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center,
               ),
               if (message != null) ...[
@@ -83,15 +80,12 @@ class AppEmptyState extends StatelessWidget {
                 Text(
                   message!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    color: AppColors.textSecondary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
-              if (action != null) ...[
-                const SizedBox(height: 16),
-                action!,
-              ],
+              if (action != null) ...[const SizedBox(height: 16), action!],
             ],
           ),
         ),

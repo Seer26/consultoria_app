@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/auth/role_guard.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../providers/auth_providers.dart';
 import '../state/auth_state.dart';
@@ -17,8 +17,8 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'admin@teste.com');
-  final _passwordController = TextEditingController(text: '123456');
+  final _emailController = TextEditingController(text: '');
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
@@ -32,7 +32,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     ref.read(authControllerProvider.notifier).clearError();
     final auth = ref.read(authControllerProvider.notifier);
-    await auth.login(_emailController.text.trim(), _passwordController.text.trim());
+    await auth.login(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
     final state = ref.read(authControllerProvider);
 
     if (state.status == AuthStatus.authenticated && mounted) {
@@ -41,7 +44,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         message: 'Sessao iniciada com sucesso.',
         type: AppFeedbackType.success,
       );
-      context.go(RoleGuard.defaultRouteForRole(state.user?.role));
+      context.go('/');
     }
   }
 
@@ -58,34 +61,39 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             colors: [Color(0xFFF5F7FC), Color(0xFFEAF0FF)],
           ),
         ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1120),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 900;
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: isWide
-                          ? Row(
-                              children: [
-                                const Expanded(child: _LoginAside()),
-                                const SizedBox(width: 24),
-                                Expanded(
-                                  child: _LoginForm(
-                                    state: state,
-                                    onSubmit: _submit,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : _LoginForm(state: state, onSubmit: _submit),
-                    ),
-                  );
-                },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1120),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 900;
+                      return Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(isWide ? 24 : 18),
+                          child: isWide
+                              ? Row(
+                                  children: [
+                                    const Expanded(child: _LoginAside()),
+                                    const SizedBox(width: 24),
+                                    Expanded(
+                                      child: _LoginForm(
+                                        state: state,
+                                        onSubmit: _submit,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : _LoginForm(state: state, onSubmit: _submit),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -116,7 +124,7 @@ class _LoginAside extends StatelessWidget {
               Icon(Icons.insights, color: Colors.white, size: 40),
               SizedBox(height: 24),
               Text(
-                'Login com backend real antes de entrar no workspace.',
+                'Acesse o painel da sua empresa com seguranca.',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 28,
@@ -126,7 +134,7 @@ class _LoginAside extends StatelessWidget {
               ),
               SizedBox(height: 12),
               Text(
-                'A sessao local salva token, user, role, companyId e company para liberar o painel correto do usuario.',
+                'Cada usuario entra no workspace correto conforme seu perfil e empresa vinculada.',
                 style: TextStyle(
                   color: Color(0xFFDCE6FF),
                   fontSize: 16,
@@ -139,9 +147,9 @@ class _LoginAside extends StatelessWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _LoginInfoChip(label: 'SharedPreferences'),
-              _LoginInfoChip(label: 'JWT via backend'),
-              _LoginInfoChip(label: 'Role + companyId + company'),
+              _LoginInfoChip(label: 'Token protegido'),
+              _LoginInfoChip(label: 'Sessao segura'),
+              _LoginInfoChip(label: 'Acesso por perfil'),
             ],
           ),
         ],
@@ -170,10 +178,7 @@ class _LoginInfoChip extends StatelessWidget {
 }
 
 class _LoginForm extends StatelessWidget {
-  const _LoginForm({
-    required this.state,
-    required this.onSubmit,
-  });
+  const _LoginForm({required this.state, required this.onSubmit});
 
   final AuthState state;
   final Future<void> Function() onSubmit;
@@ -188,41 +193,50 @@ class _LoginForm extends StatelessWidget {
       children: [
         Text(
           'Entrar na plataforma',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
         Text(
-          'Use seu acesso para entrar no painel conforme o perfil ADMIN, OWNER ou EMPLOYEE.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+          'Use seu e-mail e senha para acessar o painel conforme seu perfil.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 24),
-        Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F9FC),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE4E9F2)),
+        if (AppConstants.showDemoCredentials)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F9FC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE4E9F2)),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Usuarios de demonstracao',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Administrador: use o e-mail configurado para a demonstracao.',
+                ),
+                Text(
+                  'Proprietario: use o e-mail configurado para a demonstracao.',
+                ),
+                Text(
+                  'Colaborador: use o e-mail configurado para a demonstracao.',
+                ),
+                SizedBox(height: 6),
+                Text('A senha não é armazenada nem exibida pelo aplicativo.'),
+              ],
+            ),
           ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Usuarios de teste',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              SizedBox(height: 8),
-              Text('ADMIN: admin@teste.com / 123456'),
-              Text('OWNER: owner@teste.com / 123456'),
-              Text('EMPLOYEE: employee@teste.com / 123456'),
-            ],
-          ),
-        ),
         Form(
           key: parentState._formKey,
           child: Column(
@@ -233,8 +247,9 @@ class _LoginForm extends StatelessWidget {
                   labelText: 'Email',
                   prefixIcon: Icon(Icons.mail_outline),
                 ),
-                validator: (value) =>
-                    (value == null || !value.contains('@')) ? 'Informe um email valido' : null,
+                validator: (value) => (value == null || !value.contains('@'))
+                    ? 'Informe um email valido'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -244,10 +259,22 @@ class _LoginForm extends StatelessWidget {
                   labelText: 'Senha',
                   prefixIcon: Icon(Icons.lock_outline),
                 ),
-                validator: (value) =>
-                    (value == null || value.length < 4) ? 'Senha muito curta' : null,
+                validator: (value) => (value == null || value.length < 4)
+                    ? 'Senha muito curta'
+                    : null,
               ),
               const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  key: const Key('forgot-password-link'),
+                  onPressed: state.isLoading
+                      ? null
+                      : () => context.push('/forgot-password'),
+                  child: const Text('Esqueci minha senha'),
+                ),
+              ),
+              const SizedBox(height: 4),
               if (state.error != null)
                 Container(
                   width: double.infinity,
@@ -277,16 +304,6 @@ class _LoginForm extends StatelessWidget {
                           ),
                         )
                       : const Text('Entrar'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'Endpoint: /auth/login',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textMuted,
-                      ),
                 ),
               ),
             ],

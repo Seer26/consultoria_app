@@ -25,7 +25,8 @@ class ActionPlanController extends StateNotifier<List<ActionItem>> {
       priority: 'Media',
       status: ActionStatus.pending,
       owner: 'Bruno Lima',
-      description: 'Escolher ferramenta e iniciar rotina de acompanhamento comercial.',
+      description:
+          'Escolher ferramenta e iniciar rotina de acompanhamento comercial.',
     ),
     ActionItem(
       id: 'a3',
@@ -35,7 +36,8 @@ class ActionPlanController extends StateNotifier<List<ActionItem>> {
       priority: 'Alta',
       status: ActionStatus.pending,
       owner: 'Paula Costa',
-      description: 'Preparar workshop com diretoria e rituais de acompanhamento.',
+      description:
+          'Preparar workshop com diretoria e rituais de acompanhamento.',
     ),
   ];
 

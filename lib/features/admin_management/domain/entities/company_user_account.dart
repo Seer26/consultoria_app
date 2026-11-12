@@ -1,4 +1,5 @@
 enum CompanyUserRole { owner, employee }
+
 enum CompanyUserStatus { active, inactive }
 
 class CompanyUserAccount {

@@ -69,16 +69,15 @@ class ClientCard extends StatelessWidget {
                     children: [
                       Text(
                         client.name,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${client.segment} • ${client.owner}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -120,7 +119,11 @@ class ClientCard extends StatelessWidget {
                   labelStyle: TextStyle(color: _statusColor),
                 ),
                 Chip(label: Text('Score ${client.score}')),
-                Chip(label: Text('Atualizado ${DateFormatter.formatRelative(client.lastUpdatedAt)}')),
+                Chip(
+                  label: Text(
+                    'Atualizado ${DateFormatter.formatRelative(client.lastUpdatedAt)}',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -166,8 +169,8 @@ class ClientCard extends StatelessWidget {
                   Text(
                     client.nextStep,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   if (client.notes.isNotEmpty) ...[
                     const SizedBox(height: 8),

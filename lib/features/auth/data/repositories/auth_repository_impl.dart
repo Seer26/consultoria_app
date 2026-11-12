@@ -1,4 +1,5 @@
 import '../../../../core/errors/failure.dart';
+import '../../../../core/errors/api_error_presenter.dart';
 import '../../../../core/http/token_storage.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -16,18 +17,44 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> login({required String email, required String password}) async {
     try {
-      final dto = await remoteDataSource.login(email: email, password: password);
+      final dto = await remoteDataSource.login(
+        email: email,
+        password: password,
+      );
       await tokenStorage.saveToken(dto.accessToken);
       await tokenStorage.saveSessionUser(dto.user);
       return dto.user;
+    } on AuthFailure {
+      rethrow;
     } catch (e) {
-      throw AuthFailure('Falha ao autenticar: $e');
+      throw AuthFailure(
+        userFriendlyError(
+          e,
+          fallback: 'Nao foi possivel iniciar sessao. Tente novamente.',
+        ),
+      );
     }
   }
 
   @override
   Future<void> logout() async {
     await tokenStorage.clear();
+  }
+
+  @override
+  Future<void> requestPasswordReset({required String email}) {
+    return remoteDataSource.requestPasswordReset(email: email);
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) {
+    return remoteDataSource.resetPassword(
+      token: token,
+      newPassword: newPassword,
+    );
   }
 
   @override

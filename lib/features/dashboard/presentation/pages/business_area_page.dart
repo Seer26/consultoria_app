@@ -9,10 +9,7 @@ import '../../../diagnosis/domain/entities/business_area.dart';
 import '../../../diagnosis/presentation/providers/diagnosis_workspace_providers.dart';
 
 class BusinessAreaPage extends ConsumerWidget {
-  const BusinessAreaPage({
-    super.key,
-    required this.area,
-  });
+  const BusinessAreaPage({super.key, required this.area});
 
   final BusinessArea area;
 
@@ -61,9 +58,7 @@ class BusinessAreaPage extends ConsumerWidget {
                       children: [
                         Text(
                           'Score atual ${score?.percentage ?? 0}%',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
+                          style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 4),
@@ -101,7 +96,9 @@ class BusinessAreaPage extends ConsumerWidget {
             subtitle:
                 'Placeholder do modulo com espaco para indicadores, planos e acoes da area.',
           ),
-          ...questions.take(5).map(
+          ...questions
+              .take(5)
+              .map(
                 (question) => Card(
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(16),

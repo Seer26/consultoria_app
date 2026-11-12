@@ -7,11 +7,8 @@ import '../../domain/usecases/get_forms.dart';
 import '../../domain/usecases/submit_form_response.dart';
 
 class FormsController extends StateNotifier<AsyncValue<List<FormTemplate>>> {
-  FormsController(
-    this._getForms,
-    this._createForm,
-    this._submitFormResponse,
-  ) : super(const AsyncValue.loading()) {
+  FormsController(this._getForms, this._createForm, this._submitFormResponse)
+    : super(const AsyncValue.loading()) {
     load();
   }
 

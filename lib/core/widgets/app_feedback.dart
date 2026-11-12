@@ -11,7 +11,10 @@ class AppFeedback {
     AppFeedbackType type = AppFeedbackType.info,
   }) {
     final (background, icon) = switch (type) {
-      AppFeedbackType.success => (AppColors.success, Icons.check_circle_outline),
+      AppFeedbackType.success => (
+        AppColors.success,
+        Icons.check_circle_outline,
+      ),
       AppFeedbackType.error => (AppColors.danger, Icons.error_outline),
       AppFeedbackType.info => (AppColors.primary, Icons.info_outline),
     };

@@ -3,16 +3,36 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/behavioral/presentation/pages/behavioral_questionnaire_page.dart';
+import '../../features/behavioral/presentation/pages/behavioral_assessments_page.dart';
+import '../../features/behavioral/presentation/pages/behavioral_result_page.dart';
+import '../../features/competencies/presentation/pages/competency_assessments_page.dart';
+import '../../features/competencies/presentation/pages/competency_catalog_page.dart';
+import '../../features/competencies/presentation/pages/competency_assessment_editor_page.dart';
+import '../../features/competencies/presentation/pages/competency_assessment_result_page.dart';
 import '../../features/auth/presentation/pages/auth_splash_page.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/pages/reset_password_page.dart';
+import '../../features/auth/presentation/pages/change_password_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/state/auth_state.dart';
 import '../../features/dashboard/presentation/pages/admin_dashboard_page.dart';
 import '../../features/dashboard/presentation/pages/owner_dashboard_page.dart';
 import '../../features/dashboard/presentation/pages/employee_home_page.dart';
-import '../../features/dashboard/presentation/pages/module_page.dart';
+import '../../features/billing/presentation/pages/current_plan_page.dart';
+import '../../features/company_settings/presentation/pages/company_settings_page.dart';
+import '../../features/team/presentation/pages/team_page.dart';
+import '../../features/action_plan/presentation/pages/action_plan_page.dart';
+import '../../features/action_plan/domain/entities/action_plan_task.dart';
 import '../../features/admin_management/presentation/pages/companies_management_page.dart';
 import '../../features/diagnosis/presentation/pages/diagnosis_page.dart';
 import '../../features/diagnosis/presentation/pages/chat_diagnosis_page.dart';
+import '../../features/diagnosis/presentation/pages/research_details_page.dart';
+import '../../features/reports/presentation/pages/reports_page.dart';
+import '../../features/legal/presentation/pages/legal_acceptance_page.dart';
+import '../../features/strategy/presentation/strategy_page.dart';
+import '../../features/legal/presentation/providers/legal_acceptance_providers.dart';
+import '../../features/legal/presentation/state/legal_acceptance_state.dart';
 import '../auth/role_guard.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/app_state_widgets.dart';
@@ -20,6 +40,7 @@ import '../../widgets/role_guard.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authControllerProvider);
+  final legalState = ref.watch(legalAcceptanceControllerProvider);
   final currentRole = authState.user?.role;
 
   return GoRouter(
@@ -29,15 +50,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/',
         name: 'splash',
         builder: (context, state) => const AuthSplashPage(),
-        redirect: (context, state) {
-          if (authState.status == AuthStatus.unknown) {
-            return null;
-          }
-          if (authState.status != AuthStatus.authenticated) {
-            return '/login';
-          }
-          return RoleGuard.defaultRouteForRole(currentRole);
-        },
       ),
       GoRoute(
         path: '/login',
@@ -45,16 +57,64 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
-        path: '/pesquisa',
-        redirect: (context, state) => '/research',
+        path: '/forgot-password',
+        name: 'forgotPassword',
+        builder: (context, state) => const ForgotPasswordPage(),
       ),
       GoRoute(
-        path: '/diagnosis',
-        redirect: (context, state) => '/research',
+        path: '/reset-password',
+        name: 'resetPassword',
+        builder: (context, state) {
+          final queryToken = state.uri.queryParameters['token'];
+          final memoryToken = state.extra is String
+              ? state.extra! as String
+              : null;
+          return ResetPasswordPage(
+            token: queryToken ?? memoryToken ?? '',
+            removeTokenFromUrl: queryToken != null && queryToken.isNotEmpty,
+          );
+        },
       ),
+      GoRoute(
+        path: '/legal-acceptance',
+        name: 'legalAcceptance',
+        builder: (context, state) => const LegalAcceptancePage(),
+      ),
+      GoRoute(
+        path: '/change-password',
+        name: 'changePassword',
+        builder: (context, state) => const ChangePasswordPage(),
+      ),
+      GoRoute(
+        path: '/unavailable',
+        name: 'unavailableFeature',
+        builder: (context, state) => const _UnavailableFeaturePage(),
+      ),
+      GoRoute(path: '/clients', redirect: (context, state) => '/unavailable'),
+      GoRoute(
+        path: '/clients/:id',
+        redirect: (context, state) => '/unavailable',
+      ),
+      GoRoute(path: '/forms', redirect: (context, state) => '/unavailable'),
+      GoRoute(path: '/chat', redirect: (context, state) => '/unavailable'),
+      GoRoute(
+        path: '/ai-diagnosis',
+        redirect: (context, state) => '/unavailable',
+      ),
+      GoRoute(
+        path: '/diagnosis/legacy',
+        redirect: (context, state) => '/unavailable',
+      ),
+      GoRoute(
+        path: '/diagnosis-workspace',
+        redirect: (context, state) => '/unavailable',
+      ),
+      GoRoute(path: '/pesquisa', redirect: (context, state) => '/research'),
+      GoRoute(path: '/diagnosis', redirect: (context, state) => '/research'),
       GoRoute(
         path: '/dashboard',
-        redirect: (context, state) => RoleGuard.defaultRouteForRole(currentRole),
+        redirect: (context, state) =>
+            RoleGuard.defaultRouteForRole(currentRole),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -78,10 +138,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   child: const OwnerDashboardPage(),
                 ),
               ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
               GoRoute(
                 path: '/employee',
                 name: 'employee',
@@ -90,6 +146,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   child: const EmployeeHomePage(),
                 ),
               ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
               GoRoute(
                 path: '/research',
                 name: 'research',
@@ -133,6 +193,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       );
                     },
                   ),
+                  GoRoute(
+                    path: ':submissionId',
+                    name: 'researchDetails',
+                    builder: (context, state) => RbacGuard(
+                      allowedRoles: const [
+                        RoleGuard.admin,
+                        RoleGuard.owner,
+                        RoleGuard.employee,
+                      ],
+                      child: ResearchDetailsPage(
+                        submissionId:
+                            state.pathParameters['submissionId'] ?? '',
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -147,6 +222,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   child: const CompaniesManagementPage(),
                 ),
               ),
+              GoRoute(
+                path: '/behavioral/companies/:companyId',
+                name: 'behavioralAssessments',
+                builder: (context, state) => BehavioralAssessmentsPage(
+                  companyId: state.pathParameters['companyId']!,
+                  userId: state.uri.queryParameters['userId'],
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'assessments/:assessmentId',
+                    name: 'behavioralResult',
+                    builder: (context, state) => BehavioralResultPage(
+                      companyId: state.pathParameters['companyId']!,
+                      assessmentId: state.pathParameters['assessmentId']!,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           StatefulShellBranch(
@@ -156,12 +249,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 name: 'reports',
                 builder: (context, state) => RbacGuard(
                   allowedRoles: const [RoleGuard.admin, RoleGuard.owner],
-                  child: const ModulePage(
-                    title: 'Relatorios',
-                    subtitle: 'Visualizacao de resultados, progresso e indicadores consolidados.',
-                    icon: Icons.assessment_outlined,
-                  ),
+                  child: const ReportsPage(),
                 ),
+                routes: [
+                  GoRoute(
+                    path: ':submissionId',
+                    name: 'reportDetails',
+                    builder: (context, state) => RbacGuard(
+                      allowedRoles: const [RoleGuard.admin, RoleGuard.owner],
+                      child: ReportDetailsPage(
+                        submissionId:
+                            state.pathParameters['submissionId'] ?? '',
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -180,14 +282,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/team',
-                name: 'team',
+                path: '/tasks',
+                name: 'tasks',
                 builder: (context, state) => RbacGuard(
-                  allowedRoles: const [RoleGuard.owner],
-                  child: const ModulePage(
-                    title: 'Equipe',
-                    subtitle: 'Gestao dos colaboradores da empresa e acompanhamento do time.',
-                    icon: Icons.groups_2_outlined,
+                  allowedRoles: const [
+                    RoleGuard.admin,
+                    RoleGuard.owner,
+                    RoleGuard.employee,
+                  ],
+                  child: ActionPlanPage(
+                    initialScope: _taskScopeFromQuery(
+                      state.uri.queryParameters['filter'],
+                    ),
                   ),
                 ),
               ),
@@ -196,16 +302,110 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/tasks',
-                name: 'tasks',
+                path: '/plan',
+                name: 'plan',
                 builder: (context, state) => RbacGuard(
-                  allowedRoles: const [RoleGuard.employee],
-                  child: const ModulePage(
-                    title: 'Tarefas',
-                    subtitle: 'Fila operacional do colaborador com execucao e acompanhamento.',
-                    icon: Icons.task_alt_outlined,
-                  ),
+                  allowedRoles: const [RoleGuard.owner],
+                  child: const CurrentPlanPage(),
                 ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/company-settings',
+                name: 'companySettings',
+                builder: (context, state) => RbacGuard(
+                  allowedRoles: const [RoleGuard.owner],
+                  child: const CompanySettingsPage(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/team',
+                name: 'team',
+                builder: (context, state) => RbacGuard(
+                  allowedRoles: const [RoleGuard.owner],
+                  child: const TeamPage(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/strategy',
+                name: 'strategy',
+                builder: (context, state) => RbacGuard(
+                  allowedRoles: const [RoleGuard.owner, RoleGuard.employee],
+                  child: const StrategyPage(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/behavioral',
+                name: 'behavioral',
+                builder: (context, state) => RbacGuard(
+                  allowedRoles: const [RoleGuard.owner, RoleGuard.employee],
+                  child: const BehavioralQuestionnairePage(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/competencies',
+                name: 'competencies',
+                builder: (context, state) => const CompetencyAssessmentsPage(),
+                routes: [
+                  GoRoute(
+                    path: 'companies/:companyId',
+                    name: 'competencyAssessments',
+                    builder: (context, state) => CompetencyAssessmentsPage(
+                      companyId: state.pathParameters['companyId']!,
+                      userId: state.uri.queryParameters['userId'],
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'catalog',
+                        name: 'competencyCatalog',
+                        builder: (context, state) => CompetencyCatalogPage(
+                          companyId: state.pathParameters['companyId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'assessments/:assessmentId',
+                        name: 'competencyEditor',
+                        builder: (context, state) =>
+                            CompetencyAssessmentEditorPage(
+                              companyId: state.pathParameters['companyId']!,
+                              assessmentId:
+                                  state.pathParameters['assessmentId']!,
+                            ),
+                        routes: [
+                          GoRoute(
+                            path: 'result',
+                            name: 'competencyResult',
+                            builder: (context, state) =>
+                                CompetencyAssessmentResultPage(
+                                  companyId: state.pathParameters['companyId']!,
+                                  assessmentId:
+                                      state.pathParameters['assessmentId']!,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
@@ -213,33 +413,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (context, state) {
-      final isLoggedIn = authState.status == AuthStatus.authenticated;
-      final isLoadingSession = authState.status == AuthStatus.unknown;
-      final isLoginRoute = state.matchedLocation == '/login';
-
-      if (isLoadingSession) {
-        return null;
-      }
-
-      if (!isLoggedIn && !isLoginRoute) {
-        return '/login';
-      }
-
-      if (isLoggedIn && isLoginRoute) {
-        return RoleGuard.defaultRouteForRole(currentRole);
-      }
-
-      if (isLoggedIn &&
-          !RoleGuard.canAccessRoute(currentRole, state.matchedLocation)) {
-        return RoleGuard.defaultRouteForRole(currentRole);
-      }
-
-      return null;
+      return resolveAppRedirect(
+        authState: authState,
+        legalState: legalState,
+        location: state.matchedLocation,
+      );
     },
     errorBuilder: (context, state) => Scaffold(
       body: AppErrorState(
-        title: 'Nao foi possivel abrir a rota',
-        message: state.error.toString(),
+        title: 'Nao foi possivel abrir esta tela',
+        message: 'Este recurso ainda nao faz parte da versao atual do produto.',
+        buttonLabel: 'Voltar para o inicio',
         onRetry: () => context.go(
           authState.status == AuthStatus.authenticated
               ? RoleGuard.defaultRouteForRole(currentRole)
@@ -249,3 +433,82 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
+
+String? resolveAppRedirect({
+  required AuthState authState,
+  required LegalAcceptanceState legalState,
+  required String location,
+}) {
+  final isLoggedIn = authState.status == AuthStatus.authenticated;
+  final isLoadingSession = authState.status == AuthStatus.unknown;
+  final isPublicAuthRoute =
+      location == '/login' ||
+      location == '/forgot-password' ||
+      location == '/reset-password';
+
+  if (isLoadingSession) {
+    return location == '/' ? null : '/';
+  }
+
+  if (!isLoggedIn) {
+    return isPublicAuthRoute ? null : '/login';
+  }
+
+  if (legalState.isChecking) {
+    return location == '/' ? null : '/';
+  }
+
+  if (legalState.blocksApp) {
+    return location == '/legal-acceptance' ? null : '/legal-acceptance';
+  }
+
+  final defaultRoute = RoleGuard.defaultRouteForRole(authState.user?.role);
+  if (location == '/' || location == '/legal-acceptance' || isPublicAuthRoute) {
+    return defaultRoute;
+  }
+
+  if (!RoleGuard.canAccessRoute(authState.user?.role, location)) {
+    return defaultRoute;
+  }
+
+  return null;
+}
+
+class _UnavailableFeaturePage extends ConsumerWidget {
+  const _UnavailableFeaturePage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(authControllerProvider).user?.role;
+
+    return Scaffold(
+      body: AppEmptyState(
+        title: 'Recurso fora da versao atual',
+        message: 'Este recurso ainda nao faz parte da versao atual do produto.',
+        icon: Icons.lock_clock_outlined,
+        action: FilledButton.icon(
+          onPressed: () => context.go(RoleGuard.defaultRouteForRole(role)),
+          icon: const Icon(Icons.arrow_back),
+          label: const Text('Voltar para o inicio'),
+        ),
+      ),
+    );
+  }
+}
+
+ActionPlanTaskScope _taskScopeFromQuery(String? value) {
+  switch (value) {
+    case 'mine':
+      return ActionPlanTaskScope.mine;
+    case 'overdue':
+      return ActionPlanTaskScope.overdue;
+    case 'dueSoon':
+      return ActionPlanTaskScope.dueSoon;
+    case 'critical':
+      return ActionPlanTaskScope.critical;
+    case 'completed':
+      return ActionPlanTaskScope.completed;
+    default:
+      return ActionPlanTaskScope.all;
+  }
+}

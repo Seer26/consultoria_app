@@ -8,6 +8,8 @@ class User {
     required this.role,
     this.companyId,
     this.company,
+    this.department,
+    this.jobFunction,
   });
 
   final String id;
@@ -16,6 +18,8 @@ class User {
   final String role;
   final String? companyId;
   final Map<String, dynamic>? company;
+  final String? department;
+  final String? jobFunction;
 
   Map<String, dynamic> toMap() {
     return {
@@ -25,6 +29,8 @@ class User {
       'role': role,
       'companyId': companyId,
       'company': company,
+      'department': department,
+      'jobFunction': jobFunction,
     };
   }
 
@@ -35,11 +41,13 @@ class User {
       email: map['email']?.toString() ?? '',
       role: map['role']?.toString() ?? 'EMPLOYEE',
       companyId: map['companyId']?.toString(),
+      department: map['department']?.toString(),
+      jobFunction: map['jobFunction']?.toString(),
       company: map['company'] is Map<String, dynamic>
           ? map['company'] as Map<String, dynamic>
           : map['company'] is Map
-              ? Map<String, dynamic>.from(map['company'] as Map)
-              : null,
+          ? Map<String, dynamic>.from(map['company'] as Map)
+          : null,
     );
   }
 

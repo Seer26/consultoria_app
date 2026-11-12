@@ -10,4 +10,3 @@ class AdminDashboardPage extends StatelessWidget {
     return const DashboardPage();
   }
 }
-

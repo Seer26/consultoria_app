@@ -1,5 +1,1 @@
-enum ActionStatus {
-  pending,
-  inProgress,
-  done,
-}
+enum ActionStatus { pending, inProgress, done }

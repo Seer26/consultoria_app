@@ -20,9 +20,5 @@ class UserModel {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'token': token,
-        'role': role,
-        'name': name,
-      };
+  Map<String, dynamic> toJson() => {'token': token, 'role': role, 'name': name};
 }

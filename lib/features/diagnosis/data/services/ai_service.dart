@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../../core/errors/api_error_presenter.dart';
+
 class AiDiagnosisResult {
   const AiDiagnosisResult({
     required this.problems,
@@ -59,31 +61,25 @@ class AiDiagnosisResult {
 }
 
 class AIService {
-  AIService({
-    http.Client? client,
-    String? baseUrl,
-  })  : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ?? 'http://127.0.0.1:3000/ai-diagnosis';
+  AIService({http.Client? client, String? baseUrl})
+    : _client = client ?? http.Client(),
+      _baseUrl = baseUrl ?? 'http://127.0.0.1:3000/ai-diagnosis';
 
   final http.Client _client;
   final String _baseUrl;
 
-  Future<AiDiagnosisResult> sendAnswers(List<Map<String, dynamic>> answers) async {
+  Future<AiDiagnosisResult> sendAnswers(
+    List<Map<String, dynamic>> answers,
+  ) async {
     try {
       final response = await _client.post(
         Uri.parse(_baseUrl),
-        headers: const {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'answers': answers,
-        }),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'answers': answers}),
       );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(
-          'Falha ao consultar IA: ${response.statusCode} ${response.body}',
-        );
+        throw Exception('Nao foi possivel consultar a IA neste momento.');
       }
 
       final decoded = jsonDecode(response.body);
@@ -94,7 +90,12 @@ class AIService {
 
       return AiDiagnosisResult.fromJson(decoded);
     } catch (error) {
-      throw Exception('Nao foi possivel consultar a IA: $error');
+      throw Exception(
+        userFriendlyError(
+          error,
+          fallback: 'Nao foi possivel consultar a IA neste momento.',
+        ),
+      );
     }
   }
 }

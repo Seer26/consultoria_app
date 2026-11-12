@@ -4,11 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../diagnosis/presentation/state/diagnosis_workspace_state.dart';
 
 class AreaScoreCard extends StatelessWidget {
-  const AreaScoreCard({
-    super.key,
-    required this.snapshot,
-    required this.onTap,
-  });
+  const AreaScoreCard({super.key, required this.snapshot, required this.onTap});
 
   final AreaScoreSnapshot snapshot;
   final VoidCallback onTap;
@@ -34,18 +30,16 @@ class AreaScoreCard extends StatelessWidget {
               const Spacer(),
               Text(
                 area.title,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               Text(
                 '${snapshot.percentage}%',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w900),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 8),
               ClipRRect(
@@ -61,8 +55,8 @@ class AreaScoreCard extends StatelessWidget {
               Text(
                 '${snapshot.answeredQuestions}/${snapshot.totalQuestions} respondidas | Media ${snapshot.averageScore.toStringAsFixed(1)}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),

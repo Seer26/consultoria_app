@@ -30,19 +30,15 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final role = ref.read(authControllerProvider).user?.role.toUpperCase();
     final service = ref.read(dashboardServiceProvider);
 
-    try {
-      switch (role) {
-        case 'ADMIN':
-          return await service.getAdminDashboard();
-        case 'OWNER':
-          return await service.getOwnerDashboard();
-        case 'EMPLOYEE':
-          return await service.getEmployeeDashboard();
-        default:
-          throw Exception('Role nao suportado para dashboard.');
-      }
-    } catch (_) {
-      return _fallbackDashboard(role);
+    switch (role) {
+      case 'ADMIN':
+        return await service.getAdminDashboard();
+      case 'OWNER':
+        return await service.getOwnerDashboard();
+      case 'EMPLOYEE':
+        return await service.getEmployeeDashboard();
+      default:
+        throw Exception('Role nao suportado para dashboard.');
     }
   }
 
@@ -59,7 +55,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final role = user?.role.toUpperCase();
 
     return AppPageScaffold(
-      title: 'Dashboard',
+      title: 'Visao geral',
       subtitle: _subtitleForRole(role),
       actions: role == 'OWNER' || role == 'EMPLOYEE'
           ? [
@@ -100,7 +96,29 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             );
           }
 
-          final data = snapshot.data ?? _fallbackDashboard(role);
+          final data = snapshot.data;
+          if (data == null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 48,
+                    color: AppColors.textMuted,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('O dashboard não retornou dados.'),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: _reload,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Tentar novamente'),
+                  ),
+                ],
+              ),
+            );
+          }
 
           switch (role) {
             case 'ADMIN':
@@ -128,45 +146,5 @@ String _subtitleForRole(String? role) {
       return 'Painel operacional com tarefas, progresso pessoal e pendencias do diagnostico.';
     default:
       return 'Visao principal do workspace.';
-  }
-}
-
-Map<String, dynamic> _fallbackDashboard(String? role) {
-  switch (role) {
-    case 'ADMIN':
-      return {
-        'totals': {
-          'companies': 0,
-          'diagnoses': 0,
-          'alerts': 0,
-        },
-        'companies': const [],
-        'alerts': const ['Sem conexao com a API. Exibindo fallback simples.'],
-      };
-    case 'EMPLOYEE':
-      return {
-        'tasks': const [],
-        'progress': {
-          'personalProgress': 0,
-          'pendingDiagnosis': 0,
-        },
-        'diagnosis': {
-          'pendingItems': const ['Sem conexao com a API. Exibindo fallback simples.'],
-        },
-      };
-    case 'OWNER':
-    default:
-      return {
-        'company': {
-          'score': 0,
-          'progress': 0,
-        },
-        'problems': const ['Sem conexao com a API. Exibindo fallback simples.'],
-        'actions': const ['Conectar backend para carregar dados reais do dashboard.'],
-        'metrics': {
-          'answeredQuestions': 0,
-          'totalQuestions': 0,
-        },
-      };
   }
 }

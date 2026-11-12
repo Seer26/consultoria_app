@@ -30,17 +30,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     return AppPageScaffold(
       title: 'Chat',
-      subtitle: 'Canal de acompanhamento pronto para futura persistencia, sincronizacao e estados remotos.',
+      subtitle:
+          'Canal de acompanhamento pronto para futura persistencia, sincronizacao e estados remotos.',
       child: Column(
         children: [
           Card(
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 8,
+              ),
               leading: const CircleAvatar(child: Icon(Icons.support_agent)),
               title: const Text('Canal de acompanhamento'),
-              subtitle: const Text('Consultor online • respostas mockadas persistem na sessao atual'),
+              subtitle: const Text(
+                'Consultor online • respostas mockadas persistem na sessao atual',
+              ),
               trailing: TextButton(
-                onPressed: () => ref.read(chatControllerProvider.notifier).clearConversation(),
+                onPressed: () => ref
+                    .read(chatControllerProvider.notifier)
+                    .clearConversation(),
                 child: const Text('Limpar'),
               ),
             ),
@@ -54,7 +62,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     child: messages.isEmpty
                         ? const AppEmptyState(
                             title: 'Sem mensagens ainda',
-                            message: 'Inicie a conversa para registrar alinhamentos, dúvidas e próximos passos.',
+                            message:
+                                'Inicie a conversa para registrar alinhamentos, dúvidas e próximos passos.',
                             icon: Icons.chat_bubble_outline,
                           )
                         : ListView.builder(
@@ -117,7 +126,9 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isConsultant = message.role == 'consultant';
-    final bubbleColor = isConsultant ? AppColors.primary : AppColors.surfaceMuted;
+    final bubbleColor = isConsultant
+        ? AppColors.primary
+        : AppColors.surfaceMuted;
     final textColor = isConsultant ? Colors.white : AppColors.textPrimary;
 
     return Align(

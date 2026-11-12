@@ -1,109 +1,129 @@
-class ReportAreaScore {
-  const ReportAreaScore({
-    required this.name,
-    required this.progress,
+class ReportPillarScore {
+  const ReportPillarScore({
+    required this.pillar,
+    required this.score,
+    this.answersCount,
+    this.maturity,
   });
 
-  final String name;
-  final double progress;
+  final String pillar;
+  final double score;
+  final int? answersCount;
+  final String? maturity;
 }
 
 class ReportTask {
   const ReportTask({
-    required this.title,
-    required this.status,
-    required this.priority,
-  });
-
-  final String title;
-  final String status;
-  final String priority;
-}
-
-class Report {
-  const Report({
     required this.id,
     required this.title,
-    required this.client,
-    required this.sentAt,
-    required this.summary,
-    required this.type,
-    required this.period,
+    required this.description,
+    required this.priority,
     required this.status,
-    required this.highlights,
-    required this.consultant,
-    required this.executiveSummary,
-    required this.overallScore,
-    required this.riskLevel,
-    required this.planProgress,
-    required this.engagement,
-    required this.areas,
-    required this.criticalIssues,
-    required this.recommendations,
-    required this.actionItems,
+    required this.source,
+    this.pillar,
+    this.dueDate,
+    this.responsibleUserName,
+    this.responsibleUserEmail,
   });
 
   final String id;
   final String title;
-  final String client;
-  final DateTime sentAt;
-  final String summary;
-  final String type;
-  final String period;
+  final String description;
+  final String? pillar;
+  final String priority;
   final String status;
-  final List<String> highlights;
-  final String consultant;
-  final String executiveSummary;
-  final int overallScore;
-  final String riskLevel;
-  final double planProgress;
-  final int engagement;
-  final List<ReportAreaScore> areas;
-  final List<String> criticalIssues;
-  final List<String> recommendations;
-  final List<ReportTask> actionItems;
+  final DateTime? dueDate;
+  final String? responsibleUserName;
+  final String? responsibleUserEmail;
+  final String source;
+}
 
-  Report copyWith({
-    String? id,
-    String? title,
-    String? client,
-    DateTime? sentAt,
-    String? summary,
-    String? type,
-    String? period,
-    String? status,
-    List<String>? highlights,
-    String? consultant,
-    String? executiveSummary,
-    int? overallScore,
-    String? riskLevel,
-    double? planProgress,
-    int? engagement,
-    List<ReportAreaScore>? areas,
-    List<String>? criticalIssues,
-    List<String>? recommendations,
-    List<ReportTask>? actionItems,
-  }) {
-    return Report(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      client: client ?? this.client,
-      sentAt: sentAt ?? this.sentAt,
-      summary: summary ?? this.summary,
-      type: type ?? this.type,
-      period: period ?? this.period,
-      status: status ?? this.status,
-      highlights: highlights ?? this.highlights,
-      consultant: consultant ?? this.consultant,
-      executiveSummary: executiveSummary ?? this.executiveSummary,
-      overallScore: overallScore ?? this.overallScore,
-      riskLevel: riskLevel ?? this.riskLevel,
-      planProgress: planProgress ?? this.planProgress,
-      engagement: engagement ?? this.engagement,
-      areas: areas ?? this.areas,
-      criticalIssues: criticalIssues ?? this.criticalIssues,
-      recommendations: recommendations ?? this.recommendations,
-      actionItems: actionItems ?? this.actionItems,
-    );
-  }
+class ReportSummary {
+  const ReportSummary({
+    required this.submissionId,
+    required this.companyId,
+    required this.companyName,
+    required this.actionPlanGenerated,
+    this.respondentName,
+    this.respondentRole,
+    this.department,
+    this.completedAt,
+    this.overallScore,
+    this.maturityLevel,
+    this.maturityLabel,
+  });
+
+  final String submissionId;
+  final String companyId;
+  final String companyName;
+  final String? respondentName;
+  final String? respondentRole;
+  final String? department;
+  final DateTime? completedAt;
+  final double? overallScore;
+  final String? maturityLevel;
+  final String? maturityLabel;
+  final bool actionPlanGenerated;
+}
+
+class ExecutiveReport {
+  const ExecutiveReport({
+    required this.companyId,
+    required this.companyName,
+    required this.companyStatus,
+    required this.submissionId,
+    required this.status,
+    required this.actionPlanGenerated,
+    required this.tasksTotal,
+    required this.tasksTodo,
+    required this.tasksInProgress,
+    required this.tasksDone,
+    required this.tasksCanceled,
+    required this.tasksOverdue,
+    required this.pillarScores,
+    required this.criticalPoints,
+    required this.opportunities,
+    required this.recommendations,
+    required this.nextSteps,
+    required this.tasks,
+    this.respondentName,
+    this.respondentEmail,
+    this.respondentRole,
+    this.department,
+    this.createdAt,
+    this.completedAt,
+    this.overallScore,
+    this.maturityLevel,
+    this.maturityLabel,
+    this.summary,
+  });
+
+  final String companyId;
+  final String companyName;
+  final String companyStatus;
+  final String submissionId;
+  final String? respondentName;
+  final String? respondentEmail;
+  final String? respondentRole;
+  final String? department;
+  final String status;
+  final DateTime? createdAt;
+  final DateTime? completedAt;
+  final double? overallScore;
+  final String? maturityLevel;
+  final String? maturityLabel;
+  final String? summary;
+  final List<ReportPillarScore> pillarScores;
+  final List<String> criticalPoints;
+  final List<String> opportunities;
+  final List<String> recommendations;
+  final List<String> nextSteps;
+  final bool actionPlanGenerated;
+  final int tasksTotal;
+  final int tasksTodo;
+  final int tasksInProgress;
+  final int tasksDone;
+  final int tasksCanceled;
+  final int tasksOverdue;
+  final List<ReportTask> tasks;
 }

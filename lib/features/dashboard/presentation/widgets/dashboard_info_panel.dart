@@ -18,6 +18,10 @@ class DashboardInfoPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleItems = items.isEmpty
+        ? const ['Nenhum dado disponivel no momento.']
+        : items;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -25,7 +29,7 @@ class DashboardInfoPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SectionHeader(title: title, subtitle: subtitle),
-            ...items.map(
+            ...visibleItems.map(
               (item) => Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 12),
@@ -51,8 +55,8 @@ class DashboardInfoPanel extends StatelessWidget {
                       child: Text(
                         item,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],

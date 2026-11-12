@@ -4,9 +4,10 @@ import '../../domain/entities/business_area.dart';
 import '../mock/diagnosis_workspace_catalog.dart';
 import '../state/diagnosis_workspace_state.dart';
 
-class DiagnosisWorkspaceController extends StateNotifier<DiagnosisWorkspaceState> {
+class DiagnosisWorkspaceController
+    extends StateNotifier<DiagnosisWorkspaceState> {
   DiagnosisWorkspaceController()
-      : super(_buildDerivedState(buildInitialDiagnosisWorkspaceState()));
+    : super(_buildDerivedState(buildInitialDiagnosisWorkspaceState()));
 
   void updateCompanyName(String value) {
     state = _buildDerivedState(state.copyWith(companyName: value));
@@ -21,8 +22,9 @@ class DiagnosisWorkspaceController extends StateNotifier<DiagnosisWorkspaceState
     DiagnosisWorkspaceState input,
   ) {
     final areaScores = BusinessArea.values.map((area) {
-      final areaQuestions =
-          input.questions.where((question) => question.area == area).toList();
+      final areaQuestions = input.questions
+          .where((question) => question.area == area)
+          .toList();
       final answers = areaQuestions
           .map((question) => input.answers[question.id])
           .whereType<int>()
@@ -49,9 +51,9 @@ class DiagnosisWorkspaceController extends StateNotifier<DiagnosisWorkspaceState
     final overallScore = input.questions.isEmpty
         ? 0
         : ((input.answers.values.fold<int>(0, (sum, item) => sum + item) /
-                    (input.questions.length * 5)) *
-                100)
-            .round();
+                      (input.questions.length * 5)) *
+                  100)
+              .round();
     final completion = input.questions.isEmpty
         ? 0
         : ((input.answers.length / input.questions.length) * 100).round();

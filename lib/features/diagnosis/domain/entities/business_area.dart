@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 enum BusinessArea {
   strategy(
     title: 'Estrategia',
-    description: 'Direcionamento do negocio, metas, indicadores e posicionamento.',
+    description:
+        'Direcionamento do negocio, metas, indicadores e posicionamento.',
     icon: Icons.track_changes_outlined,
     score: 0,
   ),
@@ -27,7 +28,8 @@ enum BusinessArea {
   ),
   financial(
     title: 'Financeiro',
-    description: 'Caixa, margem, controle, planejamento e disciplina financeira.',
+    description:
+        'Caixa, margem, controle, planejamento e disciplina financeira.',
     icon: Icons.account_balance_wallet_outlined,
     score: 0,
   );

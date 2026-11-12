@@ -10,4 +10,3 @@ class OwnerDashboardPage extends StatelessWidget {
     return const DashboardPage();
   }
 }
-

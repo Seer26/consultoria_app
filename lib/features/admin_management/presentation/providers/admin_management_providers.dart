@@ -9,6 +9,10 @@ final adminManagementServiceProvider = Provider<AdminManagementService>((ref) {
 });
 
 final adminManagementControllerProvider =
-    StateNotifierProvider<AdminManagementController, AdminManagementState>((ref) {
-  return AdminManagementController(ref.watch(adminManagementServiceProvider));
-});
+    StateNotifierProvider<AdminManagementController, AdminManagementState>((
+      ref,
+    ) {
+      return AdminManagementController(
+        ref.watch(adminManagementServiceProvider),
+      );
+    });

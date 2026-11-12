@@ -43,7 +43,8 @@ class ClientsRemoteDataSource {
         lastUpdatedAt: DateTime.now().subtract(const Duration(hours: 8)),
         owner: 'Paula Costa',
         contactEmail: 'board@clarafinancas.com',
-        notes: 'Conta madura, com foco atual em governanca e rotinas de diretoria.',
+        notes:
+            'Conta madura, com foco atual em governanca e rotinas de diretoria.',
       ),
       ClientDto(
         id: 'c-04',

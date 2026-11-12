@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/errors/api_error_presenter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -56,17 +58,18 @@ class ClientsPage extends ConsumerWidget {
                         child: TextField(
                           decoration: const InputDecoration(
                             prefixIcon: Icon(Icons.search),
-                            hintText: 'Buscar por nome, segmento ou responsavel',
+                            hintText:
+                                'Buscar por nome, segmento ou responsavel',
                           ),
                           onChanged: (value) =>
-                              ref.read(_searchFilterProvider.notifier).state = value,
+                              ref.read(_searchFilterProvider.notifier).state =
+                                  value,
                         ),
                       ),
                       const SizedBox(width: 12),
                       IconButton(
-                        onPressed: () => ref
-                            .read(clientsControllerProvider.notifier)
-                            .load(),
+                        onPressed: () =>
+                            ref.read(clientsControllerProvider.notifier).load(),
                         icon: const Icon(Icons.refresh),
                       ),
                     ],
@@ -117,7 +120,8 @@ class ClientsPage extends ConsumerWidget {
                   final matchesStatus =
                       statusFilter == null || company.status == statusFilter;
                   final query = search.trim().toLowerCase();
-                  final matchesSearch = query.isEmpty ||
+                  final matchesSearch =
+                      query.isEmpty ||
                       company.name.toLowerCase().contains(query) ||
                       company.segment.toLowerCase().contains(query) ||
                       company.owner.toLowerCase().contains(query);
@@ -156,7 +160,8 @@ class ClientsPage extends ConsumerWidget {
                               width: itemWidth,
                               child: ClientCard(
                                 client: company,
-                                onOpen: () => context.go('/clients/${company.id}'),
+                                onOpen: () =>
+                                    context.go('/clients/${company.id}'),
                                 onEdit: () => _openCompanyEditor(
                                   context,
                                   ref,
@@ -195,7 +200,7 @@ class ClientsPage extends ConsumerWidget {
                   const AppLoadingState(message: 'Carregando empresas'),
               error: (error, _) => AppErrorState(
                 title: 'Falha ao carregar empresas',
-                message: error.toString(),
+                message: userFriendlyError(error),
                 onRetry: () =>
                     ref.read(clientsControllerProvider.notifier).load(),
               ),
@@ -248,8 +253,10 @@ class ClientDetailsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final company = ref.watch(selectedClientProvider(clientId));
     final forms =
-        ref.watch(formsControllerProvider).valueOrNull ?? const <FormTemplate>[];
-    final reports = ref.watch(reportsProvider);
+        ref.watch(formsControllerProvider).valueOrNull ??
+        const <FormTemplate>[];
+    final reports =
+        ref.watch(reportsProvider).valueOrNull ?? const <ReportSummary>[];
     final plans = ref.watch(actionPlanControllerProvider);
 
     if (company == null) {
@@ -261,29 +268,41 @@ class ClientDetailsPage extends ConsumerWidget {
       );
     }
 
-    final companyForms = forms
-        .where(
-          (form) => form.clientId == company.id || form.clientName == company.name,
-        )
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final sentForms =
-        companyForms.where((form) => form.status == FormStatus.sent).length;
-    final draftForms =
-        companyForms.where((form) => form.status == FormStatus.draft).length;
-    final answeredForms =
-        companyForms.where((form) => form.responsesCount > 0).length;
+    final companyForms =
+        forms
+            .where(
+              (form) =>
+                  form.clientId == company.id ||
+                  form.clientName == company.name,
+            )
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final sentForms = companyForms
+        .where((form) => form.status == FormStatus.sent)
+        .length;
+    final draftForms = companyForms
+        .where((form) => form.status == FormStatus.draft)
+        .length;
+    final answeredForms = companyForms
+        .where((form) => form.responsesCount > 0)
+        .length;
 
-    final companyReports = reports
-        .where((report) => report.client == company.name)
-        .toList()
-      ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
-    final latestReport = companyReports.isNotEmpty ? companyReports.first : null;
+    final companyReports =
+        reports.where((report) => report.companyName == company.name).toList()
+          ..sort((a, b) {
+            final left =
+                a.completedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final right =
+                b.completedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return right.compareTo(left);
+          });
+    final latestReport = companyReports.isNotEmpty
+        ? companyReports.first
+        : null;
 
-    final companyPlans = plans
-        .where((plan) => plan.client == company.name)
-        .toList()
-      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    final companyPlans =
+        plans.where((plan) => plan.client == company.name).toList()
+          ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
     ActionItem? activePlan;
     for (final plan in companyPlans) {
       if (plan.status != ActionStatus.done) {
@@ -293,39 +312,29 @@ class ClientDetailsPage extends ConsumerWidget {
     }
     activePlan ??= companyPlans.isNotEmpty ? companyPlans.first : null;
 
-    final diagnosisScore = latestReport?.overallScore ?? company.score;
-    final diagnosisAreas = latestReport?.areas
-            .map(
-              (area) => _CompanyAreaMetric(
-                name: area.name,
-                progress: area.progress,
-              ),
-            )
-            .toList() ??
-        [
-          _CompanyAreaMetric(name: 'Gestao', progress: company.progress),
-          _CompanyAreaMetric(
-            name: 'Operacoes',
-            progress: (company.progress * 0.9).clamp(0.0, 1.0),
-          ),
-          _CompanyAreaMetric(
-            name: 'Comercial',
-            progress: (company.progress * 1.1).clamp(0.0, 1.0),
-          ),
-        ];
-    final diagnosisAlerts = latestReport?.criticalIssues ??
-        const [
-          'Ritmo de execucao irregular nas frentes prioritarias do trimestre.',
-          'Dependencia elevada da lideranca central nas decisoes do dia a dia.',
-        ];
-    final diagnosisRecommendation = latestReport != null &&
-            latestReport.recommendations.isNotEmpty
-        ? latestReport.recommendations.first
-        : 'Conectar formularios, diagnostico e plano ativo em um unico rito semanal.';
+    final diagnosisScore = (latestReport?.overallScore ?? company.score)
+        .round();
+    final diagnosisAreas = [
+      _CompanyAreaMetric(name: 'Gestao', progress: company.progress),
+      _CompanyAreaMetric(
+        name: 'Operacoes',
+        progress: (company.progress * 0.9).clamp(0.0, 1.0),
+      ),
+      _CompanyAreaMetric(
+        name: 'Comercial',
+        progress: (company.progress * 1.1).clamp(0.0, 1.0),
+      ),
+    ];
+    final diagnosisAlerts = const [
+      'Ritmo de execucao irregular nas frentes prioritarias do trimestre.',
+      'Dependencia elevada da lideranca central nas decisoes do dia a dia.',
+    ];
+    final diagnosisRecommendation =
+        'Conectar pesquisa, dashboard e plano ativo em um unico rito semanal.';
     final executiveSummary = company.notes.isEmpty
         ? '${company.name} segue em acompanhamento consultivo com score '
-            '${company.score}, progresso de ${(company.progress * 100).round()}% '
-            'e foco imediato em ${company.nextStep.toLowerCase()}.'
+              '${company.score}, progresso de ${(company.progress * 100).round()}% '
+              'e foco imediato em ${company.nextStep.toLowerCase()}.'
         : company.notes;
 
     return AppPageScaffold(
@@ -353,7 +362,9 @@ class ClientDetailsPage extends ConsumerWidget {
                     action: FilledButton.icon(
                       onPressed: latestReport == null
                           ? null
-                          : () => context.go('/reports/${latestReport.id}'),
+                          : () => context.go(
+                              '/reports/${latestReport.submissionId}',
+                            ),
                       icon: const Icon(Icons.description_outlined),
                       label: const Text('Ultimo relatorio'),
                     ),
@@ -390,7 +401,9 @@ class ClientDetailsPage extends ConsumerWidget {
                       ),
                       _DetailMetric(
                         label: 'Ultimo contato',
-                        value: DateFormatter.formatRelative(company.lastUpdatedAt),
+                        value: DateFormatter.formatRelative(
+                          company.lastUpdatedAt,
+                        ),
                         icon: Icons.schedule_outlined,
                       ),
                     ],
@@ -417,7 +430,8 @@ class ClientDetailsPage extends ConsumerWidget {
                         ),
                         _TagChip(
                           icon: Icons.assignment_outlined,
-                          label: '${companyForms.length} formularios vinculados',
+                          label:
+                              '${companyForms.length} formularios vinculados',
                         ),
                         _TagChip(
                           icon: Icons.description_outlined,
@@ -433,7 +447,8 @@ class ClientDetailsPage extends ConsumerWidget {
           const SizedBox(height: 16),
           _SectionCard(
             title: 'Resumo executivo',
-            subtitle: 'Leitura rapida da situacao atual e da frente mais relevante.',
+            subtitle:
+                'Leitura rapida da situacao atual e da frente mais relevante.',
             child: Text(
               executiveSummary,
               style: Theme.of(context).textTheme.bodyLarge,
@@ -454,7 +469,8 @@ class ClientDetailsPage extends ConsumerWidget {
               ),
               _SectionCard(
                 title: 'Diagnostico',
-                subtitle: 'Leitura atual das areas avaliadas e pontos de atencao.',
+                subtitle:
+                    'Leitura atual das areas avaliadas e pontos de atencao.',
                 child: _DiagnosisOverview(
                   score: diagnosisScore,
                   areas: diagnosisAreas,
@@ -469,7 +485,8 @@ class ClientDetailsPage extends ConsumerWidget {
             children: [
               _SectionCard(
                 title: 'Plano de acao',
-                subtitle: 'Plano ativo, prioridade e proximas tarefas do ciclo.',
+                subtitle:
+                    'Plano ativo, prioridade e proximas tarefas do ciclo.',
                 child: _PlanOverview(
                   activePlan: activePlan,
                   plans: companyPlans,
@@ -477,10 +494,9 @@ class ClientDetailsPage extends ConsumerWidget {
               ),
               _SectionCard(
                 title: 'Relatorios',
-                subtitle: 'Historico recente de entregas executivas para a conta.',
-                child: _ReportsOverview(
-                  reports: companyReports,
-                ),
+                subtitle:
+                    'Historico recente de entregas executivas para a conta.',
+                child: _ReportsOverview(reports: companyReports),
               ),
             ],
           ),
@@ -488,7 +504,6 @@ class ClientDetailsPage extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 class _SectionCard extends StatelessWidget {
@@ -539,10 +554,7 @@ class _ResponsiveSectionGrid extends StatelessWidget {
           runSpacing: spacing,
           children: [
             for (final child in children)
-              SizedBox(
-                width: itemWidth,
-                child: child,
-              ),
+              SizedBox(width: itemWidth, child: child),
           ],
         );
       },
@@ -581,7 +593,9 @@ class _FormsOverview extends StatelessWidget {
         if (forms.isEmpty)
           const Text('Nenhum formulario vinculado a esta empresa.')
         else
-          ...forms.take(3).map(
+          ...forms
+              .take(3)
+              .map(
                 (form) => Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(14),
@@ -600,9 +614,8 @@ class _FormsOverview extends StatelessWidget {
                           children: [
                             Text(
                               form.title,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -637,9 +650,8 @@ class _FormsOverview extends StatelessWidget {
                         children: [
                           Text(
                             '${form.responsesCount}',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                           const Text(
                             'respostas',
@@ -703,7 +715,9 @@ class _DiagnosisOverview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        ...alerts.take(2).map(
+        ...alerts
+            .take(2)
+            .map(
               (alert) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -732,10 +746,7 @@ class _DiagnosisOverview extends StatelessWidget {
 }
 
 class _PlanOverview extends StatelessWidget {
-  const _PlanOverview({
-    required this.activePlan,
-    required this.plans,
-  });
+  const _PlanOverview({required this.activePlan, required this.plans});
 
   final ActionItem? activePlan;
   final List<ActionItem> plans;
@@ -770,9 +781,9 @@ class _PlanOverview extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           activePlan!.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -781,7 +792,11 @@ class _PlanOverview extends StatelessWidget {
           children: [
             Chip(label: Text(_planStatusLabel(activePlan!.status))),
             Chip(label: Text('Prioridade ${activePlan!.priority}')),
-            Chip(label: Text('Prazo ${activePlan!.dueDate.day}/${activePlan!.dueDate.month}')),
+            Chip(
+              label: Text(
+                'Prazo ${activePlan!.dueDate.day}/${activePlan!.dueDate.month}',
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -793,12 +808,14 @@ class _PlanOverview extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           'Etapas recentes',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
-        ...plans.take(3).map(
+        ...plans
+            .take(3)
+            .map(
               (plan) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -828,7 +845,7 @@ class _PlanOverview extends StatelessWidget {
 class _ReportsOverview extends StatelessWidget {
   const _ReportsOverview({required this.reports});
 
-  final List<Report> reports;
+  final List<ReportSummary> reports;
 
   @override
   Widget build(BuildContext context) {
@@ -859,35 +876,41 @@ class _ReportsOverview extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          report.title,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                          report.companyName,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${report.type} | ${DateFormatter.formatDate(report.sentAt)}',
-                          style: const TextStyle(color: AppColors.textSecondary),
+                          '${report.maturityLabel ?? '-'} | ${report.completedAt == null ? '-' : DateFormatter.formatDate(report.completedAt!)}',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   _StatusPill(
-                    label: report.status,
-                    color: _reportStatusColor(report.status),
+                    label: report.actionPlanGenerated
+                        ? 'Plano gerado'
+                        : 'Sem plano',
+                    color: report.actionPlanGenerated
+                        ? AppColors.success
+                        : AppColors.amber,
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               Text(
-                report.summary,
+                'Score ${report.overallScore?.toStringAsFixed(1) ?? '-'} | ${report.respondentRole ?? '-'} | ${report.department ?? '-'}',
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => context.go('/reports/${report.id}'),
+                  onPressed: () =>
+                      context.go('/reports/${report.submissionId}'),
                   icon: const Icon(Icons.visibility_outlined),
                   label: const Text('Visualizar'),
                 ),
@@ -901,10 +924,7 @@ class _ReportsOverview extends StatelessWidget {
 }
 
 class _MiniMetric extends StatelessWidget {
-  const _MiniMetric({
-    required this.label,
-    required this.value,
-  });
+  const _MiniMetric({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -923,9 +943,9 @@ class _MiniMetric extends StatelessWidget {
         children: [
           Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
           Text(label, style: const TextStyle(color: AppColors.textSecondary)),
@@ -936,10 +956,7 @@ class _MiniMetric extends StatelessWidget {
 }
 
 class _CompanyAreaMetric {
-  const _CompanyAreaMetric({
-    required this.name,
-    required this.progress,
-  });
+  const _CompanyAreaMetric({required this.name, required this.progress});
 
   final String name;
   final double progress;
@@ -1016,7 +1033,9 @@ class _DetailMetric extends StatelessWidget {
             height: 40,
             width: 40,
             decoration: BoxDecoration(
-              color: (emphasisColor ?? AppColors.primary).withOpacity(0.12),
+              color: (emphasisColor ?? AppColors.primary).withValues(
+                alpha: 0.12,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: emphasisColor ?? AppColors.primary),
@@ -1026,14 +1045,17 @@ class _DetailMetric extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+                Text(
+                  label,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   value,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: emphasisColor,
-                      ),
+                    fontWeight: FontWeight.w800,
+                    color: emphasisColor,
+                  ),
                 ),
               ],
             ),
@@ -1045,10 +1067,7 @@ class _DetailMetric extends StatelessWidget {
 }
 
 class _TagChip extends StatelessWidget {
-  const _TagChip({
-    required this.icon,
-    required this.label,
-  });
+  const _TagChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -1082,10 +1101,7 @@ class _TagChip extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.label,
-    required this.color,
-  });
+  const _StatusPill({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -1095,15 +1111,12 @@ class _StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -1117,17 +1130,6 @@ Color _companyStatusColor(ClientStatus status) {
       return AppColors.amber;
     case ClientStatus.closed:
       return AppColors.danger;
-  }
-}
-
-Color _reportStatusColor(String status) {
-  switch (status.toLowerCase()) {
-    case 'enviado':
-      return AppColors.success;
-    case 'rascunho':
-      return AppColors.amber;
-    default:
-      return AppColors.indigo;
   }
 }
 
@@ -1221,20 +1223,33 @@ class _ClientEditorDialogState extends State<_ClientEditorDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _ownerController,
-                decoration: const InputDecoration(labelText: 'Responsavel principal'),
+                decoration: const InputDecoration(
+                  labelText: 'Responsavel principal',
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email de contato'),
+                decoration: const InputDecoration(
+                  labelText: 'Email de contato',
+                ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<ClientStatus>(
-                value: _status,
+                initialValue: _status,
                 items: const [
-                  DropdownMenuItem(value: ClientStatus.active, child: Text('Ativa')),
-                  DropdownMenuItem(value: ClientStatus.paused, child: Text('Pausada')),
-                  DropdownMenuItem(value: ClientStatus.closed, child: Text('Arquivada')),
+                  DropdownMenuItem(
+                    value: ClientStatus.active,
+                    child: Text('Ativa'),
+                  ),
+                  DropdownMenuItem(
+                    value: ClientStatus.paused,
+                    child: Text('Pausada'),
+                  ),
+                  DropdownMenuItem(
+                    value: ClientStatus.closed,
+                    child: Text('Arquivada'),
+                  ),
                 ],
                 onChanged: (value) =>
                     setState(() => _status = value ?? ClientStatus.active),
@@ -1279,10 +1294,7 @@ class _ClientEditorDialogState extends State<_ClientEditorDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancelar'),
         ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Salvar'),
-        ),
+        FilledButton(onPressed: _save, child: const Text('Salvar')),
       ],
     );
   }

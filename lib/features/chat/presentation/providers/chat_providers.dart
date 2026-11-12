@@ -5,5 +5,5 @@ import '../controllers/chat_controller.dart';
 
 final chatControllerProvider =
     StateNotifierProvider<ChatController, List<ChatMessage>>((ref) {
-  return ChatController();
-});
+      return ChatController();
+    });
