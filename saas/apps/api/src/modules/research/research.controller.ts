@@ -147,6 +147,7 @@ export class ResearchController {
         case 'DIAGNOSIS_APPROVAL_REQUIRED':
           return 400;
         case 'FORBIDDEN':
+        case 'ADMIN_TASK_MUTATION_REQUIRED':
         case 'ADMIN_RESEARCH_READ_ONLY':
           return 403;
         case 'USER_NOT_FOUND':

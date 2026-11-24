@@ -12,6 +12,7 @@ const { env } = await import('../config/env');
 const { AiQuestionService } = await import('../modules/ai-question/ai-question.service');
 
 const auth = { userId: 'owner-a', role: 'OWNER' as const, companyId: 'company-a', authVersion: 0 };
+const adminAuth = { userId: 'admin-a', role: 'ADMIN' as const, companyId: null, authVersion: 0 };
 const baseSubmission = {
   id: 'submission-a', companyId: 'company-a', userId: 'owner-a', questionnaireId: 'chat-research',
   submissionType: 'RESEARCH' as const, respondentRole: 'Diretor', department: 'Financeiro',
@@ -189,10 +190,24 @@ const validAnalysis = {
 };
 
 {
+  const { service, repository } = setup();
+  repository.submission = { ...repository.submission, status: 'COMPLETED', overallScore: 61.5 } as never;
+  for (const unauthorizedAuth of [
+    auth,
+    { ...auth, userId: 'owner-b', companyId: 'company-b' },
+    { ...auth, userId: 'employee-a', role: 'EMPLOYEE' as const },
+    { ...auth, userId: 'employee-b', role: 'EMPLOYEE' as const, companyId: 'company-b' },
+  ]) {
+    await assert.rejects(service.generateAnalysis(unauthorizedAuth, 'submission-a'), /FORBIDDEN/);
+  }
+  await assert.rejects(service.generateAnalysis(adminAuth, 'missing'), /RESEARCH_SUBMISSION_NOT_FOUND/);
+}
+
+{
   const { service, repository, provider, entitlements } = setup();
-  repository.submission = { ...repository.submission, status: 'COMPLETED', overallScore: 61.5, pillarScores: [{ pillar: 'Financeiro', score: 61.5, answersCount: 1, maturity: 'intermediate' }] } as never;
+  repository.submission = { ...repository.submission, companyId: 'company-b', status: 'COMPLETED', overallScore: 61.5, pillarScores: [{ pillar: 'Financeiro', score: 61.5, answersCount: 1, maturity: 'intermediate' }] } as never;
   provider.result = validAnalysis;
-  const result = await service.generateAnalysis(auth, 'submission-a');
+  const result = await service.generateAnalysis(adminAuth, 'submission-a');
   assert.equal(result.executiveSummary, validAnalysis.executiveSummary);
   assert.equal(repository.submission.overallScore, 61.5);
   assert(repository.saved);
@@ -203,10 +218,10 @@ const validAnalysis = {
   const { service, repository, provider } = setup();
   repository.submission = { ...repository.submission, status: 'COMPLETED', overallScore: 70 } as never;
   provider.error = new Error('AI_TIMEOUT');
-  await assert.rejects(service.generateAnalysis(auth, 'submission-a'), /AI_TIMEOUT/);
+  await assert.rejects(service.generateAnalysis(adminAuth, 'submission-a'), /AI_TIMEOUT/);
   provider.error = null;
   provider.result = validAnalysis;
-  assert.equal((await service.generateAnalysis(auth, 'submission-a', true)).recommendations.length, 1);
+  assert.equal((await service.generateAnalysis(adminAuth, 'submission-a', true)).recommendations.length, 1);
 }
 
 {

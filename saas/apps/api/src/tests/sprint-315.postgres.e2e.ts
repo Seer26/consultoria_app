@@ -49,9 +49,9 @@ const { runPostgresMigrations, getPostgresMigrationStatus } = await import('../d
 const { dataSource } = await import('../database/data-source');
 await runPostgresMigrations();
 const migrationStatus = await getPostgresMigrationStatus();
-assert.equal(migrationStatus.available, 7);
+assert.equal(migrationStatus.available, 11);
 assert.equal(migrationStatus.pending.length, 0);
-passed('migration 001-007 pronta');
+passed('migrations 001-011 prontas');
 
 const now = new Date().toISOString();
 await dataSource.execute(`
@@ -247,26 +247,54 @@ try {
   passed('OWNER nao recebe respostas de EMPLOYEE');
   assert(!JSON.stringify(ownerEmployeeView).includes(rawMarker));
   passed('OWNER nao acessa transcript por ID direto');
-  const report = await call<Json>(base, 'GET', `/reports/research/${submissionA2.id}/executive`, { token: ownerA.token });
+  const report = await call<Json>(base, 'GET', `/reports/research/${submissionA2.id}/executive`, { token: admin.token });
   assert(!JSON.stringify(report).includes('Resposta limite'));
-  passed('reports OWNER nao contem respostas brutas');
-  const pdf = await call<Buffer>(base, 'GET', `/reports/research/${submissionA2.id}/executive/pdf`, { token: ownerA.token, pdf: true });
+  passed('reports ADMIN nao contem respostas brutas');
+  const pdf = await call<Buffer>(base, 'GET', `/reports/research/${submissionA2.id}/executive/pdf`, { token: admin.token, pdf: true });
   assert(!pdf.toString('utf8').includes('Resposta limite'));
-  passed('PDF OWNER nao contem respostas brutas');
+  passed('PDF ADMIN nao contem respostas brutas');
+  await call(base, 'GET', `/reports/research/${submissionA2.id}/executive`, { token: ownerA.token, status: 403 });
+  passed('OWNER nao acessa relatorio executivo');
+  await call(base, 'GET', `/reports/research/${submissionA2.id}/executive/pdf`, { token: ownerA.token, status: 403 });
+  passed('OWNER nao acessa PDF executivo');
   await call(base, 'GET', `/reports/research/${submissionA2.id}/executive`, { token: employeeA2.token, status: 403 });
   passed('EMPLOYEE nao acessa relatorio executivo');
   await call(base, 'GET', `/reports/research/${submissionA2.id}/executive/pdf`, { token: employeeA2.token, status: 403 });
   passed('EMPLOYEE nao acessa PDF executivo');
   await call(base, 'POST', `/research/submissions/${submissionA2.id}/generate-action-plan`, { token: employeeA2.token, status: 403 });
   passed('EMPLOYEE nao gera plano de acao');
+  await dataSource.execute(`
+    UPDATE diagnosis_submissions
+    SET ai_analysis = @analysis
+    WHERE id = @submissionId
+  `, {
+    submissionId: submissionA2.id,
+    analysis: JSON.stringify({
+      executiveSummary: 'Analise interna da consultoria.',
+      strengths: ['Processos mapeados.'],
+      attentionPoints: ['Indicadores incompletos.'],
+      recommendations: [{ title: 'Formalizar indicadores', description: 'Definir acompanhamento mensal.', priority: 'HIGH', pillar: 'Financeiro' }],
+      generatedAt: new Date().toISOString(),
+      source: 'test',
+    }),
+  });
+  const internalAnalysis = await call<{ executiveSummary: string }>(base, 'POST', `/ai/research/${submissionA2.id}/analysis`, { token: admin.token });
+  assert.equal(internalAnalysis.executiveSummary, 'Analise interna da consultoria.');
+  passed('ADMIN acessa analise interna de qualquer empresa');
+  await call(base, 'POST', `/ai/research/${submissionA2.id}/analysis`, { token: ownerA.token, status: 403 });
+  passed('OWNER nao acessa analise interna da propria empresa');
+  await call(base, 'POST', `/ai/research/${submissionA2.id}/analysis`, { token: ownerB.token, status: 403 });
+  passed('OWNER nao acessa analise interna por ID de outra empresa');
   await call(base, 'POST', `/ai/research/${submissionA2.id}/analysis`, { token: employeeA2.token, status: 403, body: { retry: true } });
   passed('EMPLOYEE nao gera analise estrategica por IA');
+  await call(base, 'POST', '/ai/research/submission-inexistente/analysis', { token: admin.token, status: 404 });
+  passed('ID inexistente nao expoe analise interna');
 
   const ownerSubmission = await call<{ id: string }>(base, 'POST', '/research/submissions', { token: ownerA.token, status: 201, body: { respondentRole: 'Diretor', department: 'Direcao' } });
   await call(base, 'POST', `/research/submissions/${ownerSubmission.id}/answers`, { token: ownerA.token, status: 201, body: { question: 'Pergunta do owner?', answer: 'Resposta do owner', pillar: 'Estrategia' } });
   const ownerOwn = await call<{ answers: unknown[] }>(base, 'GET', `/research/submissions/${ownerSubmission.id}`, { token: ownerA.token });
-  assert.equal(ownerOwn.answers.length, 1);
-  passed('OWNER acessa as proprias respostas');
+  assert.equal(ownerOwn.answers.length, 0);
+  passed('OWNER nao recebe respostas brutas antes da publicacao');
   const adminView = await call<{ answers: Array<{ answer: string }> }>(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: admin.token });
   assert(adminView.answers.some((answer) => answer.answer.includes(rawMarker)));
   passed('ADMIN acessa respostas individuais');
@@ -281,7 +309,7 @@ try {
   await call(base, 'GET', `/research/submissions/${submissionA1.id}`, { token: employeeB1.token, status: 403 });
   passed('isolamento Empresa A/B preservado');
 
-  assert.equal(scenarios.length, 43);
+  assert.equal(scenarios.length, 49);
   console.log(JSON.stringify({ ok: true, scenarios: scenarios.length, names: scenarios, realProviderCalls: 0, temporaryPostgres: true }));
 } finally {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

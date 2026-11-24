@@ -304,7 +304,7 @@ export class ReportsService {
   }
 
   private ensureStrategicReportAccess(actor: ReportActor): void {
-    if (actor.role === 'EMPLOYEE') {
+    if (actor.role !== 'ADMIN') {
       throw new Error('FORBIDDEN');
     }
   }

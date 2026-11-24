@@ -160,6 +160,7 @@ export class ActionPlanController {
           return 400;
         case 'FORBIDDEN':
         case 'EMPLOYEE_TASK_FIELDS_FORBIDDEN':
+        case 'ADMIN_TASK_MUTATION_REQUIRED':
         case 'EMPLOYEE_TASK_STATUS_TRANSITION_FORBIDDEN':
           return 403;
         case 'ACTION_PLAN_TASK_NOT_FOUND':

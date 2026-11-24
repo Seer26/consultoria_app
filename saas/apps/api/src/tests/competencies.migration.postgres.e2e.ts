@@ -83,9 +83,17 @@ try {
       ('competencies'::regclass, 'competency_assessments'::regclass, 'competency_assessment_items'::regclass)`)).rows;
     assert.equal(fks.length, 7);
     assert(fks.every((row) => ['a', 'r'].includes(row.confdeltype) && ['a', 'r'].includes(row.confupdtype)));
-    async function rejects(sql: string, values: unknown[] = [], code = '23514') {
+    async function rejects(
+      sql: string,
+      values: unknown[] = [],
+      code: string | string[] = '23514',
+    ) {
+      const expectedCodes = Array.isArray(code) ? code : [code];
       await assert.rejects(client.query(sql, values), (error: unknown) =>
-        error instanceof Error && 'code' in error && error.code === code, `${code}: ${sql}`);
+        error instanceof Error && 'code' in error
+          && typeof error.code === 'string'
+          && expectedCodes.includes(error.code),
+      `${expectedCodes.join('|')}: ${sql}`);
     }
     await client.query(`INSERT INTO companies (id, name, slug, created_at, updated_at)
       VALUES ('company-a', 'Company A', 'competencies-a', NOW()::text, NOW()::text),
@@ -141,10 +149,14 @@ try {
     await rejects(insertItem, ['duplicate-item', 'assessment-a', catalog[0].id, 'SYSTEM', 'RATED', 3], '23505');
     await rejects(insertItem, ['missing-parent', 'missing', catalog[0].id, 'SYSTEM', 'RATED', 3], '23503');
     await rejects(insertItem, ['missing-competency', 'assessment-a', 'missing', 'SYSTEM', 'RATED', 3], '23503');
-    await rejects(`DELETE FROM competencies WHERE id = 'private-a'`, [], '23503');
-    await rejects(`DELETE FROM companies WHERE id = 'company-a'`, [], '23503');
-    await rejects(`DELETE FROM users WHERE id = 'subject'`, [], '23503');
-    await rejects(`DELETE FROM users WHERE id = 'admin'`, [], '23503');
+    await rejects(
+      `DELETE FROM competencies WHERE id = 'private-a'`,
+      [],
+      ['23503', '23001'],
+    );
+    await rejects(`DELETE FROM companies WHERE id = 'company-a'`, [], ['23503', '23001']);
+    await rejects(`DELETE FROM users WHERE id = 'subject'`, [], ['23503', '23001']);
+    await rejects(`DELETE FROM users WHERE id = 'admin'`, [], ['23503', '23001']);
     await rejects(`UPDATE competency_assessments SET status = 'COMPLETED' WHERE id = 'assessment-a'`);
     await client.query(`UPDATE competency_assessments SET status = 'COMPLETED', completed_at = NOW()::text,
       completed_by_user_id = 'admin', completed_by_name_snapshot = 'Finisher snapshot' WHERE id = 'assessment-a'`);

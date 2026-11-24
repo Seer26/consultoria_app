@@ -771,8 +771,8 @@ export class ActionPlanService {
   }
 
   private ensureAdministrativeTaskMutation(context: ActionPlanAccessContext): void {
-    if (context.actor.role === 'EMPLOYEE') {
-      throw new Error('EMPLOYEE_TASK_FIELDS_FORBIDDEN');
+    if (context.actor.role !== 'ADMIN') {
+      throw new Error('ADMIN_TASK_MUTATION_REQUIRED');
     }
   }
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate } from '../auth/auth.middleware';
+import { authenticate, authorize } from '../auth/auth.middleware';
 import { AiQuestionController } from './ai-question.controller';
 import { AiQuestionService } from './ai-question.service';
 import { env } from '../../config/env';
@@ -27,4 +27,4 @@ const nextQuestionHandlers = [
 
 aiQuestionRouter.post('/next-question', ...nextQuestionHandlers);
 aiQuestionRouter.post('/question/next', ...nextQuestionHandlers);
-aiQuestionRouter.post('/research/:submissionId/analysis', authenticate, aiRateLimit, controller.analysis);
+aiQuestionRouter.post('/research/:submissionId/analysis', authenticate, authorize('ADMIN'), aiRateLimit, controller.analysis);

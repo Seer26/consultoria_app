@@ -120,8 +120,7 @@ export class AiQuestionService {
   }
 
   async generateAnalysis(auth: AuthTokenPayload, submissionId: string, retry = false): Promise<AiConsultingAnalysis> {
-    const context = await this.authorizedContext(auth, submissionId, 'COMPLETED');
-    if (context.actor.role === 'EMPLOYEE') throw new Error('FORBIDDEN');
+    const context = await this.adminAnalysisContext(auth, submissionId);
     if (context.submission.aiAnalysis && !retry) return context.submission.aiAnalysis;
     if (!env.aiEnabled) throw new Error('AI_DISABLED');
     if (!env.aiProviderKey) throw new Error('AI_API_KEY_NOT_CONFIGURED');
@@ -163,6 +162,21 @@ export class AiQuestionService {
     if (!actor.companyId || submission.companyId !== actor.companyId) throw new Error('FORBIDDEN');
     if (actor.role === 'EMPLOYEE' && submission.userId !== actor.id) throw new Error('FORBIDDEN');
     if (submission.status !== status) throw new Error(status === 'COMPLETED' ? 'AI_ANALYSIS_REQUIRES_COMPLETED_RESEARCH' : 'RESEARCH_ALREADY_COMPLETED');
+    const company = await this.repository.findCompanyById(submission.companyId);
+    if (!company) throw new Error('COMPANY_NOT_FOUND');
+    const answers = await this.repository.listAnswersBySubmissionId(submission.id);
+    return { actor, company, submission, answers };
+  }
+
+  private async adminAnalysisContext(auth: AuthTokenPayload, submissionId: string) {
+    if (!submissionId?.trim()) throw new Error('INVALID_SUBMISSION_ID');
+    const actor = await this.repository.findUserById(auth.userId);
+    if (!actor) throw new Error('USER_NOT_FOUND');
+    if (actor.status !== 'ACTIVE') throw new Error('INACTIVE_USER');
+    if (actor.role !== 'ADMIN') throw new Error('FORBIDDEN');
+    const submission = await this.repository.findSubmissionById(submissionId);
+    if (!submission) throw new Error('RESEARCH_SUBMISSION_NOT_FOUND');
+    if (submission.status !== 'COMPLETED') throw new Error('AI_ANALYSIS_REQUIRES_COMPLETED_RESEARCH');
     const company = await this.repository.findCompanyById(submission.companyId);
     if (!company) throw new Error('COMPANY_NOT_FOUND');
     const answers = await this.repository.listAnswersBySubmissionId(submission.id);

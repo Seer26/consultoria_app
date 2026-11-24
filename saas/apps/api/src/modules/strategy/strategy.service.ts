@@ -22,7 +22,7 @@ export class StrategyService {
     const completed = objectives.filter((item) => item.status === 'COMPLETED').length;
     return {
       companyId: context.companyId,
-      canEdit: context.actor.role !== 'EMPLOYEE',
+      canEdit: context.actor.role === 'ADMIN',
       profile: profile ?? { companyId: context.companyId, mission: '', vision: '', values: '', createdAt: null, updatedAt: null },
       objectives,
       swotItems,
@@ -148,7 +148,7 @@ export class StrategyService {
     if (!(await this.repository.companyExists(companyId))) throw new Error('COMPANY_NOT_FOUND');
     return { auth, actor, companyId };
   }
-  private async mutableContext(auth: AuthTokenPayload, requested?: unknown) { const c = await this.context(auth, requested); if (c.actor.role === 'EMPLOYEE') throw new Error('STRATEGY_READ_ONLY'); return c; }
+  private async mutableContext(auth: AuthTokenPayload, requested?: unknown) { const c = await this.context(auth, requested); if (c.actor.role !== 'ADMIN') throw new Error('STRATEGY_ADMIN_REQUIRED'); return c; }
   private sameCompany(c: StrategyContext, companyId: string) { if (c.companyId !== companyId) throw new Error('FORBIDDEN'); }
   private profileText(input: Record<string, unknown>, key: string, previous: string) {
     if (!(key in input)) return previous;

@@ -178,11 +178,11 @@ async function main(): Promise<void> {
     assert.equal(completed.status, 200);
 
     const firstPdf = await call(baseUrl, 'GET', `/reports/research/${submission.body.id}/executive/pdf`, {
-      token: ownerToken,
+      token: adminLogin.body.token,
     });
     assert.equal(firstPdf.status, 200);
     const secondPdf = await call(baseUrl, 'GET', `/reports/research/${submission.body.id}/executive/pdf`, {
-      token: ownerToken,
+      token: adminLogin.body.token,
     });
     assert.equal(secondPdf.status, 429);
 

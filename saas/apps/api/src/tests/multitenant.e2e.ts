@@ -319,12 +319,19 @@ async function createCompletedResearch(
   );
   assert(published.diagnosisStatus === 'PUBLICADO', 'Research was not published');
 
+  await expectStatus(
+    baseUrl,
+    'POST',
+    `/research/submissions/${submission.id}/generate-action-plan`,
+    403,
+    { token: ownerToken },
+  );
   const actionPlan = await request<ActionPlanResponse>(
     baseUrl,
     'POST',
     `/research/submissions/${submission.id}/generate-action-plan`,
     {
-      token: ownerToken,
+      token: adminToken,
     },
   );
   assert(actionPlan.tasks.length > 0, 'Action plan was not generated');
@@ -376,6 +383,42 @@ async function main(): Promise<void> {
     );
     await createEmployee(baseUrl, admin.token, companyB.company.id, 'empresa-b');
 
+    const persistedEmployeeA = database
+      .prepare('SELECT company_id, role, status FROM users WHERE id = ?')
+      .get(createdEmployeeA.id) as
+      | { company_id: string; role: string; status: string }
+      | undefined;
+    assert(
+      persistedEmployeeA?.company_id === companyA.company.id &&
+        persistedEmployeeA.role === 'EMPLOYEE' &&
+        persistedEmployeeA.status === 'ACTIVE',
+      'Admin-created employee should persist in its company as active',
+    );
+    await expectStatus(
+      baseUrl,
+      'POST',
+      `/companies/${companyA.company.id}/users`,
+      409,
+      {
+        token: admin.token,
+        body: {
+          name: 'Employee A duplicate',
+          email: 'employee.empresa-a@teste.com',
+          password: 'SenhaBeta123',
+          role: 'EMPLOYEE',
+        },
+      },
+    );
+    await expectStatus(baseUrl, 'POST', '/companies/company-inexistente/users', 404, {
+      token: admin.token,
+      body: {
+        name: 'Employee inexistente',
+        email: 'employee.inexistente@teste.com',
+        password: 'SenhaBeta123',
+        role: 'EMPLOYEE',
+      },
+    });
+
     const ownerA = await login(baseUrl, 'owner.empresa-a@teste.com');
     const ownerB = await login(baseUrl, 'owner.empresa-b@teste.com');
     const employeeA = await login(baseUrl, 'employee.empresa-a@teste.com');
@@ -384,6 +427,17 @@ async function main(): Promise<void> {
     assert(ownerB.user.companyId === companyB.company.id, 'Owner B company mismatch');
     assert(employeeA.user.companyId === companyA.company.id, 'Employee A company mismatch');
     assert(employeeA.user.id === createdEmployeeA.id, 'Employee A id mismatch');
+    for (const token of [ownerA.token, employeeA.token]) {
+      await expectStatus(baseUrl, 'POST', `/companies/${companyA.company.id}/users`, 403, {
+        token: token,
+        body: {
+          name: 'Criacao sem permissao',
+          email: 'sem.permissao@teste.com',
+          password: 'SenhaBeta123',
+          role: 'EMPLOYEE',
+        },
+      });
+    }
 
     const initialOwnerDashboard = await request<{
       onboarding: { completedCount: number; items: Record<string, boolean> };
@@ -405,13 +459,35 @@ async function main(): Promise<void> {
       403,
       { token: ownerA.token },
     );
+    await expectStatus(baseUrl, 'PUT', '/strategy/profile', 403, {
+      token: ownerA.token,
+      body: { mission: 'Owner não pode alterar a estratégia.' },
+    });
+    await expectStatus(baseUrl, 'PUT', '/strategy/profile', 403, {
+      token: ownerA.token,
+      body: {
+        companyId: companyB.company.id,
+        mission: 'Owner não pode alterar a estratégia de outra empresa.',
+      },
+    });
+    const ownerStrategyA = await request<{ companyId: string; canEdit: boolean }>(
+      baseUrl,
+      'GET',
+      '/strategy',
+      { token: ownerA.token },
+    );
+    assert(
+      ownerStrategyA.companyId === companyA.company.id && !ownerStrategyA.canEdit,
+      'Owner should retain read-only access to its own strategy',
+    );
     const profileA = await request<{ companyId: string; mission: string }>(
       baseUrl,
       'PUT',
       '/strategy/profile',
       {
-        token: ownerA.token,
+        token: admin.token,
         body: {
+          companyId: companyA.company.id,
           mission: 'Ajudar clientes a crescer com consistencia.',
           vision: 'Ser referencia nacional em consultoria empresarial.',
           values: 'Etica, clareza e resultado.',
@@ -420,30 +496,34 @@ async function main(): Promise<void> {
     );
     assert(
       profileA.companyId === companyA.company.id && profileA.mission.length > 0,
-      'Owner should update only the strategy profile of their own company',
+      'Admin should update the strategy profile in the selected company',
     );
     const editedProfileA = await request<{ mission: string; vision: string }>(
       baseUrl,
       'PUT',
       '/strategy/profile',
       {
-        token: ownerA.token,
-        body: { mission: 'Transformar empresas com gestao clara.' },
+        token: admin.token,
+        body: {
+          companyId: companyA.company.id,
+          mission: 'Transformar empresas com gestao clara.',
+        },
       },
     );
     assert(
       editedProfileA.mission === 'Transformar empresas com gestao clara.' &&
         editedProfileA.vision === 'Ser referencia nacional em consultoria empresarial.',
-      'Strategy profile should support safe partial editing',
+      'Admin should support safe partial strategy profile editing',
     );
     const objectiveA = await request<{
       id: string;
       companyId: string;
       responsibleUserId: string | null;
     }>(baseUrl, 'POST', '/strategy/objectives', {
-      token: ownerA.token,
+      token: admin.token,
       expectedStatus: 201,
       body: {
+        companyId: companyA.company.id,
         title: 'Aumentar a previsibilidade de receita',
         description: 'Consolidar uma operacao comercial previsivel.',
         priority: 'HIGH',
@@ -456,15 +536,16 @@ async function main(): Promise<void> {
     assert(
       objectiveA.companyId === companyA.company.id &&
         objectiveA.responsibleUserId === employeeA.user.id,
-      'Objective should persist the tenant and active employee assignee',
+      'Admin objective should persist the tenant and active employee assignee',
     );
     const editedObjectiveA = await request<{ status: string; priority: string }>(
       baseUrl,
       'PUT',
       `/strategy/objectives/${objectiveA.id}`,
       {
-        token: ownerA.token,
+        token: admin.token,
         body: {
+          companyId: companyA.company.id,
           title: 'Aumentar a previsibilidade de receita',
           description: 'Consolidar uma operacao comercial previsivel.',
           priority: 'CRITICAL',
@@ -477,11 +558,12 @@ async function main(): Promise<void> {
     assert(
       editedObjectiveA.status === 'IN_PROGRESS' &&
         editedObjectiveA.priority === 'CRITICAL',
-      'Owner should edit objective status and priority',
+      'Admin should edit objective status and priority',
     );
     await expectStatus(baseUrl, 'POST', '/strategy/objectives', 400, {
-      token: ownerA.token,
+      token: admin.token,
       body: {
+        companyId: companyA.company.id,
         title: 'Responsavel de outra empresa',
         responsibleUserId: ownerB.user.id,
       },
@@ -491,9 +573,10 @@ async function main(): Promise<void> {
       'POST',
       `/strategy/objectives/${objectiveA.id}/goals`,
       {
-        token: ownerA.token,
+        token: admin.token,
         expectedStatus: 201,
         body: {
+          companyId: companyA.company.id,
           title: 'Atingir receita recorrente alvo',
           initialValue: 100000,
           targetValue: 180000,
@@ -513,8 +596,9 @@ async function main(): Promise<void> {
       'PUT',
       `/strategy/goals/${goalA.id}`,
       {
-        token: ownerA.token,
+        token: admin.token,
         body: {
+          companyId: companyA.company.id,
           title: 'Atingir receita recorrente alvo',
           initialValue: 100000,
           targetValue: 180000,
@@ -526,16 +610,17 @@ async function main(): Promise<void> {
     );
     assert(
       updatedGoalA.currentValue === 140000 && updatedGoalA.status === 'IN_PROGRESS',
-      'Owner should update strategic goal progress',
+      'Admin should update strategic goal progress',
     );
     const swotA = await request<{ id: string; category: string }>(
       baseUrl,
       'POST',
       '/strategy/swot',
       {
-        token: ownerA.token,
+        token: admin.token,
         expectedStatus: 201,
         body: {
+          companyId: companyA.company.id,
           category: 'STRENGTH',
           title: 'Equipe experiente',
           description: 'Conhecimento profundo dos clientes.',
@@ -544,21 +629,29 @@ async function main(): Promise<void> {
     );
     assert(swotA.category === 'STRENGTH', 'SWOT category should be persisted');
     await expectStatus(baseUrl, 'POST', '/strategy/swot', 400, {
-      token: ownerA.token,
-      body: { category: 'INVALID', title: 'Categoria invalida' },
+      token: admin.token,
+      body: {
+        companyId: companyA.company.id,
+        category: 'INVALID',
+        title: 'Categoria invalida',
+      },
     });
     const updatedSwotA = await request<{ category: string; title: string }>(
       baseUrl,
       'PUT',
       `/strategy/swot/${swotA.id}`,
       {
-        token: ownerA.token,
-        body: { category: 'OPPORTUNITY', title: 'Novo segmento de mercado' },
+        token: admin.token,
+        body: {
+          companyId: companyA.company.id,
+          category: 'OPPORTUNITY',
+          title: 'Novo segmento de mercado',
+        },
       },
     );
     assert(
       updatedSwotA.category === 'OPPORTUNITY',
-      'Owner should update SWOT items',
+      'Admin should update SWOT items',
     );
     await expectStatus(baseUrl, 'PUT', '/strategy/profile', 403, {
       token: employeeA.token,
@@ -594,9 +687,12 @@ async function main(): Promise<void> {
       'POST',
       '/strategy/objectives',
       {
-        token: ownerB.token,
+        token: admin.token,
         expectedStatus: 201,
-        body: { title: 'Objetivo privado da empresa B' },
+        body: {
+          companyId: companyB.company.id,
+          title: 'Objetivo privado da empresa B',
+        },
       },
     );
     await expectStatus(baseUrl, 'PUT', `/strategy/objectives/${objectiveB.id}`, 403, {
@@ -606,10 +702,15 @@ async function main(): Promise<void> {
     await expectStatus(baseUrl, 'DELETE', `/strategy/swot/${swotA.id}`, 403, {
       token: ownerB.token,
     });
-    await request<void>(baseUrl, 'DELETE', `/strategy/swot/${swotA.id}`, {
-      token: ownerA.token,
+    await request<void>(
+      baseUrl,
+      'DELETE',
+      `/strategy/swot/${swotA.id}?companyId=${companyA.company.id}`,
+      {
+      token: admin.token,
       expectedStatus: 204,
-    });
+      },
+    );
 
     const updatedSettingsA = await request<CompanySettingsResponse>(
       baseUrl,
@@ -804,28 +905,36 @@ async function main(): Promise<void> {
     const taskA = researchA.actionPlan.tasks[0];
     const anotherTaskA = researchA.actionPlan.tasks[1];
     await expectStatus(baseUrl, 'POST', '/action-plan/tasks', 403, {
+      token: ownerA.token,
+      body: { title: 'OWNER não pode criar tarefa' },
+    });
+    await expectStatus(baseUrl, 'POST', '/action-plan/tasks', 403, {
       token: employeeA.token,
       body: { title: 'Colaborador não pode criar tarefa' },
+    });
+    await expectStatus(baseUrl, 'PUT', `/action-plan/tasks/${taskA.id}`, 403, {
+      token: ownerA.token,
+      body: { title: 'OWNER não pode editar tarefa' },
     });
     await expectStatus(baseUrl, 'GET', `/action-plan/tasks/${anotherTaskA.id}`, 403, {
       token: employeeA.token,
     });
     await expectStatus(baseUrl, 'PUT', `/action-plan/tasks/${taskA.id}`, 400, {
-      token: ownerA.token,
+      token: admin.token,
       body: {
         title: 'Tentativa com usuário de outra empresa',
         responsibleUserId: ownerB.user.id,
       },
     });
     await expectStatus(baseUrl, 'PUT', `/action-plan/tasks/${taskA.id}`, 409, {
-      token: ownerA.token,
+      token: admin.token,
       body: {
         title: 'Tentativa com usuário inativo',
         responsibleUserId: 'inactive-assignee-a',
       },
     });
     await expectStatus(baseUrl, 'PUT', `/action-plan/tasks/${taskA.id}`, 400, {
-      token: ownerA.token,
+      token: admin.token,
       body: {
         title: 'Tentativa com OWNER como responsável',
         responsibleUserId: ownerA.user.id,
@@ -837,7 +946,7 @@ async function main(): Promise<void> {
       'PUT',
       `/action-plan/tasks/${taskA.id}`,
       {
-        token: ownerA.token,
+        token: admin.token,
         body: {
           title: 'Revisar fluxo de caixa semanal',
           description: 'Tarefa editada pelo E2E com todos os campos operacionais.',
@@ -918,7 +1027,7 @@ async function main(): Promise<void> {
       'PUT',
       `/action-plan/tasks/${taskA.id}`,
       {
-        token: ownerA.token,
+        token: admin.token,
         body: { status: 'IN_PROGRESS' },
       },
     );
@@ -927,7 +1036,7 @@ async function main(): Promise<void> {
       'PUT',
       `/action-plan/tasks/${anotherTaskA.id}`,
       {
-        token: ownerA.token,
+        token: admin.token,
         body: {
           status: 'TODO',
           responsibleUserId: employeeA.user.id,
@@ -981,14 +1090,13 @@ async function main(): Promise<void> {
       { token: ownerA.token },
     );
 
-    const ownerReports = await request<Array<{ submissionId: string; companyId: string }>>(
+    await expectStatus(
       baseUrl,
       'GET',
       '/reports/research',
+      403,
       { token: ownerA.token },
     );
-    assert(ownerReports.length === 1, 'Owner A should see only one report');
-    assert(ownerReports[0].companyId === companyA.company.id, 'Owner A report company mismatch');
 
     const adminReports = await request<Array<{ companyId: string }>>(
       baseUrl,
@@ -1101,21 +1209,21 @@ async function main(): Promise<void> {
     await request(baseUrl, 'GET', '/dashboard/admin', { token: admin.token });
     await request(baseUrl, 'GET', '/dashboard/employee', { token: employeeA.token });
 
-    const reportA = await request<{ company: { companyId: string } }>(
+    await expectStatus(
       baseUrl,
       'GET',
       `/reports/research/${researchA.submission.id}/executive`,
+      403,
       { token: ownerA.token },
     );
-    assert(reportA.company.companyId === companyA.company.id, 'Report A company mismatch');
 
-    await request<Buffer>(
+    await expectStatus(
       baseUrl,
       'GET',
       `/reports/research/${researchA.submission.id}/executive/pdf`,
+      403,
       {
         token: ownerA.token,
-        pdf: true,
       },
     );
 
@@ -1264,7 +1372,7 @@ async function main(): Promise<void> {
       SET max_active_action_tasks = ?
       WHERE id = 'plan-starter'
     `).run(Number(activeTasks.total));
-    await expectStatus(baseUrl, 'POST', '/action-plan/tasks', 402, {
+    await expectStatus(baseUrl, 'POST', '/action-plan/tasks', 403, {
       token: ownerB.token,
       body: {
         title: 'Tarefa bloqueada por limite',
@@ -1306,7 +1414,7 @@ async function main(): Promise<void> {
       baseUrl,
       'GET',
       `/reports/research/${researchB.submission.id}/executive/pdf`,
-      402,
+      403,
       { token: ownerB.token },
     );
 

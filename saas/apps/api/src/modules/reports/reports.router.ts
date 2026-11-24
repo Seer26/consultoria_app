@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate } from '../auth/auth.middleware';
+import { authenticate, authorize } from '../auth/auth.middleware';
 import { ReportsController } from './reports.controller';
 import { ReportsRepository } from './reports.repository';
 import { ReportsService } from './reports.service';
@@ -23,13 +23,15 @@ const pdfRateLimit = createRateLimiter({
 
 reportsRouter.use(authenticate);
 
-reportsRouter.get('/reports/research', controller.listResearchReports);
+reportsRouter.get('/reports/research', authorize('ADMIN'), controller.listResearchReports);
 reportsRouter.get(
   '/reports/research/:submissionId/executive/pdf',
+  authorize('ADMIN'),
   pdfRateLimit,
   controller.getExecutiveResearchReportPdf,
 );
 reportsRouter.get(
   '/reports/research/:submissionId/executive',
+  authorize('ADMIN'),
   controller.getExecutiveResearchReport,
 );
