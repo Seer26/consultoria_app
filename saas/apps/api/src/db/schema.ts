@@ -288,4 +288,17 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_diagnosis_submissions_diagnosis_status ON diagnosis_submissions(diagnosis_status)`,
   `CREATE INDEX IF NOT EXISTS idx_action_plan_versions_company_submission ON action_plan_versions(company_id, submission_id)`,
   `CREATE INDEX IF NOT EXISTS idx_action_plan_tasks_plan_version ON action_plan_tasks(plan_version_id)`,
+  `
+  CREATE TABLE IF NOT EXISTS user_permissions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    permission TEXT NOT NULL,
+    granted_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, permission),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+  )
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_user_permissions_permission_user ON user_permissions(permission, user_id)`,
 ];

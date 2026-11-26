@@ -18,6 +18,7 @@ const requiredTables = [
   'company_subscription_events',
   'password_reset_tokens',
   'legal_acceptances',
+  'user_permissions',
 ];
 
 async function validatePostgres(): Promise<void> {

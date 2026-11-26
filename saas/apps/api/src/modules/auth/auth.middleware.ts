@@ -74,3 +74,23 @@ export function authorize(...roles: UserRole[]) {
     next();
   };
 }
+
+export function authorizePermission(permission: string) {
+  return (request: Request, response: Response, next: NextFunction): void => {
+    if (!request.auth) {
+      response.status(401).json({ error: 'TOKEN_REQUIRED' });
+      return;
+    }
+
+    if (
+      request.auth.role !== 'ADMIN' ||
+      !Array.isArray(request.auth.permissions) ||
+      !request.auth.permissions.includes(permission)
+    ) {
+      response.status(403).json({ error: 'FORBIDDEN' });
+      return;
+    }
+
+    next();
+  };
+}

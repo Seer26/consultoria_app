@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { getHealth, getReadiness } from './health/health.service';
 import { aiQuestionRouter } from './modules/ai-question/ai-question.router';
 import { actionPlanRouter } from './modules/action-plan/action-plan.router';
+import { adminsRouter } from './modules/admins/admins.router';
 import { authRouter } from './modules/auth/auth.router';
 import { behavioralRouter } from './modules/behavioral/behavioral.router';
 import { companiesRouter } from './modules/companies/companies.router';
@@ -57,6 +58,7 @@ app.post('/ai-diagnosis', (_request, response) => {
 });
 
 app.use('/auth', authRouter);
+app.use('/', adminsRouter);
 app.use('/behavioral', behavioralRouter);
 app.use('/', competenciesRouter);
 app.use('/', companiesRouter);

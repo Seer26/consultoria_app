@@ -1,6 +1,6 @@
 import { env } from '../../config/env';
 import { logger } from '../../shared/logger';
-import { buildPasswordResetEmail } from './password-reset-email.template';
+import { buildAdminInviteEmail, buildPasswordResetEmail } from './password-reset-email.template';
 
 export interface PasswordResetEmailInput {
   to: string;
@@ -9,8 +9,17 @@ export interface PasswordResetEmailInput {
   requestId?: string;
 }
 
+export interface AdminInviteEmailInput {
+  to: string;
+  recipientName: string;
+  token: string;
+  expiresInMinutes: number;
+  requestId?: string;
+}
+
 export interface EmailService {
   sendPasswordReset(input: PasswordResetEmailInput): Promise<void>;
+  sendAdminInvite?(input: AdminInviteEmailInput): Promise<void>;
 }
 
 export interface HttpEmailProviderConfig {
@@ -18,6 +27,7 @@ export interface HttpEmailProviderConfig {
   apiKey: string;
   from: string;
   appPublicUrl: string;
+  apiPublicUrl?: string;
   timeoutMs: number;
   authHeader: string;
   authScheme: string;
@@ -52,10 +62,33 @@ class ConsoleEmailService implements EmailService {
       expiresInMinutes: input.expiresInMinutes,
     });
   }
+
+  async sendAdminInvite(input: AdminInviteEmailInput): Promise<void> {
+    const forbidden = env.nodeEnv === 'production' ||
+      (env.nodeEnv === 'staging' && !env.emailAllowTestProvider);
+    if (forbidden) {
+      throw new Error('CONSOLE_EMAIL_PROVIDER_FORBIDDEN');
+    }
+
+    if (env.nodeEnv === 'test') {
+      testTokens.set(input.to.toLowerCase(), input.token);
+    }
+
+    logger.info('email.admin_invite_queued_console', {
+      requestId: input.requestId,
+      provider: 'console',
+      recipientDomain: input.to.split('@')[1] ?? 'unknown',
+      expiresInMinutes: input.expiresInMinutes,
+    });
+  }
 }
 
 class UnavailableEmailService implements EmailService {
   async sendPasswordReset(): Promise<void> {
+    throw new Error('EMAIL_PROVIDER_CONFIGURATION_MISSING');
+  }
+
+  async sendAdminInvite(): Promise<void> {
     throw new Error('EMAIL_PROVIDER_CONFIGURATION_MISSING');
   }
 }
@@ -67,22 +100,54 @@ export class HttpEmailService implements EmailService {
   ) {}
 
   async sendPasswordReset(input: PasswordResetEmailInput): Promise<void> {
-    if (!this.config.apiUrl || !this.config.apiKey || !this.config.from) {
-      throw new Error('EMAIL_PROVIDER_CONFIGURATION_MISSING');
-    }
-
     const resetUrl = `${this.config.appPublicUrl.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(input.token)}`;
     const template = buildPasswordResetEmail({
       productName: 'Consultoria SaaS',
       resetUrl,
       expiresInMinutes: input.expiresInMinutes,
     });
+    await this.sendTemplateEmail({
+      to: input.to,
+      template,
+      requestId: input.requestId,
+      logEvent: 'email.password_reset_sent',
+    });
+  }
+
+  async sendAdminInvite(input: AdminInviteEmailInput): Promise<void> {
+    const baseUrl = (this.config.apiPublicUrl || this.config.appPublicUrl).replace(/\/$/, '');
+    const setupUrl = `${baseUrl}/auth/reset-password?token=${encodeURIComponent(input.token)}`;
+    const template = buildAdminInviteEmail({
+      productName: 'Consultoria SaaS',
+      recipientName: input.recipientName,
+      setupUrl,
+      token: input.token,
+      expiresInMinutes: input.expiresInMinutes,
+    });
+    await this.sendTemplateEmail({
+      to: input.to,
+      template,
+      requestId: input.requestId,
+      logEvent: 'email.admin_invite_sent',
+    });
+  }
+
+  private async sendTemplateEmail(input: {
+    to: string;
+    template: { subject: string; text: string; html: string };
+    requestId?: string;
+    logEvent: string;
+  }): Promise<void> {
+    if (!this.config.apiUrl || !this.config.apiKey || !this.config.from) {
+      throw new Error('EMAIL_PROVIDER_CONFIGURATION_MISSING');
+    }
+
     const body: Record<string, string> = {
       [this.config.fields.from]: this.config.from,
       [this.config.fields.to]: input.to,
-      [this.config.fields.subject]: template.subject,
-      [this.config.fields.text]: template.text,
-      [this.config.fields.html]: template.html,
+      [this.config.fields.subject]: input.template.subject,
+      [this.config.fields.text]: input.template.text,
+      [this.config.fields.html]: input.template.html,
     };
     const authorization = this.config.authScheme
       ? `${this.config.authScheme} ${this.config.apiKey}`
@@ -117,7 +182,7 @@ export class HttpEmailService implements EmailService {
       } catch {
         // Provider pode responder 2xx sem JSON.
       }
-      logger.info('email.password_reset_sent', {
+      logger.info(input.logEvent, {
         requestId: input.requestId,
         provider: 'http',
         statusCode: response.status,
@@ -140,6 +205,7 @@ export function emailHttpConfigFromEnv(): HttpEmailProviderConfig {
     apiKey: env.emailApiKey,
     from: env.emailFrom,
     appPublicUrl: env.appPublicUrl,
+    apiPublicUrl: env.apiPublicUrl,
     timeoutMs: env.emailTimeoutMs,
     authHeader: env.emailApiAuthHeader,
     authScheme: env.emailApiAuthScheme,

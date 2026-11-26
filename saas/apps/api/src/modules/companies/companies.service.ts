@@ -351,6 +351,9 @@ export class CompaniesService {
     if (!existing) {
       throw new Error('USER_NOT_FOUND');
     }
+    if (existing.role === 'ADMIN') {
+      throw new Error('INVALID_COMPANY_USER_ROLE');
+    }
 
     this.assertValidStatus(input.status);
     const updatedAt = new Date().toISOString();

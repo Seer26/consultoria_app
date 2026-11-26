@@ -78,6 +78,15 @@ export class AuthController {
     }
   };
 
+  me = async (request: Request, response: Response): Promise<void> => {
+    try {
+      const result = await this.service.getAuthenticatedProfile(request.auth!);
+      response.status(200).json(result);
+    } catch (error) {
+      this.handleError(error, response);
+    }
+  };
+
   private handleError(error: unknown, response: Response): void {
     const code = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
 

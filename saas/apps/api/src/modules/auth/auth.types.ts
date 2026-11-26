@@ -44,6 +44,7 @@ export interface AuthTokenPayload {
   role: UserRole;
   companyId: string | null;
   authVersion: number;
+  permissions?: string[];
 }
 
 export interface PasswordResetTokenRecord {
@@ -69,6 +70,7 @@ export interface AuthResponse {
     status: 'ACTIVE' | 'INACTIVE';
     department: string | null;
     jobFunction: string | null;
+    permissions: string[];
   };
   company: {
     id: string;

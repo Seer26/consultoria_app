@@ -18,7 +18,10 @@ import type {
   UserRole,
 } from './auth.types';
 
-function sanitizeUser(user: AuthUserRecord): AuthResponse['user'] {
+function sanitizeUser(
+  user: AuthUserRecord,
+  permissions: string[] = [],
+): AuthResponse['user'] {
   return {
     id: user.id,
     name: user.name,
@@ -28,6 +31,7 @@ function sanitizeUser(user: AuthUserRecord): AuthResponse['user'] {
     status: user.status,
     department: user.department,
     jobFunction: user.jobFunction,
+    permissions,
   };
 }
 
@@ -115,11 +119,13 @@ export class AuthService {
     }
 
     if (user.role === 'ADMIN') {
+      const permissions = await this.repository.listUserPermissions(user.id);
       return {
         userId: user.id,
         role: user.role,
         companyId: user.companyId,
         authVersion: user.authVersion,
+        permissions,
       };
     }
 
@@ -307,7 +313,31 @@ export class AuthService {
     return { message: 'Senha alterada com sucesso.' };
   }
 
+  async getAuthenticatedProfile(auth: AuthTokenPayload): Promise<{
+    user: AuthResponse['user'];
+    company: AuthResponse['company'];
+  }> {
+    const user = await this.repository.findUserById(auth.userId);
+    if (!user) {
+      throw new Error('INVALID_TOKEN');
+    }
+    const permissions = user.role === 'ADMIN'
+      ? await this.repository.listUserPermissions(user.id)
+      : [];
+    const company = user.companyId
+      ? await this.repository.findCompanyById(user.companyId)
+      : null;
+
+    return {
+      user: sanitizeUser(user, permissions),
+      company: sanitizeCompany(company),
+    };
+  }
+
   private async buildAuthResponse(user: AuthUserRecord): Promise<AuthResponse> {
+    const permissions = user.role === 'ADMIN'
+      ? await this.repository.listUserPermissions(user.id)
+      : [];
     const payload: AuthTokenPayload = {
       userId: user.id,
       role: user.role,
@@ -324,7 +354,7 @@ export class AuthService {
 
     return {
       token,
-      user: sanitizeUser(user),
+      user: sanitizeUser(user, permissions),
       company: sanitizeCompany(company),
     };
   }

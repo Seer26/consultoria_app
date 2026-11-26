@@ -156,6 +156,14 @@ export class AuthRepository {
     };
   }
 
+  async listUserPermissions(userId: string): Promise<string[]> {
+    const rows = await dataSource.many<{ permission: string }>(
+      `SELECT permission FROM user_permissions WHERE user_id = ? ORDER BY permission ASC`,
+      [userId],
+    );
+    return rows.map((row) => row.permission);
+  }
+
   async createPasswordResetToken(input: PasswordResetTokenRecord): Promise<void> {
     await dataSource.transaction(async () => {
       await dataSource.execute(`

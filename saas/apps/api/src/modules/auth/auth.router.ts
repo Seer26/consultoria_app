@@ -11,6 +11,7 @@ import {
   ipRateLimitKey,
 } from '../../shared/rate-limit';
 import { authenticate } from './auth.middleware';
+import { renderResetPasswordPage } from './reset-password-page';
 
 const repository = new AuthRepository();
 const service = new AuthService(repository, createEmailService());
@@ -42,6 +43,14 @@ const passwordChangeRateLimit = createRateLimiter({
 
 authRouter.post('/register', controller.register);
 authRouter.post('/login', loginRateLimit, controller.login);
+authRouter.get('/reset-password', (_request, response) => {
+  response.setHeader(
+    'Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+  );
+  response.setHeader('Cache-Control', 'no-store');
+  response.status(200).type('html').send(renderResetPasswordPage());
+});
 authRouter.post('/password/forgot', passwordForgotRateLimit, controller.forgotPassword);
 authRouter.post('/password/reset', controller.resetPassword);
 authRouter.put(
@@ -50,3 +59,4 @@ authRouter.put(
   passwordChangeRateLimit,
   controller.changePassword,
 );
+authRouter.get('/me', authenticate, controller.me);
